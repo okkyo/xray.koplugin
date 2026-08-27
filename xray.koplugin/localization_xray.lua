@@ -253,6 +253,8 @@ function Localization:t(key, ...)
             search_button = "Search",
             character_not_found = "No character found matching '%s'",
             multiple_matches = "Multiple matches for '%s'. Which did you mean?",
+            partial_matches = "No exact match for '%s'. Tap a related entry, or fetch it:",
+            fetch_named = "Fetch '%s'",
             label_name = "NAME",
             label_aliases = "ALIASES",
             label_role = "ROLE",

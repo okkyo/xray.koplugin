@@ -223,71 +223,24 @@ function LookupManager:handleLookup(text, pos0, pos1)
 
     local all = self:lookupAll(text)
 
-    if #all == 1 then
-        -- Unambiguous — show directly
-        local match = all[1]
-        if match.item_type == "term" and match.score < LOW_CONFIDENCE_THRESHOLD then
-            self:showResult(match.item, match.item_type, {
-                low_confidence = true,
-                original_text  = text,
-                pos0           = pos0,
-                pos1           = pos1,
-                score          = match.score,
-            })
-        else
-            self:showResult(match.item, match.item_type)
-        end
+    -- A "strong" match is an exact name or exact alias hit (score >= 95). Partial
+    -- (substring) matches score lower and must never suppress the option to fetch
+    -- the exact selected text. Example: selecting "Gale" when the book only has
+    -- "Gale's brother" / "Gale's sister" produces partial matches, not "Gale".
+    local best = all[1]
+    local strong = best and best.score and best.score >= 95
 
-    elseif #all > 1 then
-        -- Multiple candidates — let the user pick
-        local ButtonDialog = require("ui/widget/buttondialog")
-        local prompt = self.plugin.loc:t("multiple_matches", _truncateSafe(text, 30))
-        local buttons = {}
-        local dialog
-
-        for _, candidate in ipairs(all) do
-            local display_name = candidate.item.name or "???"
-            -- Capture loop vars for the closure
-            local captured_item = candidate.item
-            local captured_type = candidate.item_type
-            table.insert(buttons, {
-                {
-                    text = display_name,
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:showResult(captured_item, captured_type)
-                    end,
-                }
-            })
-        end
-
-        -- Cancel row
-        table.insert(buttons, {
-            {
-                text = self.plugin.loc:t("close") or "Close",
-                callback = function()
-                    UIManager:close(dialog)
-                end,
-            }
-        })
-
-        dialog = ButtonDialog:new{
-            title = prompt,
-            buttons = buttons,
-        }
-        UIManager:show(dialog)
-
-    else
-        -- No match found
+    if #all == 0 then
+        -- No match found — offer to fetch it.
         local ButtonDialog = require("ui/widget/buttondialog")
         local no_data_dialog
-        
+
         local text_to_show = _truncateSafe(text, 30)
         local prompt_text = self.plugin.loc:t("fetch_single_word_prompt", text_to_show)
         if not prompt_text or prompt_text == "fetch_single_word_prompt" then
             prompt_text = string.format("No X-Ray data found for '%s'. Would you like to look it up?", text_to_show)
         end
-        
+
         no_data_dialog = ButtonDialog:new{
             title = prompt_text,
             buttons = {{
@@ -310,7 +263,91 @@ function LookupManager:handleLookup(text, pos0, pos1)
             }},
         }
         UIManager:show(no_data_dialog)
+
+    elseif #all == 1 and (strong or best.item_type == "term") then
+        -- A single strong match, or a single low-confidence term (whose details
+        -- view provides its own "Re-lookup" affordance) — show it directly.
+        local match = best
+        if match.item_type == "term" and match.score < LOW_CONFIDENCE_THRESHOLD then
+            self:showResult(match.item, match.item_type, {
+                low_confidence = true,
+                original_text  = text,
+                pos0           = pos0,
+                pos1           = pos1,
+                score          = match.score,
+            })
+        else
+            self:showResult(match.item, match.item_type)
+        end
+
+    elseif strong then
+        -- Several genuine (exact / alias-exact) matches — pure disambiguation.
+        self:showMatchPicker(all, text, pos0, pos1, false)
+
+    else
+        -- Only partial (substring) matches exist. Offer the related entries AND
+        -- the option to fetch the exact selected text as a new entry.
+        self:showMatchPicker(all, text, pos0, pos1, true)
     end
+end
+
+-- Show a picker of candidate entries. When offer_fetch is true, add a button that
+-- fetches the exact selected text as a new entry (used when only partial matches
+-- exist, so the user is never trapped with just related entries).
+function LookupManager:showMatchPicker(all, text, pos0, pos1, offer_fetch)
+    local ButtonDialog = require("ui/widget/buttondialog")
+    local dialog
+    local buttons = {}
+
+    for _, candidate in ipairs(all) do
+        local display_name = candidate.item.name or "???"
+        -- Capture loop vars for the closure
+        local captured_item = candidate.item
+        local captured_type = candidate.item_type
+        table.insert(buttons, {
+            {
+                text = display_name,
+                callback = function()
+                    UIManager:close(dialog)
+                    if self.plugin and not self.plugin.destroyed then
+                        self:showResult(captured_item, captured_type)
+                    end
+                end,
+            }
+        })
+    end
+
+    if offer_fetch then
+        table.insert(buttons, {
+            {
+                text = self.plugin.loc:t("fetch_named", _truncateSafe(text, 20)),
+                is_enter_default = true,
+                callback = function()
+                    UIManager:close(dialog)
+                    if self.plugin and not self.plugin.destroyed then
+                        self.plugin:fetchSingleWord(text, pos0, pos1)
+                    end
+                end,
+            }
+        })
+    end
+
+    -- Cancel row
+    table.insert(buttons, {
+        {
+            text = self.plugin.loc:t("close") or "Close",
+            callback = function()
+                UIManager:close(dialog)
+            end,
+        }
+    })
+
+    local title_key = offer_fetch and "partial_matches" or "multiple_matches"
+    dialog = ButtonDialog:new{
+        title = self.plugin.loc:t(title_key, _truncateSafe(text, 30)),
+        buttons = buttons,
+    }
+    UIManager:show(dialog)
 end
 
 return LookupManager

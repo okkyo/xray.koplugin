@@ -716,6 +716,12 @@ msgstr "This book is in %s. Switch X-Ray language to match?"
 msgid "multiple_matches"
 msgstr "Multiple matches for '%s'. Which did you mean?"
 
+msgid "partial_matches"
+msgstr "No exact match for '%s'. Tap a related entry, or fetch it:"
+
+msgid "fetch_named"
+msgstr "Fetch '%s'"
+
 msgid "new_feature"
 msgstr "New Feature"
 
