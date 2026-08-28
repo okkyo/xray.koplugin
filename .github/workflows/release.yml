@@ -21,6 +21,12 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history for all tags and branches
 
+      - name: Create default config for release
+        run: |
+          # xray_config.lua is git-ignored, so it is absent from the checkout.
+          # Ship a blank-key copy from the example so the plugin loads on install.
+          cp xray.koplugin/xray_config.example.lua xray.koplugin/xray_config.lua
+
       - name: Create Plugin Archive
         run: |
           # Package the plugin directory into a zip file
