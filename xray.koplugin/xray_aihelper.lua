@@ -332,7 +332,7 @@ function AIHelper:buildComprehensiveRequest(title, author, context, prompt_overr
                 local is_openrouter = (ai.provider == "custom1" or ai.provider == "custom2")
                     and (config.endpoint or ""):find("openrouter.ai", 1, true)
                 if is_openrouter then
-                    headers["HTTP-Referer"] = "https://github.com/koreader/koreader-xray-plugin"
+                    headers["HTTP-Referer"] = "https://github.com/okkyo/xray.koplugin"
                     headers["X-Title"] = "KOReader X-Ray"
                 end
                 
@@ -441,7 +441,7 @@ function AIHelper:buildComprehensiveRequest(title, author, context, prompt_overr
                 
                 if ai.provider == "custom1" or ai.provider == "custom2" then
                     if (config.endpoint or ""):find("openrouter.ai", 1, true) then
-                        headers["HTTP-Referer"]      = "https://github.com/koreader/koreader-xray-plugin"
+                        headers["HTTP-Referer"]      = "https://github.com/okkyo/xray.koplugin"
                         headers["X-Title"] = "KOReader X-Ray"
                         headers["Accept"] = "text/event-stream"
                         req_body.stream = true
@@ -1755,150 +1755,73 @@ function AIHelper:createPrompt(title, author, context, section_name, targeted_wo
         -- Merge mode: tell AI what we already know
         local has_merge_data = false
         local _merge_char_len = (self.settings and self.settings.char_desc_len) or 200
-        local merge_instructions = "\n\nMERGE MODE INSTRUCTIONS:\nYou are UPDATING an existing X-Ray.\n- For entities (Characters, Locations, Historical Figures) that already exist, synthesize a completely rewritten, cohesive summary combining the EXISTING KNOWLEDGE with any new information found in the text.\n- Write a solid summary that is not repetitive.\n- Descriptions MUST NOT exceed " .. tostring(_merge_char_len) .. " characters.\n- If there is no new information, return the existing description (or a refined version of it under " .. tostring(_merge_char_len) .. " characters)."
+        local merge_instructions = "\n\nMERGE MODE INSTRUCTIONS:\nYou are UPDATING an existing X-Ray.\n- For entities (Characters, Locations, Historical Figures, Terms) that already exist, synthesize a completely rewritten, cohesive summary combining the EXISTING KNOWLEDGE with any new information found in the text.\n- Write a solid summary that is not repetitive.\n- Descriptions and term definitions MUST NOT exceed " .. tostring(_merge_char_len) .. " characters.\n- If there is no new information, return the existing description (or a refined version of it under " .. tostring(_merge_char_len) .. " characters)."
         
-        if context.existing_characters and #context.existing_characters > 0 then
+        -- All four existing-knowledge blocks (characters, historical figures,
+        -- locations, terms) share the same shape: keep an entry when it has a
+        -- value (or always, in enrich mode), confirm the name/alias/first-name
+        -- appears in the sampled text, then anchor with initial + latest history.
+        -- One helper replaces four near-identical copies that had drifted apart.
+        local function appendExistingKnowledge(list, value_field, header)
+            if not list or #list == 0 then return end
             local existing_lines = {}
-            local sample_text = context.book_text or ""
-            for _, c in ipairs(context.existing_characters) do
-                if c.name and c.description then
-                    -- Optimized context trimming checks (Name, aliases, first-name fallback)
+            local sample_lower = (context.book_text or ""):lower()
+            for _, item in ipairs(list) do
+                local value = item[value_field]
+                -- List every known entry at least by name (the else branch below
+                -- emits a name-only line). MERGE MODE must anchor the AI to the
+                -- canonical names even when a prior fetch stored an empty value,
+                -- or an update fetch reintroduces the entity under a name variant
+                -- and the name-based merge creates a duplicate. A blank-value
+                -- entry is also exactly what a user clicks "Fetch More" on.
+                if item.name then
+                    -- Context trimming checks (name, aliases, first-name fallback)
                     local found_in_sample = false
-                    local name_lower = c.name:lower()
-                    local sample_lower = sample_text:lower()
-                    if sample_lower:find(name_lower, 1, true) then
+                    if sample_lower:find(item.name:lower(), 1, true) then
                         found_in_sample = true
                     else
-                        if c.aliases then
-                            for _, alias in ipairs(c.aliases) do
+                        if item.aliases then
+                            for _, alias in ipairs(item.aliases) do
                                 if type(alias) == "string" and #alias > 1 and sample_lower:find(alias:lower(), 1, true) then
                                     found_in_sample = true; break
                                 end
                             end
                         end
                         if not found_in_sample then
-                            local first_name = c.name:match("^(%S+)")
+                            local first_name = item.name:match("^(%S+)")
                             if first_name and #first_name > 3 and sample_lower:find(first_name:lower(), 1, true) then
                                 found_in_sample = true
                             end
                         end
                     end
 
-                    if found_in_sample then
-                        -- Prompt Anchoring: Send initial + latest description if history is available
-                        local desc_str = c.description
-                        if c.history and #c.history > 1 then
-                            local initial_desc = c.history[1].description
-                            local latest_desc = c.history[#c.history].description
-                            if initial_desc and latest_desc and initial_desc ~= latest_desc then
-                                desc_str = "Initial Introduction: " .. initial_desc .. " | Latest Status: " .. latest_desc
+                    if found_in_sample and value and value ~= "" then
+                        -- Prompt anchoring: send initial + latest when history exists.
+                        local value_str = value
+                        if item.history and #item.history > 1 then
+                            local initial = item.history[1][value_field]
+                            local latest = item.history[#item.history][value_field]
+                            if initial and latest and initial ~= latest then
+                                value_str = "Initial Introduction: " .. initial .. " | Latest Status: " .. latest
                             end
                         end
-                        table.insert(existing_lines, "- " .. c.name .. ": " .. desc_str)
+                        table.insert(existing_lines, "- " .. item.name .. ": " .. value_str)
                     else
-                        table.insert(existing_lines, "- " .. c.name)
+                        table.insert(existing_lines, "- " .. item.name)
                     end
                 end
             end
             if #existing_lines > 0 then
                 if not has_merge_data then extra_context = extra_context .. merge_instructions; has_merge_data = true end
-                extra_context = extra_context .. "\n\nEXISTING CHARACTER KNOWLEDGE (Context Optimized):\n" .. table.concat(existing_lines, "\n")
+                extra_context = extra_context .. "\n\n" .. header .. ":\n" .. table.concat(existing_lines, "\n")
             end
         end
+
+        appendExistingKnowledge(context.existing_characters, "description", "EXISTING CHARACTER KNOWLEDGE (Context Optimized)")
+        appendExistingKnowledge(context.existing_historical_figures, "biography", "EXISTING HISTORICAL FIGURE KNOWLEDGE (Context Optimized)")
+        appendExistingKnowledge(context.existing_locations, "description", "EXISTING LOCATION KNOWLEDGE (Context Optimized)")
+        appendExistingKnowledge(context.existing_terms, "definition", "EXISTING TERM KNOWLEDGE (Context Optimized)")
         
-        if context.existing_historical_figures and #context.existing_historical_figures > 0 then
-            local existing_lines = {}
-            local sample_text = context.book_text or ""
-            for _, h in ipairs(context.existing_historical_figures) do
-                if h.name and h.biography then
-                    local found_in_sample = false
-                    local name_lower = h.name:lower()
-                    local sample_lower = sample_text:lower()
-                    if sample_lower:find(name_lower, 1, true) then
-                        found_in_sample = true
-                    else
-                        if h.aliases then
-                            for _, alias in ipairs(h.aliases) do
-                                if type(alias) == "string" and #alias > 1 and sample_lower:find(alias:lower(), 1, true) then
-                                    found_in_sample = true; break
-                                end
-                            end
-                        end
-                        if not found_in_sample then
-                            local first_name = h.name:match("^(%S+)")
-                            if first_name and #first_name > 3 and sample_lower:find(first_name:lower(), 1, true) then
-                                found_in_sample = true
-                            end
-                        end
-                    end
-
-                    if found_in_sample then
-                        local bio_str = h.biography
-                        if h.history and #h.history > 1 then
-                            local initial_bio = h.history[1].biography
-                            local latest_bio = h.history[#h.history].biography
-                            if initial_bio and latest_bio and initial_bio ~= latest_bio then
-                                bio_str = "Initial Introduction: " .. initial_bio .. " | Latest Status: " .. latest_bio
-                            end
-                        end
-                        table.insert(existing_lines, "- " .. h.name .. ": " .. bio_str)
-                    else
-                        table.insert(existing_lines, "- " .. h.name)
-                    end
-                end
-            end
-            if #existing_lines > 0 then
-                if not has_merge_data then extra_context = extra_context .. merge_instructions; has_merge_data = true end
-                extra_context = extra_context .. "\n\nEXISTING HISTORICAL FIGURE KNOWLEDGE (Context Optimized):\n" .. table.concat(existing_lines, "\n")
-            end
-        end
-        
-        if context.existing_locations and #context.existing_locations > 0 then
-            local existing_lines = {}
-            local sample_text = context.book_text or ""
-            for _, l in ipairs(context.existing_locations) do
-                if l.name and l.description then
-                    local found_in_sample = false
-                    local name_lower = l.name:lower()
-                    local sample_lower = sample_text:lower()
-                    if sample_lower:find(name_lower, 1, true) then
-                        found_in_sample = true
-                    else
-                        if l.aliases then
-                            for _, alias in ipairs(l.aliases) do
-                                if type(alias) == "string" and #alias > 1 and sample_lower:find(alias:lower(), 1, true) then
-                                    found_in_sample = true; break
-                                end
-                            end
-                        end
-                        if not found_in_sample then
-                            local first_name = l.name:match("^(%S+)")
-                            if first_name and #first_name > 3 and sample_lower:find(first_name:lower(), 1, true) then
-                                found_in_sample = true
-                            end
-                        end
-                    end
-
-                    if found_in_sample then
-                        local desc_str = l.description
-                        if l.history and #l.history > 1 then
-                            local initial_desc = l.history[1].description
-                            local latest_desc = l.history[#l.history].description
-                            if initial_desc and latest_desc and initial_desc ~= latest_desc then
-                                desc_str = "Initial Introduction: " .. initial_desc .. " | Latest Status: " .. latest_desc
-                            end
-                        end
-                        table.insert(existing_lines, "- " .. l.name .. ": " .. desc_str)
-                    else
-                        table.insert(existing_lines, "- " .. l.name)
-                    end
-                end
-            end
-            if #existing_lines > 0 then
-                if not has_merge_data then extra_context = extra_context .. merge_instructions; has_merge_data = true end
-                extra_context = extra_context .. "\n\nEXISTING LOCATION KNOWLEDGE (Context Optimized):\n" .. table.concat(existing_lines, "\n")
-            end
-        end
     end
     -- Dynamically inject "aliases" into the "terms" JSON schema template.
     -- This inserts `"aliases": ["Alias 1", "Alias 2"],` before `"expanded":` translation-safely.
@@ -2161,7 +2084,7 @@ function AIHelper:callClaude(prompt, config, current_model)
     
     if provider_id and (provider_id == "custom1" or provider_id == "custom2") then
         if (config.endpoint or ""):find("openrouter.ai") then
-            headers["HTTP-Referer"]       = "https://github.com/koreader/koreader-xray-plugin"
+            headers["HTTP-Referer"]       = "https://github.com/okkyo/xray.koplugin"
             headers["X-Title"] = "KOReader X-Ray"
         end
     end
@@ -2321,7 +2244,7 @@ function AIHelper:callChatGPT(prompt, config, current_model)
     
     local headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. config.api_key }
     if (config.endpoint or ""):find("openrouter.ai") then
-        headers["HTTP-Referer"]       = "https://github.com/koreader/koreader-xray-plugin"
+        headers["HTTP-Referer"]       = "https://github.com/okkyo/xray.koplugin"
         headers["X-Title"] = "KOReader X-Ray"
     end
     
@@ -2810,7 +2733,7 @@ function AIHelper:validateProviderKey(provider_id)
             ["Authorization"] = "Bearer " .. key
         }
         if (url:find("openrouter.ai")) then
-            headers["HTTP-Referer"] = "https://github.com/koreader/koreader-xray-plugin"
+            headers["HTTP-Referer"] = "https://github.com/okkyo/xray.koplugin"
             headers["X-Title"] = "KOReader X-Ray"
         end
         local model = prov.model or (provider_id == "deepseek" and "deepseek-chat" or "gpt-4o-mini")

@@ -441,7 +441,14 @@ function ChapterAnalyzer:getTextFromPageRange(ui, start_page, end_page, max_len)
             
             -- Get XPointer for the end of the range
             local end_xp = nil
-            if ui.document.getPageXPointer then
+            local page_count = ui.document.getPageCount and ui.document:getPageCount()
+            if page_count and end_page > page_count and ui.document.getEndXPointer then
+                -- Exclusive-end semantics put the last page's end one past the
+                -- page count, where no page xpointer exists. Use the document's
+                -- real end so the final page is included.
+                end_xp = ui.document:getEndXPointer()
+            end
+            if not end_xp and ui.document.getPageXPointer then
                 end_xp = ui.document:getPageXPointer(end_page)
             end
             if not end_xp then
@@ -987,13 +994,27 @@ end
 
 -- Scan a single TOC entry for occurrences of `name`.
 -- Returns a list of { chapter, page, snippet } tables.
-function ChapterAnalyzer:findMentionsInChapter(ui, entity, toc_entry, next_toc_entry, yield_fn)
+-- next_paged_entry: the first entry AFTER toc_entry that carries a page number
+-- (may be next_toc_entry itself, or nil). The page-range fallback and the page
+-- interpolation use it as the end bound when the immediate successor has none.
+function ChapterAnalyzer:findMentionsInChapter(ui, entity, toc_entry, next_toc_entry, yield_fn, next_paged_entry)
     if not ui or not ui.document or not entity or not entity.name or not toc_entry then return {} end
-    if not toc_entry.xpointer then return {} end
+    -- A page-based TOC entry (PDF, or an EPUB with a page-only TOC) has no
+    -- xpointer. Do not reject it here, or the page fallbacks below never run.
+    -- Reject only when there is no location marker of any kind.
+    if not toc_entry.xpointer and not toc_entry.page then return {} end
 
     local name = entity.name
     local name_lower = name:lower()
     local chapter_mentions = {}
+
+    -- Page bounds actually used to extract raw_text, when known. The recovery
+    -- fallback below sets these to the real range it read. A malformed TOC entry
+    -- often has no page marker, so the page estimate must interpolate over this
+    -- known span instead of defaulting to the whole book.
+    -- extracted_end_page is EXCLUSIVE (the first page after the text read), which
+    -- is what the position-to-page interpolation below expects.
+    local extracted_start_page, extracted_end_page
 
     -- Load chapter text first so we can use frequency analysis when building terms
     local ok, raw_text = pcall(function()
@@ -1001,7 +1022,11 @@ function ChapterAnalyzer:findMentionsInChapter(ui, entity, toc_entry, next_toc_e
             if type(toc_entry.xpointer) == "string" and toc_entry.xpointer:sub(1, 5) == "page:" then
                 local p = tonumber(toc_entry.xpointer:match("page:(%d+)"))
                 if p and ui.document.getPageText then
-                    local end_p = next_toc_entry and next_toc_entry.xpointer and tonumber(next_toc_entry.xpointer:match("page:(%d+)")) or (ui.document.getTotalPages and ui.document:getTotalPages()) or p
+                    -- next_p is where the NEXT section begins. The loop below reads
+                    -- end_p inclusive, so stop one page earlier to avoid pulling the
+                    -- next section's first page in (matches the page fallbacks below).
+                    local next_p = next_toc_entry and next_toc_entry.xpointer and tonumber(next_toc_entry.xpointer:match("page:(%d+)"))
+                    local end_p = (next_p and (next_p - 1)) or (ui.document.getTotalPages and ui.document:getTotalPages()) or p
                     if end_p < p then end_p = p end
                     local txt = ""
                     for curr_p = p, end_p do
@@ -1041,8 +1066,15 @@ function ChapterAnalyzer:findMentionsInChapter(ui, entity, toc_entry, next_toc_e
         -- Fallback for PDF/page-based documents
         if toc_entry.page and ui.document.getPageText then
             local start_pg = tonumber(toc_entry.page)
-            local end_pg = next_toc_entry and tonumber(next_toc_entry.page) or (ui.document.getTotalPages and ui.document:getTotalPages()) or start_pg
+            -- next_toc_entry.page is where the NEXT chapter begins. The loop below
+            -- reads end_pg inclusive, so stop one page earlier to avoid pulling the
+            -- next chapter's first page into this chapter (matches the page-range
+            -- fallback further down).
+            local end_pg = (next_toc_entry and tonumber(next_toc_entry.page) and (tonumber(next_toc_entry.page) - 1))
+                or (ui.document.getTotalPages and ui.document:getTotalPages()) or start_pg
             if start_pg then
+                -- A very short chapter can share a page with the next one; read that page.
+                if end_pg < start_pg then end_pg = start_pg end
                 local txt = ""
                 for p = start_pg, end_pg do
                     local pt = ui.document:getPageText(p)
@@ -1066,6 +1098,83 @@ function ChapterAnalyzer:findMentionsInChapter(ui, entity, toc_entry, next_toc_e
         end
         return ""
     end)
+
+    -- Fallback: the TOC is the default source, but some books have a missing or
+    -- malformed table of contents (entries with no location marker, or listed out
+    -- of document order). In those books the xpointer extraction above returns
+    -- nothing. When that happens, extract the chapter by page range instead, the
+    -- same robust method the X-Ray fetch uses. A short-but-real extraction (a
+    -- part heading whose span is just its own title) is NOT a failure: the
+    -- fallback would re-read pages owned by the next chapter and mis-attribute
+    -- their mentions, so only an effectively empty extraction triggers it.
+    if (not ok or not raw_text or not raw_text:find("%S")) and self.getTextFromPageRange then
+        local start_pg = tonumber(toc_entry.page)
+        -- A malformed entry can lack a page marker while its xpointer still
+        -- resolves to a position (it only extracts no text). Resolve the page
+        -- from the xpointer so such entries also recover.
+        if not start_pg and type(toc_entry.xpointer) == "string" then
+            start_pg = tonumber(toc_entry.xpointer:match("^page:(%d+)"))
+            if not start_pg and ui.document.getPageFromXPointer then
+                local okp, p = pcall(function() return ui.document:getPageFromXPointer(toc_entry.xpointer) end)
+                if okp then start_pg = tonumber(p) end
+            end
+        end
+        -- getTextFromPageRange has different end semantics per document type
+        -- (see getEndPageForCurrentPage). Reflowable: the end page is EXCLUSIVE
+        -- (it stops at the start xpointer of end_pg), so pass the next chapter's
+        -- first page to read this chapter through its last page. Page-based:
+        -- the end page is INCLUSIVE, so stop one page before the next chapter.
+        local is_reflowable = ui.rolling ~= nil
+        -- End bound: the next entry that carries a page number. The immediate
+        -- successor can lack one; ending at the book's page count there would
+        -- re-read the whole tail of the book for every such entry.
+        local next_pg = (next_toc_entry and tonumber(next_toc_entry.page))
+            or (next_paged_entry and tonumber(next_paged_entry.page))
+        local end_pg = next_pg and (is_reflowable and next_pg or (next_pg - 1))
+        -- Last chapter: no later paged entry. Use the document page count. Prefer
+        -- getPageCount (the method the rest of the plugin relies on) and fall back
+        -- to getTotalPages, so a reflowable book with a broken TOC still recovers.
+        if not end_pg then
+            local page_count
+            if ui.document.getPageCount then
+                page_count = ui.document:getPageCount()
+            elseif ui.document.getTotalPages then
+                page_count = ui.document:getTotalPages()
+            end
+            if page_count then
+                -- Reflowable ends are exclusive: one past the count makes
+                -- getTextFromPageRange read through the final page (it resolves
+                -- an out-of-range end to the document's end xpointer).
+                end_pg = is_reflowable and (page_count + 1) or page_count
+            end
+        end
+        -- A very short chapter can share a page with the next one; read that page.
+        -- On reflowable documents the exclusive end must be at least one page
+        -- past the start, or the range is empty.
+        if start_pg and end_pg then
+            if is_reflowable then
+                if end_pg <= start_pg then end_pg = start_pg + 1 end
+            elseif end_pg < start_pg then
+                end_pg = start_pg
+            end
+        end
+        if start_pg and end_pg and end_pg >= start_pg then
+            local ok2, txt = pcall(function()
+                return self:getTextFromPageRange(ui, start_pg, end_pg, 5000000)
+            end)
+            if ok2 and txt and #txt >= 10 then
+                raw_text = txt
+                ok = true
+                -- Remember the range this text really came from, so the page
+                -- estimate below interpolates over it and does not fall back to
+                -- the whole-book span when the TOC entry has no page marker.
+                -- Normalize to an exclusive end for the interpolation.
+                extracted_start_page = start_pg
+                extracted_end_page = is_reflowable and math.max(end_pg, start_pg + 1) or (end_pg + 1)
+            end
+        end
+    end
+
     if not ok or not raw_text or #raw_text < 10 then return {} end
 
     local text_lower = raw_text:lower()
@@ -1256,10 +1365,24 @@ function ChapterAnalyzer:findMentionsInChapter(ui, entity, toc_entry, next_toc_e
         
         local match_pos = min_p
 
-        local start_page = tonumber(toc_entry.page) or 1
-        local end_page = next_toc_entry and tonumber(next_toc_entry.page) or (ui.document.getTotalPages and ui.document:getTotalPages()) or start_page
+        -- Prefer the real range the recovery fallback read. A malformed TOC entry
+        -- has no page marker, so keying on toc_entry.page there would default the
+        -- span to the whole book and scatter this chapter's mentions across it.
+        local start_page = extracted_start_page or tonumber(toc_entry.page) or 1
+        -- end_page is EXCLUSIVE: the page where the next chapter starts. The
+        -- interpolation below maps fraction f (0 <= f < 1) of the text onto
+        -- [start_page, end_page), so the chapter's last page is reachable and
+        -- the first page of the next chapter is not. Prefer getPageCount (the
+        -- method the rest of the plugin uses) and fall back to getTotalPages
+        -- for the last chapter.
+        local end_page = extracted_end_page
+            or (next_toc_entry and tonumber(next_toc_entry.page))
+            or (next_paged_entry and tonumber(next_paged_entry.page))
+            or (ui.document.getPageCount and ui.document:getPageCount())
+            or (ui.document.getTotalPages and ui.document:getTotalPages())
+            or start_page
         if end_page < start_page then end_page = start_page end
-        
+
         local est_page = start_page
         local total_chars = #raw_text
         if total_chars > 0 and end_page > start_page then
@@ -1323,6 +1446,49 @@ function ChapterAnalyzer:scanMentionsAsync(ui, entity, toc, min_page, max_page, 
         end
     end
 
+    -- Scan in ascending page order. Some books list TOC entries out of document
+    -- order. The boundary math below (next entry = this chapter's end) and the
+    -- spoiler break both assume ascending pages, so an out-of-order TOC would
+    -- give an end page before the start (chapter unread) or break the loop early
+    -- and skip later chapters. Sort a copy so the caller's TOC is not mutated.
+    --
+    -- Two constraints keep the entry -> next entry chain intact (the next
+    -- entry's xpointer is this chapter's end bound in findMentionsInChapter):
+    --  * table.sort is not stable, so same-page entries (a parent heading and
+    --    its first child) must tie-break on original TOC order. Otherwise the
+    --    child can end up before its parent and read an inverted range.
+    --  * Entries with no page marker anchor to the paged entry LISTED before
+    --    them and move with it, so they keep their real neighbourhood when the
+    --    paged entries re-sort. Keeping them at a fixed index instead would
+    --    strand them between arbitrary strangers, inverting the chain; pushing
+    --    them to the end would give them no next entry, so they would read
+    --    from their xpointer to the end of the book.
+    do
+        local with_page, head = {}, {}
+        for _, e in ipairs(scan_toc) do
+            if tonumber(e.page) then
+                with_page[#with_page + 1] = { entry = e, idx = #with_page + 1, children = {} }
+            elseif #with_page > 0 then
+                local host = with_page[#with_page].children
+                host[#host + 1] = e
+            else
+                head[#head + 1] = e
+            end
+        end
+        table.sort(with_page, function(a, b)
+            local pa, pb = tonumber(a.entry.page), tonumber(b.entry.page)
+            if pa ~= pb then return pa < pb end
+            return a.idx < b.idx
+        end)
+        local sorted = {}
+        for _, e in ipairs(head) do sorted[#sorted + 1] = e end
+        for _, w in ipairs(with_page) do
+            sorted[#sorted + 1] = w.entry
+            for _, c in ipairs(w.children) do sorted[#sorted + 1] = c end
+        end
+        scan_toc = sorted
+    end
+
     local UIManager = require("ui/uimanager")
     local cancel_handle = { _cancelled = false }
     function cancel_handle:cancel()
@@ -1330,8 +1496,12 @@ function ChapterAnalyzer:scanMentionsAsync(ui, entity, toc, min_page, max_page, 
     end
 
     local mentions = {}
+    -- A page-based TOC can list a parent heading and its first child on the
+    -- same page. Both read that page, so the same passage is found twice under
+    -- two chapter titles. Drop exact repeats (same page, same snippet).
+    local seen_mentions = {}
     local total_chapters = #scan_toc
-    
+
     -- Cooperative multitasking using Coroutines
     local scan_co = coroutine.create(function()
         for i = 1, total_chapters do
@@ -1339,7 +1509,16 @@ function ChapterAnalyzer:scanMentionsAsync(ui, entity, toc, min_page, max_page, 
 
             local entry = scan_toc[i]
             local next_entry = scan_toc[i + 1]
-            
+            -- First later entry with a page number: the end bound for the
+            -- page-range paths when the immediate successor has none.
+            local next_paged_entry = nil
+            for j = i + 1, total_chapters do
+                if tonumber(scan_toc[j].page) then
+                    next_paged_entry = scan_toc[j]
+                    break
+                end
+            end
+
             local start_p = tonumber(entry.page)
             local end_p = next_entry and tonumber(next_entry.page) or math.huge
 
@@ -1347,17 +1526,21 @@ function ChapterAnalyzer:scanMentionsAsync(ui, entity, toc, min_page, max_page, 
                 -- Reached spoiler limit
                 break
             end
-            
+
             if not (min_page and end_p <= min_page) then
                 -- We pass a yield function that will pause the coroutine
                 local chapter_mentions = self:findMentionsInChapter(ui, entity, entry, next_entry, function()
                     coroutine.yield()
-                end)
+                end, next_paged_entry)
                 
                 -- Filter out mentions that pass max_page or are before min_page
                 for _, m in ipairs(chapter_mentions) do
                     if not (max_page and m.page and m.page > (max_page + 5)) and not (min_page and m.page and m.page <= min_page) then
-                        table.insert(mentions, m)
+                        local key = tostring(m.page) .. "\0" .. tostring(m.snippet)
+                        if not seen_mentions[key] then
+                            seen_mentions[key] = true
+                            table.insert(mentions, m)
+                        end
                     end
                 end
 

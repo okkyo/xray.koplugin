@@ -199,19 +199,7 @@ function M:fetchSingleWord(text, pos0, pos1)
             local settings_xray_dir = DataStorage:getSettingsDir() .. "/xray"
             
             -- Clean up orphaned fetch files
-            pcall(function()
-                local ok, lfs = pcall(require, "libs/libkoreader-lfs")
-                if not ok or type(lfs) ~= "table" then
-                    ok, lfs = pcall(require, "lfs")
-                end
-                if ok and lfs and lfs.dir then
-                    for file in lfs.dir(settings_xray_dir) do
-                        if file:find("^sw_fetch_.*%.json$") then
-                            os.remove(settings_xray_dir .. "/" .. file)
-                        end
-                    end
-                end
-            end)
+            self:_sweepStaleFetchFiles(settings_xray_dir)
 
             if is_cancelled then return end
             if self.destroyed or not self.ui or not self.ui.document then
@@ -225,14 +213,18 @@ function M:fetchSingleWord(text, pos0, pos1)
             end
 
             result_file = settings_xray_dir .. "/sw_fetch_" .. tostring(os.time()) .. ".json"
-            request_pid = self.ai_helper:lookupSingleWordAsync(text, context, result_file)
+            local start_err_code, start_err_msg
+            request_pid, start_err_code, start_err_msg = self.ai_helper:lookupSingleWordAsync(text, context, result_file)
             if not request_pid then
                 if progress_msg then UIManager:close(progress_msg) end
                 if self._active_ai_dialog == progress_msg then self._active_ai_dialog = nil end
                 if self._active_ai_cancel == cancelLookup then self._active_ai_cancel = nil end
-                self:log("XRayPlugin: Failed to start async lookup")
+                self:log("XRayPlugin: Failed to start async lookup: " .. tostring(start_err_msg))
                 local ButtonDialog = require("ui/widget/buttondialog")
-                local title, text_msg = utils:getFriendlyError("error_api", "Failed to start background process", self.loc)
+                -- Forward the build error (e.g. missing API key) when there is one;
+                -- fall back to the generic process error otherwise.
+                local title, text_msg = utils:getFriendlyError(start_err_code or "error_api",
+                    start_err_msg or "Failed to start background process", self.loc)
                 local err_dlg
                 err_dlg = ButtonDialog:new{
                     title = title,
@@ -307,7 +299,11 @@ function M:fetchSingleWord(text, pos0, pos1)
     end)
 end
 
-function M:_processSingleWordResult(result, text, book_text, current_page)
+-- known_entity / known_type: set by Fetch More. When present, the result enriches
+-- THIS existing entity. We route by the caller's type and merge into the exact
+-- object, so a name variant or a reclassification from the AI cannot create a
+-- duplicate entry in a different list.
+function M:_processSingleWordResult(result, text, book_text, current_page, skip_resort, known_entity, known_type)
     if self.destroyed or not self.ui or not self.ui.document then return end
     local safe_text = type(text) == "string" and text or tostring(text or "")
     if type(result) ~= "table" then
@@ -318,7 +314,8 @@ function M:_processSingleWordResult(result, text, book_text, current_page)
 
     if result.is_valid then
         local item = result.item
-        local item_type = result.type
+        local item_type = known_type or result.type
+        local shown_item = item
         if type(item) ~= "table" or not item.name then
             local err = result.error_message or self.loc:t("entity_not_found", safe_text:sub(1, 20))
             UIManager:show(InfoMessage:new{ text = err, timeout = 5 })
@@ -362,37 +359,118 @@ function M:_processSingleWordResult(result, text, book_text, current_page)
                 end
             end
 
-            -- Check if already exists (case-insensitive)
-            local found = false
-            for _, existing in ipairs(target_list) do
-                if (existing.name or ""):lower() == (item.name or ""):lower() then
-                    -- Update description/role
-                    for k, v in pairs(item) do existing[k] = v end
-                    
-                    -- Record history for single word lookup
-                    local desc_key = item_type == "historical_figure" and "biography" or "description"
-                    if existing[desc_key] and existing[desc_key] ~= "" then
-                        existing.history = existing.history or {}
-                        local dup = false
-                        for _, entry in ipairs(existing.history) do
-                            if entry.page == current_page then
-                                entry[desc_key] = existing[desc_key]
-                                entry.chapter = chapter_title or entry.chapter
-                                dup = true; break
-                            end
-                        end
-                        if not dup then
-                            local hist_entry = { page = current_page, chapter = chapter_title or "" }
-                            hist_entry[desc_key] = existing[desc_key]
-                            table.insert(existing.history, hist_entry)
+            local desc_key = self:_descKeyForType(item_type)
+
+            -- Merge the AI item into an existing entry. On Fetch More, keep the
+            -- original entry name so a normalized AI name does not rename it.
+            -- Treat an empty string as "no value". The AI can return the key it
+            -- was shown with an empty value and the real text under another
+            -- key; an empty string is truthy in Lua and would win an `or` chain.
+            local function nonEmpty(v)
+                if type(v) == "string" and v ~= "" then return v end
+                return nil
+            end
+
+            local function mergeInto(existing)
+                local preserved_name = known_entity and existing.name or nil
+                -- Empty means "" or an empty table: a JSON [] decodes to {},
+                -- which is truthy and would wipe e.g. a real aliases list.
+                local function isEmptyValue(v)
+                    return v == "" or (type(v) == "table" and next(v) == nil)
+                end
+                for k, v in pairs(item) do
+                    -- On Fetch More never overwrite a real value with an empty one.
+                    if not (known_entity and isEmptyValue(v)) then
+                        existing[k] = v
+                    end
+                end
+                if preserved_name then existing.name = preserved_name end
+
+                -- Fetch More forces the chosen entry's own type, so desc_key is
+                -- fixed. If the AI classified the word differently and returned
+                -- its text under another key (description/biography/definition),
+                -- copy that into the forced key. Without this the target field
+                -- keeps its old value and the card looks unchanged.
+                if known_entity and not nonEmpty(item[desc_key]) then
+                    local new_desc = nonEmpty(item.description) or nonEmpty(item.biography) or nonEmpty(item.definition)
+                    if new_desc then
+                        existing[desc_key] = new_desc
+                    end
+                end
+
+                -- Fetch More forces one description field for the entry's type. If
+                -- the AI returned its text under a different key, drop the other
+                -- description-type keys so the cached entry does not accumulate
+                -- contradictory description/biography/definition text.
+                if known_entity then
+                    for _, k in ipairs({ "description", "biography", "definition" }) do
+                        if k ~= desc_key then existing[k] = nil end
+                    end
+                end
+
+                -- Record history for single word lookup
+                if existing[desc_key] and existing[desc_key] ~= "" then
+                    existing.history = existing.history or {}
+                    local dup = false
+                    for _, entry in ipairs(existing.history) do
+                        if entry.page == current_page then
+                            entry[desc_key] = existing[desc_key]
+                            entry.chapter = chapter_title or entry.chapter
+                            dup = true; break
                         end
                     end
+                    if not dup then
+                        local hist_entry = { page = current_page, chapter = chapter_title or "" }
+                        hist_entry[desc_key] = existing[desc_key]
+                        table.insert(existing.history, hist_entry)
+                    end
+                end
+            end
+
+            -- Check if already exists. On Fetch More (known_entity set), match
+            -- ONLY by identity, so a name variant returned by the AI still
+            -- enriches the exact chosen entry and a different entry that happens
+            -- to share the name cannot be picked instead. Otherwise (single-word
+            -- lookup / new entry) match by name (case-insensitive).
+            local found = false
+            for _, existing in ipairs(target_list) do
+                local is_match
+                if known_entity then
+                    is_match = (existing == known_entity)
+                else
+                    is_match = (existing.name or ""):lower() == (item.name or ""):lower()
+                end
+                if is_match then
+                    mergeInto(existing)
                     found = true
+                    shown_item = existing
                     break
                 end
             end
+
+            -- Fetch More identity miss: the list was reloaded during the async
+            -- round-trip, so the chosen entry is now a different table instance
+            -- and the identity match failed. Fall back to a name match against
+            -- the chosen entity so the enrichment still lands on it.
+            if not found and known_entity then
+                local target_name = (known_entity.name or ""):lower()
+                for _, existing in ipairs(target_list) do
+                    if (existing.name or ""):lower() == target_name then
+                        mergeInto(existing)
+                        found = true
+                        shown_item = existing
+                        break
+                    end
+                end
+                -- Still no match: a known entity must never create a duplicate.
+                -- Skip the insert and show the enriched AI item as-is.
+                if not found then
+                    self:log("XRayPlugin: Fetch More entry not found after reload; skip insert to avoid duplicate")
+                    found = true
+                end
+            end
+
             if not found then
-                local desc_key = item_type == "historical_figure" and "biography" or "description"
                 if item[desc_key] and item[desc_key] ~= "" then
                     local hist_entry = { page = current_page, chapter = chapter_title or "" }
                     hist_entry[desc_key] = item[desc_key]
@@ -401,8 +479,13 @@ function M:_processSingleWordResult(result, text, book_text, current_page)
                 table.insert(target_list, item)
             end
             
-            -- Sort and save cache
-            self:sortDataByFrequency(target_list, book_text, "name")
+            -- Sort and save cache. Skip the frequency re-sort when the caller
+            -- passes synthetic text (fetch-more). That text only repeats the
+            -- focused entity's name, so re-sorting would score every other
+            -- entity at zero frequency and stamp a wrong sort_order into cache.
+            if not skip_resort then
+                self:sortDataByFrequency(target_list, book_text, "name")
+            end
             if not self.cache_manager then self.cache_manager = require(plugin_path .. "xray_cachemanager"):new() end
             
             local doc_file = self.ui and self.ui.document and self.ui.document.file
@@ -424,12 +507,467 @@ function M:_processSingleWordResult(result, text, book_text, current_page)
             end
         end
         
-        -- Always show result if it's valid, even if it didn't merge into a target_list
-        self.lookup_manager:showResult(item, item_type)
+        -- Always show result if it's valid, even if it didn't merge into a target_list.
+        -- On a merge, show the enriched entry (its preserved name), not the raw AI item.
+        self.lookup_manager:showResult(shown_item, item_type)
     else
         local err = result.error_message or self.loc:t("entity_not_found", safe_text:sub(1, 20))
         UIManager:show(InfoMessage:new{ text = err, timeout = 5 })
     end
+end
+
+-- Map an entity type to the field that holds its main text. Kept in one place
+-- so single-word lookup, Fetch More, and context building stay in step.
+function M:_descKeyForType(item_type)
+    return (item_type == "historical_figure" and "biography")
+        or (item_type == "term" and "definition")
+        or "description"
+end
+
+-- Remove stale orphaned fetch result files from the xray settings directory.
+-- checkAsyncResult removes the file on a normal poll, but a stale poll or an
+-- app close can leave one behind. Single-word lookup and Fetch More share the
+-- "sw_fetch_" prefix, so only sweep old orphans. A concurrent request's result
+-- file is recent; an age gate past the request timeout (300s) keeps it while it
+-- still clears real orphans.
+function M:_sweepStaleFetchFiles(dir)
+    pcall(function()
+        local ok, lfs = pcall(require, "libs/libkoreader-lfs")
+        if not ok or type(lfs) ~= "table" then
+            ok, lfs = pcall(require, "lfs")
+        end
+        if ok and lfs and lfs.dir then
+            local now = os.time()
+            for file in lfs.dir(dir) do
+                if file:find("^sw_fetch_.*%.json$") then
+                    local path = dir .. "/" .. file
+                    local mtime = lfs.attributes and lfs.attributes(path, "modification")
+                    if not mtime or (now - mtime) > 600 then
+                        os.remove(path)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Resolve which X-Ray list an entity belongs to. The card usually passes the
+-- type; this is the fallback when it does not.
+function M:_inferEntityType(entity)
+    if not entity then return "character" end
+    local name = (entity.name or ""):lower()
+    local function inList(list)
+        if type(list) ~= "table" then return false end
+        for _, e in ipairs(list) do
+            if type(e) == "table" and (e.name or ""):lower() == name then return true end
+        end
+        return false
+    end
+    -- Prefer the list the entity actually lives in. A character or location can
+    -- carry a stray definition/biography key; that must not route it to the wrong
+    -- list. Only fall back to field shape when the entity is in no list yet.
+    if inList(self.terms) then return "term" end
+    if inList(self.historical_figures) then return "historical_figure" end
+    if inList(self.locations) then return "location" end
+    if inList(self.characters) then return "character" end
+    if entity.definition ~= nil then return "term" end
+    if entity.biography ~= nil then return "historical_figure" end
+    return "character"
+end
+
+-- Build the AI context for a Fetch More (enrich) request. Pure function so the
+-- assembly logic can be tested without the UI or a live document.
+--   entity        : the entity table (has name + a description/biography/definition)
+--   entity_type   : "character" | "location" | "historical_figure" | "term"
+--   passages      : list of mention rows ({snippet=...}) or plain strings
+--   samples       : distributed chapter samples string (optional)
+--   limit_percent : reading percent, for spoiler bounding downstream
+-- Returns: context table, book_text string
+function M:_buildEnrichContext(entity, entity_type, passages, samples, limit_percent)
+    local name = tostring(entity.name or "")
+    local desc_key = self:_descKeyForType(entity_type)
+    local existing_desc = entity[desc_key] or entity.description or entity.biography or entity.definition or ""
+
+    -- Targeted passages: the sentences where the entity actually appears.
+    -- Bounded so a very common name cannot blow up the request size.
+    local parts = {}
+    local budget = 18000
+    local seen = {}
+    for _, m in ipairs(passages or {}) do
+        local s = (type(m) == "table") and m.snippet or m
+        -- Skip a snippet that does not fit; do not stop. One long early snippet
+        -- must not drop every later (possibly more relevant) passage.
+        -- Skip exact duplicates so a name repeated on adjacent pages does not
+        -- spend the budget on the same text and crowd out distinct passages.
+        if type(s) == "string" and #s > 0 and not seen[s] and budget - #s >= 0 then
+            seen[s] = true
+            table.insert(parts, s)
+            budget = budget - #s
+        end
+    end
+    local passage_text = table.concat(parts, "\n")
+
+    -- Preserve links across the rewrite. Linked-entry detection keys on names in
+    -- the description; a rewrite can drop a name the old entry had and hide the
+    -- link. We list the currently related entities and ask the rewrite to keep
+    -- naming them. Guarded because the pure helper is unit-tested without the UI
+    -- mixin that defines findRelatedEntities.
+    local preserve_names = {}
+    if type(self.findRelatedEntities) == "function" then
+        local extra = (type(self._mentionScanText) == "function") and self:_mentionScanText(entity) or nil
+        local rel = self:findRelatedEntities(existing_desc or "", name, extra) or {}
+        for _, r in ipairs(rel) do
+            if r.item and r.item.name then table.insert(preserve_names, r.item.name) end
+        end
+    end
+
+    local header = "FOCUS ENTITY: \"" .. name .. "\"\n"
+        .. "TASK: Improve and expand the existing entry for this entity using the passages below, where it actually appears in the book.\n"
+        .. "Combine what is already known with the new details into one cohesive summary about THIS entity.\n"
+        .. "Describe other people or places only as they relate to this entity, not as the main subject.\n"
+    if #preserve_names > 0 then
+        header = header .. "Keep naming these related entities where they are relevant: "
+            .. table.concat(preserve_names, ", ") .. ".\n"
+    end
+    header = header .. "\n"
+    if existing_desc ~= "" then
+        header = header .. "EXISTING ENTRY FOR " .. name .. ":\n" .. existing_desc .. "\n\n"
+    end
+    local book_text = header
+    if passage_text ~= "" then
+        book_text = book_text .. "PASSAGES MENTIONING " .. name .. ":\n" .. passage_text
+    end
+
+    local context = {
+        reading_percent = limit_percent,
+        chapter_samples = samples,
+        book_text = book_text,
+    }
+    -- Trigger MERGE MODE for the types that support it, so the AI is told it is
+    -- updating a known entry rather than defining a fresh term.
+    if entity_type == "character" then
+        context.existing_characters = { entity }
+    elseif entity_type == "location" then
+        context.existing_locations = { entity }
+    elseif entity_type == "historical_figure" then
+        context.existing_historical_figures = { entity }
+    elseif entity_type == "term" then
+        context.existing_terms = { entity }
+    end
+
+    return context, book_text
+end
+
+-- Fetch More: enrich ONE existing entity's entry using passages from across the
+-- book where the entity actually appears. This reads wider than the reader's
+-- current page, so the entity is described from its real scenes and not only
+-- from wherever the reader happened to open its card.
+--
+-- Read scope follows the spoiler setting: spoiler-free caps the scan at the
+-- current reading position; full-book scans the whole book. The improved text
+-- is written back through the same merge path a single-word lookup uses, so the
+-- existing entry and the new details combine into one rewritten summary.
+function M:fetchMoreDetailsForEntity(entity, entity_type)
+    if not entity or not entity.name then return end
+
+    require("ui/network/manager"):runWhenOnline(function()
+        if self.destroyed or not self.ui or not self.ui.document or not self.ui.getCurrentPage then return end
+
+        entity_type = entity_type or self:_inferEntityType(entity)
+
+        if not self.ai_helper then
+            local AIHelper = require(plugin_path .. "xray_aihelper")
+            self.ai_helper = AIHelper
+            self.ai_helper:init(self.path)
+        end
+
+        if self.ai_helper and type(self.ai_helper.hasApiKey) == "function" and not self.ai_helper:hasApiKey() then
+            if self.showWelcomeCard then self:showWelcomeCard() end
+            return
+        end
+
+        if self._active_ai_cancel or (self.ai_helper and self.ai_helper._async_child_pid) then
+            -- A comprehensive fetch can run for many minutes; replacing it
+            -- silently would throw that work away. Ask before cancelling it.
+            local ConfirmBox = require("ui/widget/confirmbox")
+            UIManager:show(ConfirmBox:new{
+                text = self.loc:t("fetch_more_replace_confirm"),
+                ok_text = self.loc:t("fetch_more"),
+                ok_callback = function()
+                    self:cancelActiveAIRequest("Previous AI request replaced by fetch-more")
+                    self:fetchMoreDetailsForEntity(entity, entity_type)
+                end,
+            })
+            return
+        end
+
+        local current_page = self.ui:getCurrentPage()
+        local total_pages = (type(self.ui.document.getPageCount) == "function" and self.ui.document:getPageCount()) or 1
+        local spoiler_setting = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.spoiler_setting or "spoiler_free"
+        local full_book = (spoiler_setting == "full_book")
+        -- limit_percent is set later from the real scan range end, which is the
+        -- reader's current page, so the reading percent matches the text it sees.
+
+        local request_pid
+        local result_file
+        local is_cancelled = false
+        local scan_handle
+        local slot_handle  -- this fetch's registration in the shared mention-scan slot
+        local progress_msg
+
+        local cancelFetch  -- forward-declared so closeProgress can reference it
+        local function closeProgress()
+            if progress_msg then
+                UIManager:close(progress_msg)
+                if self._active_ai_dialog == progress_msg then self._active_ai_dialog = nil end
+                progress_msg = nil
+            end
+            if self._active_ai_cancel == cancelFetch then
+                self._active_ai_cancel = nil
+            end
+            -- Release the cancel closure (and everything it captures: entity,
+            -- book_text, passages, dialog, scan handle) once this fetch ends, so
+            -- it does not linger on the plugin until the next Fetch More.
+            if self._fetch_more_cancel == cancelFetch then
+                self._fetch_more_cancel = nil
+            end
+        end
+
+        local function showError(err_code, err_msg)
+            local ButtonDialog2 = require("ui/widget/buttondialog")
+            local title, text_msg = utils:getFriendlyError(err_code, err_msg, self.loc)
+            local err_dlg
+            err_dlg = ButtonDialog2:new{
+                title = title,
+                text = text_msg,
+                buttons = {{{ text = self.loc:t("ok") or "OK", callback = function() if err_dlg then UIManager:close(err_dlg) end end }}}
+            }
+            UIManager:show(err_dlg)
+        end
+
+        cancelFetch = function(reason)
+            if is_cancelled then return end
+            is_cancelled = true
+            if scan_handle and scan_handle.cancel then
+                pcall(function() scan_handle:cancel() end)
+            end
+            -- Release the shared mention-scan slot if this fetch holds it.
+            if slot_handle and self.active_mention_scan and self.active_mention_scan.cancel_handle == slot_handle then
+                self.active_mention_scan = nil
+            end
+            if request_pid and self.ai_helper and self.ai_helper.cancelAsyncChild then
+                self.ai_helper:cancelAsyncChild(request_pid)
+            end
+            if result_file then pcall(function() os.remove(result_file) end) end
+            closeProgress()
+            self:log("XRayPlugin: " .. (reason or "Fetch-more cancelled"))
+        end
+        self._fetch_more_cancel = cancelFetch
+
+        progress_msg = ButtonDialog:new{
+            title = self.loc:t("fetch_more_progress") or "Fetching more details...",
+            text = tostring(entity.name) .. "\n\n" .. (self.loc:t("fetching_wait") or "This may take a moment.\nTap Cancel to stop."),
+            buttons = {{{
+                text = self.loc:t("cancel") or "Cancel",
+                callback = function() cancelFetch("Fetch-more cancelled by user") end,
+            }}},
+        }
+        self._active_ai_dialog = progress_msg
+        self._active_ai_cancel = cancelFetch
+        UIManager:show(progress_msg)
+        UIManager:forceRePaint()
+
+        -- Two ticks so the dialog is painted before any blocking extraction.
+        UIManager:scheduleIn(0.3, function()
+            if is_cancelled then return end
+            if self.destroyed or not self.ui or not self.ui.document then return cancelFetch("Fetch-more stopped: document unavailable") end
+            if not self.chapter_analyzer then self.chapter_analyzer = require(plugin_path .. "xray_chapteranalyzer"):new() end
+
+            -- Spoiler-free must have a page bound. If the helper cannot resolve one
+            -- (no current page), stop instead of scanning the whole book and
+            -- leaking passages past the reader's position.
+            local max_page = nil
+            if not full_book then
+                max_page = self.chapter_analyzer:getEndPageForCurrentPage(self.ui, current_page) or current_page
+                if not max_page then
+                    return cancelFetch("Fetch-more stopped: cannot resolve spoiler bound")
+                end
+            end
+
+            -- Spoiler bound: base the reading percent on the scan range end, which
+            -- is the reader's current page (one page ahead for reflowable books),
+            -- so it matches the text range the AI actually receives.
+            -- For reflowable books max_page can be one past the current page and
+            -- reach or pass the page count near the end, so clamp to 100.
+            local limit_percent = full_book and 100
+                or math.min(100, math.floor((max_page / math.max(1, total_pages)) * 100))
+
+            -- Phase 2: build context from the gathered passages and run the AI.
+            local function runEnrich(passages)
+                if is_cancelled then return end
+                -- Guard against a second entry (e.g. the scan's completion callback
+                -- firing twice after a coroutine error). One request per fetch.
+                if request_pid then return end
+                if self.destroyed or not self.ui or not self.ui.document then return cancelFetch("Fetch-more stopped: document unavailable") end
+
+                -- The distributed whole-book samples are a heavy extraction (up to
+                -- 100 chapters). The targeted passages are the primary signal for
+                -- enriching one entry, so only pay for samples when the passages
+                -- are too few to rely on.
+                local samples = nil
+                if not passages or #passages < 3 then
+                    samples = self.chapter_analyzer:getDetailedChapterSamples(self.ui, 100, 40000, full_book, nil, nil, current_page)
+                end
+                local context, book_text = self:_buildEnrichContext(entity, entity_type, passages, samples, limit_percent)
+
+                local DataStorage = require("datastorage")
+                local settings_xray_dir = DataStorage:getSettingsDir() .. "/xray"
+
+                -- Clean up orphaned fetch files. A fetch-more-only user would
+                -- never hit the single-word sweep, so sweep here too.
+                self:_sweepStaleFetchFiles(settings_xray_dir)
+
+                result_file = settings_xray_dir .. "/sw_fetch_" .. tostring(os.time()) .. ".json"
+
+                local start_err_code, start_err_msg
+                request_pid, start_err_code, start_err_msg = self.ai_helper:lookupSingleWordAsync(entity.name, context, result_file)
+                if not request_pid then
+                    cancelFetch("Failed to start fetch-more request: " .. tostring(start_err_msg))
+                    -- Forward the build error (e.g. missing API key) when there is
+                    -- one; fall back to the generic process error otherwise.
+                    showError(start_err_code or "error_api", start_err_msg or "Failed to start background process")
+                    return
+                end
+
+                local started_at = os.time()
+                local function poll()
+                    if is_cancelled then return end
+                    if self.destroyed or not self.ui or not self.ui.document then return cancelFetch("Fetch-more stopped: document unavailable") end
+                    if not self.ai_helper or not self.ai_helper.checkAsyncResult then return cancelFetch("Fetch-more stopped: AI helper unavailable") end
+
+                    local data, p_err_code, p_err_msg = self.ai_helper:checkAsyncResult(result_file, request_pid)
+                    if data == nil then
+                        if not self:isRequestTimedOut(started_at, 300) then
+                            UIManager:scheduleIn(2, poll)
+                        else
+                            cancelFetch("Fetch-more timed out")
+                            showError("error_timeout", nil)
+                        end
+                    elseif data == false then
+                        closeProgress()
+                        self:log("XRayPlugin: Fetch-more failed: " .. tostring(p_err_msg))
+                        showError(p_err_code, p_err_msg)
+                    else
+                        closeProgress()
+                        if not is_cancelled then
+                            self:_processSingleWordResult(data, entity.name, book_text, current_page, true, entity, entity_type)
+                        end
+                    end
+                end
+                UIManager:scheduleIn(2, poll)
+            end
+
+            -- Phase 1: gather the entity's passages. Reuse cached mentions when
+            -- they already cover the range the reader can see; otherwise scan the
+            -- unread remainder (spoiler-aware) and persist it, so Find Mentions
+            -- and Fetch More share one scan.
+
+            -- Cached mentions can reach further into the book than the reader's
+            -- current position. In spoiler-free mode, drop any that pass max_page
+            -- before reuse, mirroring the scan path's page filter in
+            -- scanMentionsAsync.
+            local function usableMentions(list)
+                if type(list) ~= "table" then return {} end
+                if full_book or not max_page then return list end
+                local usable = {}
+                for _, m in ipairs(list) do
+                    if not (m.page and m.page > (max_page + 5)) then
+                        table.insert(usable, m)
+                    end
+                end
+                return usable
+            end
+
+            -- entity.last_mention_page records how far an earlier scan actually
+            -- read (math.huge = whole book). A cache that stops short of the
+            -- reader's position is a stale partial scan, not a substitute for the
+            -- book-wide passage scan; scan the unread part from where it stopped.
+            local last_scanned = entity.last_mention_page
+            local cache_covers_range = last_scanned == math.huge
+                or (max_page ~= nil and type(last_scanned) == "number" and last_scanned >= max_page)
+            -- A cache that covers the range is authoritative (this mirrors the
+            -- needs_scan test in xray_mentions.lua): a rescan would find the same
+            -- passages. runEnrich falls back to chapter samples when there are
+            -- fewer than 3 passages.
+            if cache_covers_range then
+                runEnrich(usableMentions(entity.mentions))
+            else
+                local scan_min_page = nil
+                if type(last_scanned) == "number" and last_scanned ~= math.huge then
+                    scan_min_page = last_scanned
+                end
+                local toc = utils:flattenTOC(self.ui.document.getToc and self.ui.document:getToc())
+                -- Claim the mention-scan slot shared with Find Mentions
+                -- (xray_mentions.lua): cancel whatever scan is running and
+                -- register this one, so the two paths can never scan the same
+                -- entity concurrently and each persist the same mentions.
+                -- Register a wrapper handle: an outside cancel (Find Mentions
+                -- switching to another entity, plugin teardown) must stop the
+                -- whole fetch, or its progress dialog would wait forever on a
+                -- scan that will never complete.
+                if self.active_mention_scan and self.active_mention_scan.cancel_handle then
+                    pcall(function() self.active_mention_scan.cancel_handle:cancel() end)
+                end
+                slot_handle = { cancel = function()
+                    cancelFetch("Fetch-more scan cancelled by another mention scan")
+                end }
+                self.active_mention_scan = { entity_name = entity.name, chapter_idx = 0, total_chapters = #(toc or {}), cancel_handle = slot_handle }
+                scan_handle = self.chapter_analyzer:scanMentionsAsync(
+                    self.ui, entity, toc, scan_min_page, max_page,
+                    function(_, chapter_idx, total_chapters)
+                        local rec = self.active_mention_scan
+                        if rec and rec.cancel_handle == slot_handle then
+                            rec.chapter_idx = chapter_idx
+                            rec.total_chapters = total_chapters
+                            if self.mentions_menu and type(self.updateMentionsMenuInPlace) == "function" then
+                                self:updateMentionsMenuInPlace(entity)
+                            end
+                        end
+                    end,
+                    function(found)
+                        if self.active_mention_scan and self.active_mention_scan.cancel_handle == slot_handle then
+                            self.active_mention_scan = nil
+                        end
+                        scan_handle = nil
+                        if is_cancelled then return end
+
+                        -- Persist the scan on the entity (mirrors the Find Mentions
+                        -- completion in xray_mentions.lua) so the next Find Mentions
+                        -- or Fetch More does not rescan the same range.
+                        entity.mentions = entity.mentions or {}
+                        utils:appendUniqueMentions(entity.mentions, found)
+                        table.sort(entity.mentions, function(a, b) return (a.page or 0) < (b.page or 0) end)
+                        entity.last_mention_page = max_page or math.huge
+                        if type(self.saveMentionsToCache) == "function" then
+                            pcall(function() self:saveMentionsToCache() end)
+                        end
+
+                        local passages = usableMentions(entity.mentions)
+
+                        -- This callback runs inside the scan coroutine. If the
+                        -- enrich step raised here, the scanner would report the
+                        -- error and call on_complete again, starting a second
+                        -- request. Defer to the next UI tick so the coroutine
+                        -- finishes cleanly first.
+                        UIManager:scheduleIn(0, function()
+                            if is_cancelled then return end
+                            runEnrich(passages)
+                        end)
+                    end
+                )
+            end
+        end)
+    end)
 end
 
 function M:continueWithFetch(reading_percent, is_update, last_fetch_page, is_silent)

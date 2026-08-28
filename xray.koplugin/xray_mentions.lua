@@ -213,6 +213,10 @@ function M:showMentionsForEntity(entity)
         return
     end
 
+    if not self.chapter_analyzer then
+        self.chapter_analyzer = require(plugin_path .. "xray_chapteranalyzer"):new()
+    end
+
     self.active_mention_scan = { entity_name = name, chapter_idx = 0, total_chapters = #toc, cancel_handle = nil }
     self.active_mention_scan.cancel_handle = self.chapter_analyzer:scanMentionsAsync(
         self.ui, entity, toc, min_page, max_page,
@@ -227,7 +231,7 @@ function M:showMentionsForEntity(entity)
         function(new_mentions)
             if self.active_mention_scan and self.active_mention_scan.entity_name == name then self.active_mention_scan = nil end
             entity.mentions = entity.mentions or {}
-            for _, m in ipairs(new_mentions) do table.insert(entity.mentions, m) end
+            utils:appendUniqueMentions(entity.mentions, new_mentions)
             table.sort(entity.mentions, function(a, b) return (a.page or 0) < (b.page or 0) end)
             
             entity.last_mention_page = max_page or math.huge

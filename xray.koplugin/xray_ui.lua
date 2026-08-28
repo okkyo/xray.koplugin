@@ -190,6 +190,7 @@ function XRayBottomPopup:init()
 
     local HorizontalGroup = require("ui/widget/horizontalgroup")
     local HorizontalSpan  = require("ui/widget/horizontalspan")
+    local CenterContainer = require("ui/widget/container/centercontainer")
     local btn_padding_h   = (Size.padding and Size.padding.large) or 12
     local btn_padding_v   = (Size.padding and Size.padding.small) or 4
 
@@ -289,7 +290,11 @@ function XRayBottomPopup:init()
     local linked_enabled = plugin and plugin.ai_helper and plugin.ai_helper.settings and plugin.ai_helper.settings.linked_entries_enabled ~= false
     local related = {}
     if linked_enabled and plugin and plugin.findRelatedEntities then
-        related = plugin:findRelatedEntities(desc_str or "", e.name) or {}
+        -- Scan the original list entity, not the per-open normalized copy `e`.
+        -- The scan cache is keyed by entity identity, so a fresh copy each open
+        -- never hits it; the original also reliably carries `.mentions`.
+        local extra = plugin._mentionScanText and plugin:_mentionScanText(self.source_entity or e) or nil
+        related = plugin:findRelatedEntities(desc_str or "", e.name, extra) or {}
     end
     local mentions_enabled = plugin and plugin.ai_helper and plugin.ai_helper.settings and plugin.ai_helper.settings.mentions_enabled ~= false
 
@@ -335,36 +340,67 @@ function XRayBottomPopup:init()
     if mentions_enabled and not e.is_timeline and not e.is_conversion then
         local right_btn = make_btn(get_loc_t("find_mentions", "Find Mentions"), function()
             UIManager:close(self)
+            -- Scan the ORIGINAL entity, not the display copy `e`. The scan cache
+            -- and results (.mentions) are keyed by entity identity, so a copy
+            -- never reuses a prior scan and writes results to a throwaway. This
+            -- matches the Linked Entries and Fetch More paths.
+            local mention_entity = self.source_entity or e
             if plugin then
-                if     plugin.showMentionsForEntity then plugin:showMentionsForEntity(e)
-                elseif plugin.findMentions          then plugin:findMentions(e)
-                elseif plugin.showMentions          then plugin:showMentions(e)
+                if     plugin.showMentionsForEntity then plugin:showMentionsForEntity(mention_entity)
+                elseif plugin.findMentions          then plugin:findMentions(mention_entity)
+                elseif plugin.showMentions          then plugin:showMentions(mention_entity)
                 end
             end
         end)
         table.insert(active_btns, right_btn)
     end
 
-    -- Layout buttons row
-    local btn_row
-    if #active_btns > 0 then
-        local row_h = 0
-        for _, btn in ipairs(active_btns) do
-            row_h = math.max(row_h, btn:getSize().h)
-        end
-        local btn_components = { align = "center" }
-        local btn_w = math.floor(inner_w / #active_btns)
-        for _, btn in ipairs(active_btns) do
-            table.insert(btn_components, LeftContainer:new{
-                dimen = Geom:new{ w = btn_w, h = row_h },
-                btn,
-            })
-        end
-        btn_row = HorizontalGroup:new(btn_components)
+    -- D. Fetch More button — enrich this entry using passages from across the book.
+    if not e.is_timeline and not e.is_conversion then
+        local fetch_more_btn = make_btn(get_loc_t("fetch_more", "Fetch More"), function()
+            UIManager:close(self)
+            -- Enrich the ORIGINAL entry, not the display copy `e`. The copy would
+            -- fail the identity-based dedup and could create a duplicate entry.
+            -- Pass the known type so the enrich path does not have to guess it.
+            if plugin and plugin.fetchMoreDetailsForEntity then
+                plugin:fetchMoreDetailsForEntity(self.source_entity or e, self.entity_type)
+            end
+        end)
+        table.insert(active_btns, fetch_more_btn)
     end
 
-    if btn_row then
-        table.insert(vg_components, btn_row)
+    -- Layout buttons. Up to 3 buttons stay on one row (unchanged look). More than
+    -- that wraps into rows of two so labels do not get crushed on narrow screens.
+    if #active_btns > 0 then
+        local per_row = (#active_btns <= 3) and #active_btns or 2
+        local function makeRow(slice)
+            local row_h = 0
+            for _, btn in ipairs(slice) do
+                row_h = math.max(row_h, btn:getSize().h)
+            end
+            local btn_components = { align = "center" }
+            -- A full row splits into equal per_row cells, left-aligned, so columns
+            -- line up down the rows. A short final row (fewer buttons than a full
+            -- row) instead centers its buttons across the width, so a lone last
+            -- button is not stranded in the left half with a large empty gap.
+            local is_short_row = #slice < per_row
+            local cell_w = math.floor(inner_w / (is_short_row and #slice or per_row))
+            local cell_container = is_short_row and CenterContainer or LeftContainer
+            for _, btn in ipairs(slice) do
+                table.insert(btn_components, cell_container:new{
+                    dimen = Geom:new{ w = cell_w, h = row_h },
+                    btn,
+                })
+            end
+            return HorizontalGroup:new(btn_components)
+        end
+        for i = 1, #active_btns, per_row do
+            local slice = {}
+            for j = i, math.min(i + per_row - 1, #active_btns) do
+                table.insert(slice, active_btns[j])
+            end
+            table.insert(vg_components, makeRow(slice))
+        end
     end
 
     local vg = VerticalGroup:new(vg_components)
@@ -462,7 +498,7 @@ function XRayBottomPopup:onCloseWidget()
     UIManager:setDirty(nil, "ui")
 end
 
-local function showBottomPopup(plugin, entity)
+local function showBottomPopup(plugin, entity, entity_type)
     if not entity then return end
     if plugin.active_details_dialog then
         UIManager:close(plugin.active_details_dialog)
@@ -494,10 +530,14 @@ local function showBottomPopup(plugin, entity)
         pad = G_reader_settings:readSetting("xray_popup_margin") or pad
     end
     local popup = XRayBottomPopup:new{
-        entity      = normalized,
-        plugin      = plugin,
-        font_size   = fs,
-        margin_size = pad,
+        entity        = normalized,
+        -- Keep the original entry and its type so Fetch More enriches the exact
+        -- object in the list (identity match), not this display copy.
+        source_entity = entity,
+        entity_type   = entity_type,
+        plugin        = plugin,
+        font_size     = fs,
+        margin_size   = pad,
     }
     plugin.active_details_dialog = popup
     UIManager:show(popup)
@@ -998,13 +1038,88 @@ function M:showCharacters()
     end)
 end
 
-function M:findRelatedEntities(text, exclude_name)
-    if not text or text == "" then return {} end
+-- Build extra scan text from an entity's stored mention snippets. Linked-entry
+-- detection keys on names in text; a single rewritten description can drop a name
+-- that the real passages still contain, so we also scan the cached snippets. This
+-- is local string work only — it never calls the AI or the network.
+function M:_mentionScanText(entity)
+    if not entity or type(entity.mentions) ~= "table" then return nil end
+
+    -- Opening any detail card (and the bottom popup) calls this on a UI hot path.
+    -- Concatenating up to 8000 chars of snippets every time is wasteful, so cache
+    -- the result per entity. The cache lives in a weak-keyed side table (not on
+    -- the entity) so it is never serialized into the book cache and does not keep
+    -- entities alive.
+    --
+    -- Iterate in ascending index order so that, when the total exceeds the
+    -- budget, the earliest mentions win deterministically (pairs order is not
+    -- stable). mentions is normally a dense array, but sort the numeric keys so a
+    -- sparse one (holes) does not silently drop every row after the first gap.
+    local idx = {}
+    for k in pairs(entity.mentions) do
+        if type(k) == "number" then idx[#idx + 1] = k end
+    end
+    table.sort(idx)
+
+    -- Cache signature. A count check alone misses a re-scan that replaces the
+    -- snippets with a different set of the SAME size, so fold each snippet's
+    -- length plus several sampled byte positions into the signature. Sampling
+    -- the interior (not just the ends) catches a same-length swap that happens
+    -- to keep the first and last byte, while staying cheap (a fixed number of
+    -- bytes per snippet, not a full re-hash of every character).
+    local sig = #idx
+    for _, i in ipairs(idx) do
+        local m = entity.mentions[i]
+        local s = (type(m) == "table") and m.snippet or m
+        if type(s) == "string" and #s > 0 then
+            local n = #s
+            sig = (sig * 131 + n) % 2147483647
+            local positions = { 1, math.floor(n / 4) + 1, math.floor(n / 2) + 1, math.floor(3 * n / 4) + 1, n }
+            for _, p in ipairs(positions) do
+                sig = (sig * 131 + s:byte(p)) % 2147483647
+            end
+        end
+    end
+
+    local cache = self._mention_scan_cache
+    if not cache then
+        cache = setmetatable({}, { __mode = "k" })
+        self._mention_scan_cache = cache
+    end
+    local hit = cache[entity]
+    if hit and hit.sig == sig then return hit.text end
+
+    local parts = {}
+    local budget = 8000
+    for _, i in ipairs(idx) do
+        local m = entity.mentions[i]
+        local s = (type(m) == "table") and m.snippet or m
+        -- Skip a snippet that does not fit; do not stop. One long early snippet
+        -- must not drop every later snippet that would still fit the budget.
+        if type(s) == "string" and #s > 0 and budget - #s >= 0 then
+            table.insert(parts, s)
+            budget = budget - #s
+        end
+    end
+    local result = (#parts > 0) and table.concat(parts, "\n") or nil
+    cache[entity] = { sig = sig, text = result }
+    return result
+end
+
+-- text        : the entity's description (primary scan source)
+-- exclude_name: the entity itself, so it never links to itself
+-- extra_text  : optional extra source (e.g. mention snippets) scanned together
+function M:findRelatedEntities(text, exclude_name, extra_text)
+    local combined = text or ""
+    if extra_text and extra_text ~= "" then
+        combined = (combined ~= "" and (combined .. "\n") or "") .. extra_text
+    end
+    if combined == "" then return {} end
     local related = {}
     local seen = {}
     if exclude_name then seen[exclude_name:lower()] = true end
 
-    local lower_text = text:lower()
+    local lower_text = combined:lower()
 
     -- Honorifics: fast-path blocklist for known titles.
     -- Tokens < 3 chars are already blocked by isTooGeneric's length check;
@@ -1029,6 +1144,10 @@ function M:findRelatedEntities(text, exclude_name)
     -- entity's full name in the text, it is too generic to be a useful identifier.
     -- This is language-agnostic — articles, stop words, and AI-hallucinated
     -- one-word aliases will all fail this test naturally.
+    -- The scanned text can be several KB (description plus mention snippets)
+    -- and this runs on every detail-card open, on the UI thread. Keep the
+    -- per-term work to one pattern search over a single shared copy; run the
+    -- expensive full-text counts only for aliases that actually occur.
     local function countInText(term)
         local escaped = term:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%1")
         local pattern = escaped
@@ -1038,19 +1157,26 @@ function M:findRelatedEntities(text, exclude_name)
         local _, n = lower_text:gsub(pattern, "")
         return n
     end
-    local function isTooGeneric(term, entity_name)
+    -- name_freq: the entity's own full-name count, computed once per entity.
+    -- The corpus can include several KB of the FOCUS entity's mention snippets,
+    -- where a candidate's full name is naturally rare (often 0-1) while a valid
+    -- alias of it repeats. Scale the ceiling with the corpus size so a handful
+    -- of alias hits in a large text does not read as "generic" and unlink the
+    -- exact entry the snippets were added to preserve.
+    local function isTooGeneric(term, name_freq)
         local term_l = term:lower()
         if #term < 2 or honorifics[term_l] then return true end
-        local name_freq = math.max(1, countInText(entity_name:lower()))
-        return countInText(term_l) > name_freq * 5
+        local limit = math.max(name_freq * 5, math.floor(#lower_text / 800))
+        return countInText(term_l) > limit
     end
 
     -- Check if a term appears in the text surrounded by non-word characters.
     -- Pads the text so names at the very start/end of a string also match.
+    local padded_text = " " .. lower_text .. " "
     local function termFound(term)
         if not term or #term < 2 then return false end
         local escaped = term:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%1")
-        return (" " .. lower_text .. " "):find("[^%w]" .. escaped:lower() .. "[^%w]") ~= nil
+        return padded_text:find("[^%w]" .. escaped:lower() .. "[^%w]") ~= nil
     end
 
     local function scanList(list, type_name)
@@ -1065,15 +1191,20 @@ function M:findRelatedEntities(text, exclude_name)
                     found = true
                 end
 
-                -- Strategy 2: Aliases (skip generic and honorific-only aliases)
+                -- Strategy 2: Aliases (skip generic and honorific-only aliases).
+                -- Cheap presence check first; the frequency counts only run for
+                -- aliases that are present, and the name count runs once.
                 if not found and item.aliases then
+                    local name_freq = nil
                     for _, alias in ipairs(item.aliases) do
                         if type(alias) == "string"
                                   and not honorifics[alias:lower()]
-                                  and not isTooGeneric(alias, name)
                                   and termFound(alias) then
-                            found = true
-                            break
+                            name_freq = name_freq or math.max(1, countInText(name:lower()))
+                            if not isTooGeneric(alias, name_freq) then
+                                found = true
+                                break
+                            end
                         end
                     end
                 end
@@ -1143,7 +1274,7 @@ end
 
 function M:showCharacterDetails(character, opts)
     if shouldUseBottomPopup(self, opts) then
-        showBottomPopup(self, character)
+        showBottomPopup(self, character, "character")
         return
     end
     local base_fs = _getPopupFontSize(self)
@@ -1280,7 +1411,7 @@ function M:showCharacterDetails(character, opts)
     local vg = VerticalGroup:new(vg_components)
 
     local linked_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.linked_entries_enabled ~= false
-    local related = linked_enabled and self:findRelatedEntities(resolved_desc or "", character.name) or {}
+    local related = linked_enabled and self:findRelatedEntities(resolved_desc or "", character.name, self:_mentionScanText(character)) or {}
     local mentions_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.mentions_enabled ~= false
     
     local buttons = {}
@@ -1377,6 +1508,14 @@ function M:showCharacterDetails(character, opts)
         })
     end
 
+    table.insert(buttons, 1, {{
+        text = self.loc:t("fetch_more") or "Fetch More",
+        callback = function()
+            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
+            self:fetchMoreDetailsForEntity(character, "character")
+        end,
+    }})
+
     self.active_details_dialog = ButtonDialog:new{
         _added_widgets = { vg },
         buttons = buttons,
@@ -1386,7 +1525,7 @@ end
 
 function M:showLocationDetails(loc_item, opts)
     if shouldUseBottomPopup(self, opts) then
-        showBottomPopup(self, loc_item)
+        showBottomPopup(self, loc_item, "location")
         return
     end
     local base_fs = _getPopupFontSize(self)
@@ -1463,7 +1602,7 @@ function M:showLocationDetails(loc_item, opts)
     local vg = VerticalGroup:new(vg_components)
 
     local linked_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.linked_entries_enabled ~= false
-    local related = linked_enabled and self:findRelatedEntities(desc, loc_item.name) or {}
+    local related = linked_enabled and self:findRelatedEntities(desc, loc_item.name, self:_mentionScanText(loc_item)) or {}
     local mentions_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.mentions_enabled ~= false
     
     local buttons = {}
@@ -1550,6 +1689,14 @@ function M:showLocationDetails(loc_item, opts)
         })
     end
 
+    table.insert(buttons, 1, {{
+        text = self.loc:t("fetch_more") or "Fetch More",
+        callback = function()
+            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
+            self:fetchMoreDetailsForEntity(loc_item, "location")
+        end,
+    }})
+
     self.active_details_dialog = ButtonDialog:new{
         _added_widgets = { vg },
         buttons = buttons,
@@ -1559,7 +1706,7 @@ end
 
 function M:showTermDetails(term, opts)
     if shouldUseBottomPopup(self, opts) then
-        showBottomPopup(self, term)
+        showBottomPopup(self, term, "term")
         return
     end
     local base_fs = _getPopupFontSize(self)
@@ -1687,7 +1834,7 @@ function M:showTermDetails(term, opts)
     local vg = VerticalGroup:new(vg_components)
 
     local linked_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.linked_entries_enabled ~= false
-    local related = linked_enabled and self:findRelatedEntities(term.definition or "", term.name) or {}
+    local related = linked_enabled and self:findRelatedEntities(term.definition or "", term.name, self:_mentionScanText(term)) or {}
     local mentions_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.mentions_enabled ~= false
 
     local function get_relookup_row()
@@ -1819,6 +1966,14 @@ function M:showTermDetails(term, opts)
             }
         })
     end
+
+    table.insert(buttons, 1, {{
+        text = self.loc:t("fetch_more") or "Fetch More",
+        callback = function()
+            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
+            self:fetchMoreDetailsForEntity(term, "term")
+        end,
+    }})
 
     self.active_details_dialog = ButtonDialog:new{
         _added_widgets = { vg },
@@ -2012,7 +2167,7 @@ function M:showLinkedEntriesSettings()
             self.ai_helper:saveSettings({ linked_entries_enabled = val })
             UIManager:setDirty(nil, "ui")
         end,
-        about_text = self.loc:t("linked_entries_setting_desc") or "Linked Entries automatically connects characters, locations, and historical figures when they are mentioned in each other's descriptions.\n\nDisabling this will hide the [B]Linked Entries[/B] button from detail dialogs.",
+        about_text = self.loc:t("linked_entries_setting_desc") or "Linked Entries automatically connects characters, locations, and historical figures when they are named in each other's descriptions or in their found mentions.\n\nDisabling this will hide the [B]Linked Entries[/B] button from detail dialogs.",
     })
 end
 
@@ -3590,7 +3745,7 @@ end
 
 function M:showHistoricalFigureDetails(fig, opts)
     if shouldUseBottomPopup(self, opts) then
-        showBottomPopup(self, fig)
+        showBottomPopup(self, fig, "historical_figure")
         return
     end
     local base_fs = _getPopupFontSize(self)
@@ -3665,7 +3820,7 @@ function M:showHistoricalFigureDetails(fig, opts)
     local vg = VerticalGroup:new(vg_components)
 
     local linked_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.linked_entries_enabled ~= false
-    local related = linked_enabled and self:findRelatedEntities(bio, fig.name) or {}
+    local related = linked_enabled and self:findRelatedEntities(bio, fig.name, self:_mentionScanText(fig)) or {}
     local mentions_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.mentions_enabled ~= false
     
     local buttons = {}
@@ -3751,6 +3906,14 @@ function M:showHistoricalFigureDetails(fig, opts)
             }
         })
     end
+
+    table.insert(buttons, 1, {{
+        text = self.loc:t("fetch_more") or "Fetch More",
+        callback = function()
+            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
+            self:fetchMoreDetailsForEntity(fig, "historical_figure")
+        end,
+    }})
 
     self.active_details_dialog = ButtonDialog:new{
         _added_widgets = { vg },
@@ -4380,7 +4543,7 @@ function M:showConfigFileGuide()
         span(),
     }
 
-    local wiki_url = "https://github.com/ultimatejimmy/xray.koplugin/wiki/2.-API-Key-Setup-Options"
+    local wiki_url = "https://github.com/okkyo/xray.koplugin/wiki/2.-API-Key-Setup-Options"
     local qr_size = math.max(100, math.min(math.floor((dialog_w - sc(32)) * 0.35), 140))
     local ok_qr, QRWidget = pcall(require, "ui/widget/qrwidget")
     if ok_qr and QRWidget then

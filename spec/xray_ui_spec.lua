@@ -1266,5 +1266,65 @@ describe("xray_ui", function()
             assert.is_true(ok, "clear_single_key callback failed: " .. tostring(err))
         end)
     end)
+
+    describe("findRelatedEntities with mention snippets", function()
+        before_each(function()
+            plugin.characters = {
+                { name = "Madge Undersee", aliases = { "Madge" } },
+                { name = "Mayor of District 12", aliases = { "Madge's father" } },
+                { name = "Gale", aliases = {} },
+            }
+            plugin.locations = {}
+            plugin.historical_figures = {}
+            plugin.terms = {}
+        end)
+
+        it("still links a rewritten description via cached mention snippets", function()
+            -- The rewritten description no longer names the Mayor, so the
+            -- description alone finds nothing.
+            local desc = "The daughter of District 12's mayor who gives Katniss a pin."
+            local none = plugin:findRelatedEntities(desc, "Madge Undersee")
+            local has_mayor = false
+            for _, r in ipairs(none) do
+                if r.item.name == "Mayor of District 12" then has_mayor = true end
+            end
+            assert.is_false(has_mayor)
+
+            -- With the entity's snippets (which say "Madge's father"), the link
+            -- comes back.
+            local madge = plugin.characters[1]
+            madge.mentions = {
+                { snippet = "Two of the three chairs fill with Madge's father, Mayor Undersee." },
+            }
+            local extra = plugin:_mentionScanText(madge)
+            local rel = plugin:findRelatedEntities(desc, "Madge Undersee", extra)
+            has_mayor = false
+            for _, r in ipairs(rel) do
+                if r.item.name == "Mayor of District 12" then has_mayor = true end
+            end
+            assert.is_true(has_mayor)
+        end)
+
+        it("returns nil scan text when the entity has no mentions", function()
+            assert.is_nil(plugin:_mentionScanText({ name = "X" }))
+            assert.is_nil(plugin:_mentionScanText({ name = "X", mentions = {} }))
+        end)
+
+        it("accepts sparse and plain-string mention rows", function()
+            local ent = { name = "Y", mentions = { [3] = { snippet = "meets Gale" }, [9] = "and Gale again" } }
+            local text = plugin:_mentionScanText(ent)
+            assert.is_not_nil(text)
+            assert.is_truthy(text:find("Gale"))
+        end)
+
+        it("does not link the entity to itself through its own snippets", function()
+            local madge = plugin.characters[1]
+            madge.mentions = { { snippet = "Madge walks straight to me." } }
+            local rel = plugin:findRelatedEntities("", "Madge Undersee", plugin:_mentionScanText(madge))
+            for _, r in ipairs(rel) do
+                assert.are_not.equal("Madge Undersee", r.item.name)
+            end
+        end)
+    end)
 end)
 

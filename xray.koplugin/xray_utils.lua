@@ -137,6 +137,24 @@ function M:flattenTOC(nodes, flat_list)
     return flat_list
 end
 
+-- Append mentions from `found` to `list`, skipping entries already present
+-- (same page and snippet). Find Mentions and Fetch More both persist scan
+-- results into entity.mentions; a rescan overlapping the cached range must
+-- not store the same passage twice.
+function M:appendUniqueMentions(list, found)
+    local seen = {}
+    for _, m in ipairs(list) do
+        seen[tostring(m.page) .. "\0" .. tostring(m.snippet)] = true
+    end
+    for _, m in ipairs(found or {}) do
+        local key = tostring(m.page) .. "\0" .. tostring(m.snippet)
+        if not seen[key] then
+            seen[key] = true
+            list[#list + 1] = m
+        end
+    end
+end
+
 -- Detect AI provider from key format (supports modern AQ.*, AIza*, sk-ant-*, sk-or-*, sk-proj-*, sk-*)
 function M:detectProviderFromKey(raw_key)
     if type(raw_key) ~= "string" then return nil, nil end

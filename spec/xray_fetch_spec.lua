@@ -626,4 +626,227 @@ describe("xray_fetch", function()
             assert.is_nil(err)
         end)
     end)
+
+    describe("fetch-more entity type inference", function()
+        before_each(function()
+            plugin.characters = { { name = "Madge Undersee" } }
+            plugin.locations = { { name = "District 12" } }
+            plugin.historical_figures = { { name = "President Snow", biography = "..." } }
+            plugin.terms = { { name = "Tessera", definition = "..." } }
+        end)
+
+        it("classifies a term by its definition field", function()
+            assert.are.equal("term", plugin:_inferEntityType({ name = "X", definition = "d" }))
+        end)
+        it("classifies a historical figure by its biography field", function()
+            assert.are.equal("historical_figure", plugin:_inferEntityType({ name = "X", biography = "b" }))
+        end)
+        it("classifies a location by list membership", function()
+            assert.are.equal("location", plugin:_inferEntityType({ name = "District 12" }))
+        end)
+        it("defaults an unknown entity to character", function()
+            assert.are.equal("character", plugin:_inferEntityType({ name = "Nobody" }))
+        end)
+    end)
+
+    describe("fetch-more result merge", function()
+        local madge
+        before_each(function()
+            madge = { name = "Madge Undersee", description = "Mayor's daughter and friend." }
+            plugin.characters = { madge }
+            plugin.lookup_manager = { showResult = function() end }
+        end)
+
+        it("does not let an empty description wipe the entry when the text is under another key", function()
+            plugin:_processSingleWordResult(
+                { is_valid = true, type = "historical_figure",
+                  item = { name = "Madge", description = "", biography = "Long enriched text." } },
+                "Madge", "book text", 1, true, madge, "character")
+            assert.are.equal("Long enriched text.", madge.description)
+            assert.is_nil(madge.biography)
+            assert.are.equal("Madge Undersee", madge.name)
+        end)
+
+        it("keeps the existing description when the AI returns only empty text", function()
+            plugin:_processSingleWordResult(
+                { is_valid = true, type = "character",
+                  item = { name = "Madge", description = "" } },
+                "Madge", "book text", 1, true, madge, "character")
+            assert.are.equal("Mayor's daughter and friend.", madge.description)
+        end)
+    end)
+
+    describe("fetch-more start errors", function()
+        it("forwards the build error from lookupSingleWordAsync to the error dialog", function()
+            local shown_codes = {}
+            local utils = require("xray_utils")
+            local orig_friendly = utils.getFriendlyError
+            utils.getFriendlyError = function(_, code, msg, loc)
+                table.insert(shown_codes, { code = code, msg = msg })
+                return "title", tostring(msg)
+            end
+            plugin.ai_helper = {
+                hasApiKey = function() return true end,
+                settings = { spoiler_setting = "full_book" },
+                lookupSingleWordAsync = function() return nil, "error_api", "No API key configured" end,
+                cancelAsyncChild = function() end,
+            }
+            plugin.chapter_analyzer = {
+                getEndPageForCurrentPage = function() return 10 end,
+                getDetailedChapterSamples = function() return "samples", {} end,
+                scanMentionsAsync = function(_, _, _, _, _, _, _, on_complete)
+                    on_complete({})
+                    return { cancel = function() end }
+                end,
+            }
+            plugin.ui.getCurrentPage = function() return 10 end
+            plugin.ui.document.getPageCount = function() return 100 end
+            plugin._buildEnrichContext = function() return {}, "book text" end
+            plugin._sweepStaleFetchFiles = function() end
+            plugin.findRelatedEntities = function() return {} end
+
+            plugin:fetchMoreDetailsForEntity({ name = "Madge Undersee", mentions = {} }, "character")
+
+            utils.getFriendlyError = orig_friendly
+            assert.are.equal(1, #shown_codes)
+            assert.are.equal("error_api", shown_codes[1].code)
+            assert.are.equal("No API key configured", shown_codes[1].msg)
+        end)
+    end)
+
+    describe("fetch-more passage gathering", function()
+        local entity, scan_calls, enrich_passages
+
+        before_each(function()
+            scan_calls = {}
+            enrich_passages = nil
+            entity = { name = "Madge Undersee" }
+            plugin.ai_helper = {
+                hasApiKey = function() return true end,
+                settings = { spoiler_setting = "spoiler_free" },
+                lookupSingleWordAsync = function() return 4242 end,
+                cancelAsyncChild = function() end,
+                -- The spec UIManager runs scheduled callbacks at once, so the poll
+                -- must end on its first tick or it recurses forever.
+                checkAsyncResult = function() return false, "error_api", "stub" end,
+            }
+            plugin.chapter_analyzer = {
+                getEndPageForCurrentPage = function(_, _, p) return p end,
+                getDetailedChapterSamples = function() return "samples", {} end,
+                scanMentionsAsync = function(_, _, _, _, min_page, max_page, _, on_complete)
+                    table.insert(scan_calls, { min_page = min_page, max_page = max_page })
+                    on_complete({ { page = 70, snippet = "Madge waves.", chapter = "Ch 7" } })
+                    return { cancel = function() end }
+                end,
+            }
+            plugin.ui.getCurrentPage = function() return 80 end
+            plugin.ui.document.getPageCount = function() return 100 end
+            plugin._buildEnrichContext = function(_, _, _, passages)
+                enrich_passages = passages
+                return {}, "book text"
+            end
+            plugin._sweepStaleFetchFiles = function() end
+            plugin.saveMentionsToCache = function() end
+            plugin.isRequestTimedOut = function() return false end
+        end)
+
+        it("rescans from the last scanned page when the cache stops short of the reader", function()
+            entity.mentions = {
+                { page = 3, snippet = "a" }, { page = 5, snippet = "b" }, { page = 9, snippet = "c" },
+            }
+            entity.last_mention_page = 20
+            plugin:fetchMoreDetailsForEntity(entity, "character")
+
+            assert.are.equal(1, #scan_calls)
+            assert.are.equal(20, scan_calls[1].min_page)
+            assert.are.equal(80, scan_calls[1].max_page)
+            -- The scan result is merged and persisted on the entity.
+            assert.are.equal(4, #entity.mentions)
+            assert.are.equal(70, entity.mentions[4].page)
+            assert.are.equal(80, entity.last_mention_page)
+            -- The AI receives the combined passages, not only the stale cache.
+            assert.are.equal(4, #enrich_passages)
+        end)
+
+        it("reuses a cache that already covers the readable range without scanning", function()
+            entity.mentions = {
+                { page = 3, snippet = "a" }, { page = 5, snippet = "b" }, { page = 9, snippet = "c" },
+            }
+            entity.last_mention_page = math.huge
+            plugin:fetchMoreDetailsForEntity(entity, "character")
+
+            assert.are.equal(0, #scan_calls)
+            assert.are.equal(3, #enrich_passages)
+        end)
+    end)
+
+    describe("fetch-more context assembly", function()
+        local entity = {
+            name = "Madge Undersee",
+            role = "Mayor's daughter and friend",
+            description = "The daughter of the mayor of District 12.",
+            aliases = { "Madge" },
+        }
+
+        it("focuses the prompt on the entity and includes the existing entry", function()
+            local ctx, book_text = plugin:_buildEnrichContext(entity, "character",
+                { { snippet = "Madge opens the door." }, { snippet = "Madge smiles at Katniss." } },
+                "CHAPTER SAMPLES TEXT", 55)
+            assert.is_truthy(book_text:find("FOCUS ENTITY", 1, true))
+            assert.is_truthy(book_text:find("Madge Undersee", 1, true))
+            assert.is_truthy(book_text:find("The daughter of the mayor", 1, true))
+            assert.is_truthy(book_text:find("Madge opens the door.", 1, true))
+            assert.are.equal(55, ctx.reading_percent)
+            assert.are.equal("CHAPTER SAMPLES TEXT", ctx.chapter_samples)
+        end)
+
+        it("triggers merge mode for the matching entity type only", function()
+            local ctx = plugin:_buildEnrichContext(entity, "character", {}, nil, 100)
+            assert.is_truthy(ctx.existing_characters)
+            assert.is_nil(ctx.existing_locations)
+            assert.is_nil(ctx.existing_historical_figures)
+
+            local lctx = plugin:_buildEnrichContext({ name = "District 12", description = "A district." }, "location", {}, nil, 100)
+            assert.is_truthy(lctx.existing_locations)
+            assert.is_nil(lctx.existing_characters)
+        end)
+
+        it("accepts plain-string passages and caps the passage budget", function()
+            local big = {}
+            for i = 1, 500 do big[i] = { snippet = string.rep("Madge ", 20) } end
+            local ok, _, book_text = pcall(function()
+                local c, bt = plugin:_buildEnrichContext(entity, "character", big, nil, 100)
+                return c, bt
+            end)
+            assert.is_true(ok)
+            -- book_text stays bounded (header + <= ~18000 chars of passages)
+            local _, bt2 = plugin:_buildEnrichContext(entity, "character", big, nil, 100)
+            assert.is_true(#bt2 < 20000)
+        end)
+
+        it("handles a term with a definition and no merge-mode branch", function()
+            local ctx, book_text = plugin:_buildEnrichContext(
+                { name = "Tessera", definition = "A ration entry in exchange for tesserae." },
+                "term", { { snippet = "You can sign up for a tessera." } }, nil, 100)
+            assert.is_truthy(book_text:find("A ration entry", 1, true))
+            assert.is_nil(ctx.existing_characters)
+        end)
+
+        it("asks the rewrite to keep naming currently linked entities", function()
+            -- Stub the link detector (defined in the UI mixin, absent here) so the
+            -- preserve-names branch runs.
+            plugin.findRelatedEntities = function()
+                return { { item = { name = "Mayor of District 12" }, type = "character" } }
+            end
+            local _, book_text = plugin:_buildEnrichContext(entity, "character", {}, nil, 100)
+            assert.is_truthy(book_text:find("Keep naming these related entities", 1, true))
+            assert.is_truthy(book_text:find("Mayor of District 12", 1, true))
+        end)
+
+        it("omits the preserve line when nothing is linked", function()
+            plugin.findRelatedEntities = function() return {} end
+            local _, book_text = plugin:_buildEnrichContext(entity, "character", {}, nil, 100)
+            assert.is_nil(book_text:find("Keep naming these related entities", 1, true))
+        end)
+    end)
 end)

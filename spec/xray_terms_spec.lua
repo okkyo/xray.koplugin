@@ -160,6 +160,178 @@ describe("xray_terms", function()
             assert.is_not_nil(found_mentions)
             assert.is_true(#found_mentions > 0)
         end)
+
+        it("should fall back to page-range when the TOC is malformed (empty xpointer extraction)", function()
+            -- Reproduces a book whose TOC entries exist but whose xpointers do not
+            -- extract any text (out-of-order / broken navMap, as in some AZW files).
+            -- The TOC path returns "", so the scanner must recover via page range.
+            local doc = {
+                rolling = true,  -- reflowable
+                getTotalPages = function() return 100 end,
+                getXPointer = function() return "saved_pos" end,
+                gotoXPointer = function() end,
+                getPageXPointer = function(self, p) return "PAGE:" .. tostring(p) end,
+                getTextFromXPointers = function(self, start_xp, end_xp)
+                    -- Only page-derived xpointers yield text; TOC xpointers are broken.
+                    if type(start_xp) == "string" and start_xp:match("^PAGE:") then
+                        return "The mayor's daughter Madge opens the door. Madge smiles."
+                    end
+                    return ""
+                end,
+            }
+            -- getTextFromPageRange reads ui.rolling off the ReaderUI, not the document.
+            local ui = { document = doc, rolling = true, loc = { t = function(self, s) return s end } }
+            local entity = { name = "Madge Undersee", role = "friend", aliases = { "Madge" } }
+
+            local toc_entry      = { title = "PART I",  page = 1,  xpointer = "broken_toc_1" }
+            local next_toc_entry = { title = "PART II", page = 10, xpointer = "broken_toc_2" }
+
+            local mentions = analyzer:findMentionsInChapter(ui, entity, toc_entry, next_toc_entry, nil)
+            assert.is_true(#mentions > 0)
+        end)
+
+        it("reads a reflowable chapter through its last page in the page-range fallback", function()
+            -- getTextFromPageRange stops at the START xpointer of the end page on
+            -- reflowable documents, so the end bound must be the next chapter's
+            -- first page, not the page before it.
+            local ranges = {}
+            local doc = {
+                getTotalPages = function() return 100 end,
+                getXPointer = function() return "saved_pos" end,
+                gotoXPointer = function() end,
+                getPageXPointer = function(self, p) return "PAGE:" .. tostring(p) end,
+                getTextFromXPointers = function(self, start_xp, end_xp)
+                    if type(start_xp) == "string" and start_xp:match("^PAGE:") then
+                        table.insert(ranges, { start_xp, end_xp })
+                        if start_xp == end_xp then return "" end
+                        return "The mayor's daughter Madge opens the door. Madge smiles."
+                    end
+                    return ""
+                end,
+            }
+            local ui = { document = doc, rolling = true, loc = { t = function(self, s) return s end } }
+            local entity = { name = "Madge Undersee", aliases = { "Madge" } }
+
+            local mentions = analyzer:findMentionsInChapter(ui, entity,
+                { title = "PART I", page = 1, xpointer = "broken_1" },
+                { title = "PART II", page = 10, xpointer = "broken_2" }, nil)
+            assert.is_true(#mentions > 0)
+            assert.are.equal("PAGE:10", ranges[1][2])
+
+            -- A one-page chapter (next chapter starts on the very next page) still recovers.
+            ranges = {}
+            mentions = analyzer:findMentionsInChapter(ui, entity,
+                { title = "Short", page = 5, xpointer = "broken_3" },
+                { title = "After", page = 6, xpointer = "broken_4" }, nil)
+            assert.is_true(#mentions > 0)
+            assert.are.equal("PAGE:5", ranges[1][1])
+            assert.are.equal("PAGE:6", ranges[1][2])
+        end)
+
+        it("keeps the page-based fallback inclusive and stops before the next chapter", function()
+            local pages_read = {}
+            local doc = {
+                getTotalPages = function() return 100 end,
+                getPageText = function(self, p)
+                    table.insert(pages_read, p)
+                    return "Madge is on page " .. p .. "."
+                end,
+            }
+            local ui = { document = doc, paging = true, loc = { t = function(self, s) return s end } }
+            local entity = { name = "Madge Undersee", aliases = { "Madge" } }
+
+            analyzer:findMentionsInChapter(ui, entity, { title = "One", page = 1 }, { title = "Two", page = 10 }, nil)
+            assert.are.equal(1, pages_read[1])
+            assert.are.equal(9, pages_read[#pages_read])
+        end)
+
+        it("can place a mention on the chapter's last page", function()
+            -- Pages 10..19 belong to the chapter; the name appears only on page 19.
+            local doc = {
+                getTotalPages = function() return 100 end,
+                getPageText = function(self, p)
+                    if p == 19 then return "Madge waves goodbye." end
+                    return "Nothing here on page " .. p .. ". Filler filler filler."
+                end,
+            }
+            local ui = { document = doc, paging = true, loc = { t = function(self, s) return s end } }
+            local entity = { name = "Madge Undersee", aliases = { "Madge" } }
+
+            local mentions = analyzer:findMentionsInChapter(ui, entity,
+                { title = "Ch", page = 10, xpointer = "page:10" },
+                { title = "Next", page = 20, xpointer = "page:20" }, nil)
+            assert.are.equal(1, #mentions)
+            assert.are.equal(19, mentions[1].page)
+        end)
+    end)
+
+    describe("Mentions scan TOC ordering", function()
+        local analyzer = require("xray_chapteranalyzer")
+
+        local function scan(toc, doc_overrides)
+            local ranges = {}
+            local doc = {
+                getPageCount = function() return 100 end,
+                getEndXPointer = function() return "END" end,
+                getTextFromXPointers = function(self, s, e)
+                    table.insert(ranges, { s, e })
+                    return "Madge stands by the door of the bakery and waits for a while."
+                end,
+            }
+            for k, v in pairs(doc_overrides or {}) do doc[k] = v end
+            local ui = { document = doc, loc = { t = function(self, s) return s end } }
+            local entity = { name = "Madge Undersee", aliases = { "Madge" } }
+            local result
+            analyzer:scanMentionsAsync(ui, entity, toc, nil, nil, nil, function(m) result = m end)
+            return result, ranges
+        end
+
+        it("keeps original order for entries that share a page", function()
+            local _, ranges = scan({
+                { title = "Part I", page = 1, xpointer = "A" },
+                { title = "Chapter 1", page = 1, xpointer = "B" },
+                { title = "Chapter 2", page = 20, xpointer = "C" },
+            })
+            assert.are.same({ "A", "B" }, ranges[1])
+            assert.are.same({ "B", "C" }, ranges[2])
+            assert.are.same({ "C", "END" }, ranges[3])
+        end)
+
+        it("keeps an entry without a page marker in place", function()
+            local _, ranges = scan({
+                { title = "Chapter 1", page = 1, xpointer = "A" },
+                { title = "Interlude", xpointer = "B" },
+                { title = "Chapter 2", page = 20, xpointer = "C" },
+            })
+            assert.are.same({ "A", "B" }, ranges[1])
+            assert.are.same({ "B", "C" }, ranges[2])
+            assert.are.same({ "C", "END" }, ranges[3])
+        end)
+
+        it("still sorts out-of-order entries by page", function()
+            local _, ranges = scan({
+                { title = "Chapter 2", page = 20, xpointer = "C" },
+                { title = "Chapter 1", page = 1, xpointer = "A" },
+            })
+            assert.are.same({ "A", "C" }, ranges[1])
+            assert.are.same({ "C", "END" }, ranges[2])
+        end)
+
+        it("drops an identical mention found twice under two headings", function()
+            -- Page-only TOC: a parent heading and its first child share page 1,
+            -- so both read page 1.
+            local mentions = scan({
+                { title = "Part I", page = 1 },
+                { title = "Chapter 1", page = 1 },
+                { title = "Chapter 2", page = 2 },
+            }, {
+                getPageText = function(self, p)
+                    if p == 1 then return "Madge opens the door." end
+                    return "Nothing here."
+                end,
+            })
+            assert.are.equal(1, #mentions)
+        end)
     end)
 
     describe("finalizeXRayData with glossary-only data", function()
