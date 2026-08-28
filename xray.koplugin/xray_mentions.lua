@@ -8,7 +8,14 @@ local ButtonDialog = require("ui/widget/buttondialog")
 local Event = require("ui/event")
 
 local plugin_path = ((...) or ""):match("(.-)[^%.]+$") or ""
-local XRayConfig = require(plugin_path .. "xray_config")
+-- xray_config.lua holds user API keys and is git-ignored, so a fresh checkout
+-- may not have it. Fail loudly with a clear message instead of a generic
+-- "module not found", so the user knows to create it from the example.
+local ok, XRayConfig = pcall(require, plugin_path .. "xray_config")
+if not ok then
+    error("xray.koplugin: xray_config.lua not found. "
+        .. "Copy xray_config.example.lua to xray_config.lua and add your API key(s).")
+end
 
 local M = {}
 

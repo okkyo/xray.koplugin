@@ -4,3 +4,4 @@ scratch/
 .wrangler/
 *.log
 *.log.old
+xray.koplugin/xray_config.lua
