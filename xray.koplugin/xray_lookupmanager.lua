@@ -13,7 +13,11 @@ local LookupManager = {}
 
 
 local function _truncateSafe(text, limit)
-    return (utils:getTruncatedText(text, limit))
+    local truncated, was_truncated = utils:getTruncatedText(text, limit)
+    if was_truncated then
+        return truncated .. "…"
+    end
+    return truncated
 end
 
 function LookupManager:new(plugin)
