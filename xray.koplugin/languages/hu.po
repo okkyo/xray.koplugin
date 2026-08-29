@@ -81,9 +81,9 @@ msgstr "Engedélyezve"
 msgid "auto_enrich_preference_desc"
 msgstr "Válassza ki a kártyák automatikus gazdagításának beállításait:"
 
-# en-hash: 10b0e718ab22bc54c2ee2339d420206c
+# en-hash: 00284c3d790603be570224a4662d2527
 msgid "auto_enrich_setting_desc"
-msgstr "Amikor megnyit egy rövid vagy elavult karakter-, helyszín- vagy fogalomkártyát, az X-Ray a háttérben csendben megkérheti az AI-t annak gazdagítására, majd frissítheti a megnyitott kártyát az új szöveggel.\n\nEnnek letiltása leállítja az összes automatikus gazdagítást.\n\n[B]Megjegyzés:[/B] minden gazdagítás [B]egy[/B] AI API hívást használ. Ez [B]a lassabb eszközökön alapértelmezés szerint ki van kapcsolva[/B]. A szabad-szintű vagy korlátozott kvótával rendelkező felhasználók számára ajánlott lehet kikapcsolva hagyni."
+msgstr "Amikor megnyit egy karakter-, hely- vagy kifejezéskártyát, amely rövid vagy elavult, az X-Ray csendben megkérheti a mesterséges intelligenciát, hogy a háttérben gazdagítsa azt, majd frissítse a megnyitott kártyát az új szöveggel.\n\nEnnek letiltása leállít minden automatikus kiegészítést.\n\n[B]Megjegyzés:[/B] minden kiegészítés [B]egyetlen[/B] MI API-hívást használ. Ez [B]alapértelmezés szerint ki van kapcsolva a lassabb eszközökön[/B]. Az ingyenes vagy kvótakorlátos csomagot használók jobban teszik, ha kikapcsolva hagyják."
 
 # en-hash: 6504799dfab3728b5b85d01f0c482ae1
 msgid "auto_enrich_setting_title"
@@ -459,19 +459,19 @@ msgstr "Lekérdezés"
 
 # en-hash: feabc3a414741d1d0169e608cd79a8d7
 msgid "fetch_more"
-msgstr ""
+msgstr "Továbbiak lekérése"
 
 # en-hash: e6d3f832a078aa4a1b9ac3ec543144b1
 msgid "fetch_more_progress"
-msgstr ""
+msgstr "További részletek lekérése..."
 
 # en-hash: 689a44e8ec37f6f41391d8ea515e76e9
 msgid "fetch_more_replace_confirm"
-msgstr ""
+msgstr "Egy másik X-Ray kérés még fut. Meg megszakítja, és inkább lekéri ennek az elemnek a részleteit?"
 
 # en-hash: 43ed5b7ddf5e436ae0dccc841c6d509f
 msgid "fetch_named"
-msgstr ""
+msgstr "„%s” lekérése"
 
 # en-hash: 05ab2ce95089e50db065a1bd1ed0cd85
 msgid "fetch_single_word_prompt"
@@ -1059,7 +1059,7 @@ msgstr "A párosítás elutasítva (nem duplikátum)."
 
 # en-hash: 6ce50515ff472af170d4655b7a90f6be
 msgid "partial_matches"
-msgstr ""
+msgstr "Nincs pontos találat erre: „%s”. Koppintson egy kapcsolódó bejegyzésre, vagy kérje le:"
 
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"

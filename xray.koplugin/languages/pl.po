@@ -81,9 +81,9 @@ msgstr "Włączone"
 msgid "auto_enrich_preference_desc"
 msgstr "Wybierz preferencje dotyczące automatycznego wzbogacania kart:"
 
-# en-hash: 10b0e718ab22bc54c2ee2339d420206c
+# en-hash: 00284c3d790603be570224a4662d2527
 msgid "auto_enrich_setting_desc"
-msgstr "Gdy otwierasz kartę postaci, lokalizacji lub terminu, która jest krótka lub nieaktualna, X-Ray może dyskretnie poprosić AI o wzbogacenie jej w tle, a następnie odświeżyć otwartą kartę o nowy tekst.\n\nWyłączenie tej opcji zatrzymuje całe automatyczne wzbogacanie.\n\n[B]Uwaga:[/B] każde wzbogacenie zużywa [B]jedno[/B] zapytanie API AI. Ta opcja jest [B]domyślnie wyłączona na wolniejszych urządzeniach[/B]. Użytkownicy korzystający z darmowych planów lub z ograniczonym limitem zapytań mogą woleć pozostawić ją wyłączoną."
+msgstr "Po otwarciu karty postaci, miejsca lub terminu, która jest krótka lub nieaktualna, X-Ray może po cichu poprosić AI o jej wzbogacenie w tle, a następnie odświeżyć otwartą kartę nowym tekstem.\n\nWyłączenie tej opcji zatrzymuje wszelkie automatyczne wzbogacanie.\n\n[B]Uwaga:[/B] każde wzbogacenie zużywa [B]jedno[/B] wywołanie API AI. Opcja ta jest [B]domyślnie wyłączona na wolniejszych urządzeniach[/B]. Użytkownicy korzystający z planów darmowych lub z limitem zapytań mogą preferować jej wyłączenie."
 
 # en-hash: 6504799dfab3728b5b85d01f0c482ae1
 msgid "auto_enrich_setting_title"
@@ -459,19 +459,19 @@ msgstr "Pobierz"
 
 # en-hash: feabc3a414741d1d0169e608cd79a8d7
 msgid "fetch_more"
-msgstr ""
+msgstr "Pobierz więcej"
 
 # en-hash: e6d3f832a078aa4a1b9ac3ec543144b1
 msgid "fetch_more_progress"
-msgstr ""
+msgstr "Pobieranie dodatkowych szczegółów..."
 
 # en-hash: 689a44e8ec37f6f41391d8ea515e76e9
 msgid "fetch_more_replace_confirm"
-msgstr ""
+msgstr "Trwa inne żądanie X-Ray. Anulować je i zamiast tego pobrać szczegóły dla tego elementu?"
 
 # en-hash: 43ed5b7ddf5e436ae0dccc841c6d509f
 msgid "fetch_named"
-msgstr ""
+msgstr "Pobierz „%s”"
 
 # en-hash: 05ab2ce95089e50db065a1bd1ed0cd85
 msgid "fetch_single_word_prompt"
@@ -1059,7 +1059,7 @@ msgstr "Pair marked as not a duplicate."
 
 # en-hash: 6ce50515ff472af170d4655b7a90f6be
 msgid "partial_matches"
-msgstr ""
+msgstr "Brak dokładnego dopasowania dla „%s”. Stuknij powiązany wpis lub pobierz go:"
 
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"

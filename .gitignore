@@ -6,3 +6,6 @@ scratch/
 *.log.old
 xray.koplugin/xray_config.lua
 test-books/
+.env
+__pycache__/
+.claude/scheduled_tasks.lock

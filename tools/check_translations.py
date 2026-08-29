@@ -156,7 +156,8 @@ def check_translations():
 
     if failed:
         print("\nError: Translation files are out of sync or stale compared to source code and English master.")
-        print("Run 'python tools/sync_translations.py' (requires GEMINI_API_KEY) to auto-translate and re-sync.")
+        print("Run 'python tools/sync_translations.py' to auto-translate and re-sync.")
+        print("It needs GEMINI_API_KEY. Put it in a .env file at the repo root, or export it.")
         sys.exit(1)
     
     print("\nAll translation files are correctly synchronized!")

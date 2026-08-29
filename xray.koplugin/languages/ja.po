@@ -81,9 +81,9 @@ msgstr "有効"
 msgid "auto_enrich_preference_desc"
 msgstr "カードの自動拡充に関する設定を選択してください:"
 
-# en-hash: 10b0e718ab22bc54c2ee2339d420206c
+# en-hash: 00284c3d790603be570224a4662d2527
 msgid "auto_enrich_setting_desc"
-msgstr "短いまたは古くなったキャラクター、場所、用語のカードを開くと、X-Rayがバックグラウンドで自動的にAIへ拡充を依頼し、開いているカードを新しいテキストで更新できます。\n\nこれを無効にすると、すべての自動拡充が停止します。\n\n[B]注意:[/B] 各拡充ごとに[B]1回分[/B]のAI API呼び出しを消費します。これは[B]低速なデバイスでは既定で無効[/B]です。無料枠や制限付きプランをご利用の方は、無効のままにすることをお勧めします。"
+msgstr "短い、または古いキャラクター、場所、用語のカードを開いた際、X-RayはバックグラウンドでAIに内容の充実を静かに依頼し、新しいテキストでカードを更新できます。\n\nこれを無効にすると、すべての自動拡張が停止します。\n\n[B]注意:[/B] 拡張ごとにAIのAPI呼び出しが[B]1回[/B]発生します。これは[B]低速なデバイスではデフォルトでオフ[/B]になっています。無料プランや制限のあるプランをご利用の場合は、オフのままにすることをお勧めします。"
 
 # en-hash: 6504799dfab3728b5b85d01f0c482ae1
 msgid "auto_enrich_setting_title"
@@ -459,19 +459,19 @@ msgstr "取得"
 
 # en-hash: feabc3a414741d1d0169e608cd79a8d7
 msgid "fetch_more"
-msgstr ""
+msgstr "さらに取得"
 
 # en-hash: e6d3f832a078aa4a1b9ac3ec543144b1
 msgid "fetch_more_progress"
-msgstr ""
+msgstr "詳細を取得中..."
 
 # en-hash: 689a44e8ec37f6f41391d8ea515e76e9
 msgid "fetch_more_replace_confirm"
-msgstr ""
+msgstr "別のX-Rayリクエストが実行中です。それをキャンセルして、このエントリの詳細を取得しますか？"
 
 # en-hash: 43ed5b7ddf5e436ae0dccc841c6d509f
 msgid "fetch_named"
-msgstr ""
+msgstr "「%s」を取得"
 
 # en-hash: 05ab2ce95089e50db065a1bd1ed0cd85
 msgid "fetch_single_word_prompt"
@@ -1059,7 +1059,7 @@ msgstr "ペアは重複なしとマークされました。"
 
 # en-hash: 6ce50515ff472af170d4655b7a90f6be
 msgid "partial_matches"
-msgstr ""
+msgstr "「%s」に完全一致する項目はありません。関連する項目をタップするか、取得してください:"
 
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"

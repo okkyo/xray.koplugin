@@ -15,6 +15,12 @@ if sys.version_info >= (3, 7):
     except Exception:
         pass
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from env_loader import load_env_file
+
+# Read GEMINI_API_KEY (and anything else) from a .env file at the repo root.
+load_env_file()
+
 LANGUAGES_DIR = os.path.join(os.path.dirname(__file__), '..', 'xray.koplugin', 'languages')
 SOURCE_DIR = os.path.join(os.path.dirname(__file__), '..', 'xray.koplugin')
 MASTER_LANG = 'en'
@@ -100,7 +106,7 @@ def call_gemini(prompt):
     key = get_gemini_key()
     if not key: return None
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={key}"
     headers = {"Content-Type": "application/json"}
     data = {
         "contents": [{"parts": [{"text": prompt}]}],

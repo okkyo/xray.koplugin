@@ -81,9 +81,9 @@ msgstr "Aktiviert"
 msgid "auto_enrich_preference_desc"
 msgstr "Wählen Sie Ihre Einstellung für die automatische Kartenanreicherung:"
 
-# en-hash: 10b0e718ab22bc54c2ee2339d420206c
+# en-hash: 00284c3d790603be570224a4662d2527
 msgid "auto_enrich_setting_desc"
-msgstr "Wenn Sie eine Charakter-, Orts- oder Begriffskarte öffnen, die kurz oder veraltet ist, kann X-Ray die KI im Hintergrund unauffällig um eine Anreicherung bitten und dann die geöffnete Karte mit dem neuen Text aktualisieren.\n\nDas Deaktivieren stoppt jede automatische Anreicherung.\n\n[B]Hinweis:[/B] Jede Anreicherung verbraucht [B]einen[/B] KI-API-Aufruf. Dies ist [B]auf langsameren Geräten standardmäßig deaktiviert[/B]. Benutzer mit kostenlosen Kontingenten oder begrenzten Plänen möchten dies möglicherweise deaktiviert lassen."
+msgstr "Wenn Sie eine kurze oder veraltete Charakter-, Orts- oder Begriffskarte öffnen, kann X-Ray die KI im Hintergrund leise bitten, sie zu bereichern, und dann die geöffnete Karte mit dem neuen Text aktualisieren.\n\nDas Deaktivieren stoppt jede automatische Anreicherung.\n\n[B]Hinweis:[/B] Jede Anreicherung verbraucht [B]einen[/B] KI-API-Aufruf. Dies ist [B]auf langsameren Geräten standardmäßig deaktiviert[/B]. Benutzer mit kostenlosen oder kontingentierten Tarifen lassen es möglicherweise lieber ausgeschaltet."
 
 # en-hash: 6504799dfab3728b5b85d01f0c482ae1
 msgid "auto_enrich_setting_title"
@@ -459,19 +459,19 @@ msgstr "Abrufen"
 
 # en-hash: feabc3a414741d1d0169e608cd79a8d7
 msgid "fetch_more"
-msgstr ""
+msgstr "Mehr abrufen"
 
 # en-hash: e6d3f832a078aa4a1b9ac3ec543144b1
 msgid "fetch_more_progress"
-msgstr ""
+msgstr "Weitere Details werden abgerufen..."
 
 # en-hash: 689a44e8ec37f6f41391d8ea515e76e9
 msgid "fetch_more_replace_confirm"
-msgstr ""
+msgstr "Eine andere X-Ray-Anfrage läuft noch. Möchten Sie diese abbrechen und stattdessen Details für diesen Eintrag abrufen?"
 
 # en-hash: 43ed5b7ddf5e436ae0dccc841c6d509f
 msgid "fetch_named"
-msgstr ""
+msgstr "„%s“ abrufen"
 
 # en-hash: 05ab2ce95089e50db065a1bd1ed0cd85
 msgid "fetch_single_word_prompt"
@@ -1059,7 +1059,7 @@ msgstr "Pair marked as not a duplicate."
 
 # en-hash: 6ce50515ff472af170d4655b7a90f6be
 msgid "partial_matches"
-msgstr ""
+msgstr "Keine genaue Übereinstimmung für „%s“. Tippen Sie auf einen verwandten Eintrag oder rufen Sie ihn ab:"
 
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"

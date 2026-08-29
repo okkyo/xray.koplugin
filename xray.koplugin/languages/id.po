@@ -81,9 +81,9 @@ msgstr "Aktif"
 msgid "auto_enrich_preference_desc"
 msgstr "Pilih preferensi Anda untuk pengayaan kartu otomatis:"
 
-# en-hash: 10b0e718ab22bc54c2ee2339d420206c
+# en-hash: 00284c3d790603be570224a4662d2527
 msgid "auto_enrich_setting_desc"
-msgstr "Saat Anda membuka kartu karakter, lokasi, atau istilah yang pendek atau kedaluwarsa, X-Ray dapat secara diam-diam meminta AI untuk memperkayanya di latar belakang, lalu menyegarkan kartu yang terbuka dengan teks baru.\n\nMenonaktifkan ini akan menghentikan semua pengayaan otomatis.\n\n[B]Catatan:[/B] setiap pengayaan menggunakan [B]satu[/B] panggilan API AI. Ini [B]nonaktif secara default pada perangkat yang lebih lambat[/B]. Pengguna dengan paket gratis atau terbatas kuota mungkin lebih suka membiarkannya nonaktif."
+msgstr "Saat Anda membuka kartu karakter, lokasi, atau istilah yang pendek atau kedaluwarsa, X-Ray dapat secara diam-diam meminta AI untuk memperkayanya di latar belakang, lalu menyegarkan kartu yang terbuka dengan teks baru.\n\nMenonaktifkan ini akan menghentikan semua pengayaan otomatis.\n\n[B]Catatan:[/B] setiap pengayaan menggunakan [B]satu[/B] panggilan API AI. Fitur ini [B]nonaktif secara default pada perangkat yang lebih lambat[/B]. Pengguna dengan paket gratis atau terbatas kuotanya mungkin lebih memilih untuk membiarkannya nonaktif."
 
 # en-hash: 6504799dfab3728b5b85d01f0c482ae1
 msgid "auto_enrich_setting_title"
@@ -459,19 +459,19 @@ msgstr "Ambil"
 
 # en-hash: feabc3a414741d1d0169e608cd79a8d7
 msgid "fetch_more"
-msgstr ""
+msgstr "Ambil Lagi"
 
 # en-hash: e6d3f832a078aa4a1b9ac3ec543144b1
 msgid "fetch_more_progress"
-msgstr ""
+msgstr "Mengambil detail tambahan..."
 
 # en-hash: 689a44e8ec37f6f41391d8ea515e76e9
 msgid "fetch_more_replace_confirm"
-msgstr ""
+msgstr "Permintaan X-Ray lain masih berjalan. Batalkan dan ambil detail untuk entitas ini?"
 
 # en-hash: 43ed5b7ddf5e436ae0dccc841c6d509f
 msgid "fetch_named"
-msgstr ""
+msgstr "Ambil '%s'"
 
 # en-hash: 05ab2ce95089e50db065a1bd1ed0cd85
 msgid "fetch_single_word_prompt"
@@ -1059,7 +1059,7 @@ msgstr "Pair marked as not a duplicate."
 
 # en-hash: 6ce50515ff472af170d4655b7a90f6be
 msgid "partial_matches"
-msgstr ""
+msgstr "Tidak ada kecocokan akurat untuk '%s'. Ketuk entri terkait, atau ambil:"
 
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"

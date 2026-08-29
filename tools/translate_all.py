@@ -13,6 +13,12 @@ if sys.version_info >= (3, 7):
     except Exception:
         pass
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from env_loader import load_env_file
+
+# Read GEMINI_API_KEY (and anything else) from a .env file at the repo root.
+load_env_file()
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LANGUAGES_DIR = os.path.join(BASE_DIR, 'xray.koplugin', 'languages')
 PROMPTS_DIR = os.path.join(BASE_DIR, 'xray.koplugin', 'prompts')
