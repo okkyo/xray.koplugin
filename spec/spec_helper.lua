@@ -285,7 +285,10 @@ package.loaded["ui/network/manager"] = {
     runWhenOnline = function(self, fn)
         local callback = type(self) == "function" and self or fn
         if callback then callback() end
-    end
+    end,
+    -- Silent connectivity test used by auto-enrich; tests override per-case.
+    isConnected = function() return true end,
+    isOnline = function() return true end,
 }
 package.loaded["socket.http"] = {}
 package.loaded["ssl.https"] = {}

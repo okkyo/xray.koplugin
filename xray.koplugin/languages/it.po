@@ -69,6 +69,26 @@ msgstr "Se abilitato, X-Ray chiede automaticamente all'IA di verificare la prese
 msgid "auto_dupe_check_setting_title"
 msgstr "Controllo duplicato"
 
+# en-hash: b9f5c797ebbf55adccdd8539a65a0241
+msgid "auto_enrich_disabled"
+msgstr "Disabilitato"
+
+# en-hash: 00d23a76e43b46dae9ec7aa9dcbebb32
+msgid "auto_enrich_enabled"
+msgstr "Abilitato"
+
+# en-hash: c7653170146153e2eee0e36142b6b330
+msgid "auto_enrich_preference_desc"
+msgstr "Seleziona la tua preferenza per l'arricchimento automatico delle schede:"
+
+# en-hash: 10b0e718ab22bc54c2ee2339d420206c
+msgid "auto_enrich_setting_desc"
+msgstr "Quando apri una scheda di un personaggio, un luogo o un termine che è breve o non aggiornata, X-Ray può chiedere discretamente all'IA di arricchirla in background, per poi aggiornare la scheda aperta con il nuovo testo.\n\nDisabilitando questa opzione si interrompe ogni arricchimento automatico.\n\n[B]Nota:[/B] ogni arricchimento utilizza [B]una[/B] chiamata API IA. Questa opzione è [B]disabilitata per impostazione predefinita sui dispositivi più lenti[/B]. Gli utenti con piani gratuiti o con quote limitate potrebbero preferire lasciarla disabilitata."
+
+# en-hash: 6504799dfab3728b5b85d01f0c482ae1
+msgid "auto_enrich_setting_title"
+msgstr "Arricchisci schede automaticamente"
+
 # en-hash: b7e84428c69c17c5536c4a912a191e54
 msgid "auto_fetch_page_interval_prompt"
 msgstr "Intervallo di pagina"
@@ -147,7 +167,7 @@ msgstr "Modalità Prenota salvata!"
 
 # en-hash: 9ea3cd79552afa39d886f96f4b101991
 msgid "book_type_about"
-msgstr "Il tipo di libro determina quale strategia di estrazione dell'IA viene utilizzata e quali funzionalità sono disponibili.\n\n- Narrativa: si concentra su narrativa, personaggi e sequenza temporale della trama.\n- Saggistica: si concentra su termini, concetti e figure storiche.\n\n\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Rilevamento automatico\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" consentirà all'IA di decidere dopo il primo recupero.\n\n[B]Nota:[/B] Questa impostazione è salvata [B]per libro[/B]. Una scelta personalizzata prevale sul rilevamento automatico o sulle impostazioni globali."
+msgstr "Il tipo di libro determina quale strategia di estrazione dell'IA viene utilizzata e quali funzionalità sono disponibili.\n\n- Narrativa: si concentra su narrativa, personaggi e sequenza temporale della trama.\n- Saggistica: si concentra su termini, concetti e figure storiche.\n\n\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Rilevamento automatico\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" consentirà all'IA di decidere dopo il primo recupero.\n\n[B]Nota:[/B] Questa impostazione è salvata [B]per libro[/B]. Una scelta personalizzata prevale sul rilevamento automatico o sulle impostazioni globali."
 
 # en-hash: e67731741de13a0fcd235ea7630e8ebc
 msgid "book_type_auto"
@@ -177,7 +197,7 @@ msgstr "Incolla"
 msgid "cache_cleared"
 msgstr "Cache svuotata!\n\nOra puoi recuperare nuovi dati:\nMenu → X-Ray → Recupera dati AI"
 
-# en-hash: 1edc355371d87a94d024eebfed9f8815
+# en-hash: 2e361c4db7a5480c21b02780ed4e9e0b
 msgid "cache_save_failed"
 msgstr "Impossibile salvare la cache"
 
@@ -275,7 +295,7 @@ msgstr "Configurazione API personalizzata %d salvata."
 
 # en-hash: 0bec527ee74be1c3e327221a74853bca
 msgid "desc_len_about_chars"
-msgstr "DESCRIZIONI DEI PERSONAGGI\n\n• Breve (~80 caratteri): nome, ruolo e una breve nota.\n• Predefinito (~200 caratteri): analisi standard.\n• Dettagliato (~350 caratteri): studio approfondito del personaggio con tratti e motivazioni.\n• Molto dettagliato (~500 caratteri): analisi approfondita.\n\nTRADE-OFF\nDescrizioni più lunghe → meno caratteri restituiti durante i recuperi iniziali/completi. Le successive esecuzioni di \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Recupera altro\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" non sono influenzate."
+msgstr "DESCRIZIONI DEI PERSONAGGI\n\n• Breve (~80 caratteri): nome, ruolo e una breve nota.\n• Predefinito (~200 caratteri): analisi standard.\n• Dettagliato (~350 caratteri): studio approfondito del personaggio con tratti e motivazioni.\n• Molto dettagliato (~500 caratteri): analisi approfondita.\n\nTRADE-OFF\nDescrizioni più lunghe → meno caratteri restituiti durante i recuperi iniziali/completi. Le successive esecuzioni di \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Recupera altro\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" non sono influenzate."
 
 # en-hash: d286e548e835ec6e3280b7af6bd717bc
 msgid "desc_len_about_hist"
@@ -437,6 +457,22 @@ msgstr "Estrazione termini aggiuntivi..."
 msgid "fetch_button"
 msgstr "Andare a prendere"
 
+# en-hash: feabc3a414741d1d0169e608cd79a8d7
+msgid "fetch_more"
+msgstr ""
+
+# en-hash: e6d3f832a078aa4a1b9ac3ec543144b1
+msgid "fetch_more_progress"
+msgstr ""
+
+# en-hash: 689a44e8ec37f6f41391d8ea515e76e9
+msgid "fetch_more_replace_confirm"
+msgstr ""
+
+# en-hash: 43ed5b7ddf5e436ae0dccc841c6d509f
+msgid "fetch_named"
+msgstr ""
+
 # en-hash: 05ab2ce95089e50db065a1bd1ed0cd85
 msgid "fetch_single_word_prompt"
 msgstr "Nessun dato radiografico trovato per '%s'. Ti piacerebbe cercarlo?"
@@ -445,11 +481,11 @@ msgstr "Nessun dato radiografico trovato per '%s'. Ti piacerebbe cercarlo?"
 msgid "fetch_successful"
 msgstr "Recupero riuscito"
 
-# en-hash: 628671947a82f87c18a98ee9b6ff8b00
+# en-hash: 572e520194e629b3b906bb5b3e5bce2d
 msgid "fetching_ai"
 msgstr "Recupero X-Ray..."
 
-# en-hash: cfecb2031470d0e28420642fc37ab55f
+# en-hash: 2b05ded75b73f463504a742fe3492e55
 msgid "fetching_author"
 msgstr "Recupero informazioni sull'autore da %s..."
 
@@ -577,9 +613,9 @@ msgstr "Disabilitato"
 msgid "linked_entries_enabled"
 msgstr "Abilitato"
 
-# en-hash: f2cb4c8134446083c3d2859f02c963f6
+# en-hash: 1790c02ad98e9267ed7bb8ab23c5916e
 msgid "linked_entries_setting_desc"
-msgstr "Le voci collegate collegano automaticamente personaggi, luoghi e figure storiche quando sono menzionati nelle rispettive descrizioni.\n\nDisabilitando questa opzione si nasconderà il pulsante \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Voci collegate\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" dalle finestre di dialogo dei dettagli."
+msgstr "Le voci collegate collegano automaticamente personaggi, luoghi e figure storiche quando sono menzionati nelle rispettive descrizioni.\n\nDisabilitando questa opzione si nasconderà il pulsante \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Voci collegate\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" dalle finestre di dialogo dei dettagli."
 
 # en-hash: 08ea860427184895725e398c5ef821b1
 msgid "local_setup_title"
@@ -655,7 +691,7 @@ msgstr "Scansione in corso... %1 di %2 capitoli"
 
 # en-hash: b9cb4acd779a0494cd5de4f263626662
 msgid "mentions_setting_desc"
-msgstr "La scansione delle menzioni ti consente di trovare ogni occorrenza di un personaggio o di un luogo nel libro. Ciò avviene automaticamente in background per garantire che il lettore rimanga reattivo.\n\nDisabilitando questa opzione si nasconderà il pulsante \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Trova menzioni\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"."
+msgstr "La scansione delle menzioni ti consente di trovare ogni occorrenza di un personaggio o di un luogo nel libro. Ciò avviene automaticamente in background per garantire che il lettore rimanga reattivo.\n\nDisabilitando questa opzione si nasconderà il pulsante \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Trova menzioni\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"."
 
 # en-hash: 2c126ee6ce85ef471a3a0e096c78b724
 msgid "mentions_setting_title"
@@ -987,11 +1023,11 @@ msgstr "Nessun duplicato trovato."
 
 # en-hash: 064105ef9b1bca475059078013cc4a4b
 msgid "no_historical_data"
-msgstr "Ancora nessun dato sulle figure storiche.\n\nUtilizza prima \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Recupera dati a raggi X\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\".\n\nL'intelligenza artificiale rileverà le figure storiche\nreali menzionate nel libro."
+msgstr "Ancora nessun dato sulle figure storiche.\n\nUtilizza prima \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Recupera dati a raggi X\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\".\n\nL'intelligenza artificiale rileverà le figure storiche\nreali menzionate nel libro."
 
 # en-hash: 4d0e58f2c49ca238a05d2a92486d3d70
 msgid "no_location_data"
-msgstr "Nessun dato sulla posizione ancora. Utilizzare prima \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Recupera dati radiografici\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"."
+msgstr "Nessun dato sulla posizione ancora. Utilizzare prima \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Recupera dati radiografici\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"."
 
 # en-hash: 6c32701ae234f6a1c3a03e18d89bd1e1
 msgid "no_merges_performed"
@@ -1007,11 +1043,11 @@ msgstr "Nessuna serie rilevata per questo libro."
 
 # en-hash: 29503d301d509e5cfea9e97daffa9e79
 msgid "no_terms_data"
-msgstr "Nessun dato sui termini ancora. Utilizzare prima \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Recupera dati radiografici\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"."
+msgstr "Nessun dato sui termini ancora. Utilizzare prima \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Recupera dati radiografici\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"."
 
 # en-hash: 0c8a85db22b4a3eadf95fe1a55f00c63
 msgid "no_timeline_data"
-msgstr "Ancora nessun dato sulla sequenza temporale.\n\nUtilizza prima \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Recupera dati a raggi X\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\".\n\nL'AI mostrerà gli eventi chiave in\nordine cronologico."
+msgstr "Ancora nessun dato sulla sequenza temporale.\n\nUtilizza prima \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Recupera dati a raggi X\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\".\n\nL'AI mostrerà gli eventi chiave in\nordine cronologico."
 
 # en-hash: e0aa021e21dddbd6d8cecec71e9cf564
 msgid "ok"
@@ -1020,6 +1056,10 @@ msgstr "OK"
 # en-hash: 386b384e3eec6bf9bf55d32b5018de15
 msgid "pair_rejected"
 msgstr "Pair marked as not a duplicate."
+
+# en-hash: 6ce50515ff472af170d4655b7a90f6be
+msgid "partial_matches"
+msgstr ""
 
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"
@@ -1051,7 +1091,7 @@ msgstr "Reason"
 
 # en-hash: 1ec7919a887b228482b4fd9a80fcd324
 msgid "reasoning_about"
-msgstr "Controlla la profondità del \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"pensiero\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" per i modelli di ragionamento:\n\n• Non impostato: nessuna istruzione specifica inviata; il modello utilizza le sue impostazioni predefinite interne.\n• Basso: estrazione rapida ed economica per libri semplici.\n• Medio: profondità bilanciata per la maggior parte delle narrazioni.\n• Alto: analisi dettagliata per reti di personaggi complesse.\n\nSi applica a: GPT-5.x (o1/o3/gpt-5), Claude (sonetto/opus/haiku) e Gemini 2.5+.\n\nNota: DeepSeek V4 funziona intrinsecamente: questa impostazione non ha alcun effetto su di esso."
+msgstr "Controlla la profondità del \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"pensiero\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" per i modelli di ragionamento:\n\n• Non impostato: nessuna istruzione specifica inviata; il modello utilizza le sue impostazioni predefinite interne.\n• Basso: estrazione rapida ed economica per libri semplici.\n• Medio: profondità bilanciata per la maggior parte delle narrazioni.\n• Alto: analisi dettagliata per reti di personaggi complesse.\n\nSi applica a: GPT-5.x (o1/o3/gpt-5), Claude (sonetto/opus/haiku) e Gemini 2.5+.\n\nNota: DeepSeek V4 funziona intrinsecamente: questa impostazione non ha alcun effetto su di esso."
 
 # en-hash: 655d20c1ca69519ca647684edbb2db35
 msgid "reasoning_high"
@@ -1505,7 +1545,7 @@ msgstr "X-Ray è aggiornato (%s)."
 msgid "updater_whats_new"
 msgstr "Cosa c'è di nuovo:"
 
-# en-hash: 46667b51ced49ca8828f897cf83e89b8
+# en-hash: 362b2e695aa7299e20bb0d9ce320f58d
 msgid "updating_ai"
 msgstr "Aggiornamento dei dati radiografici..."
 
@@ -1627,7 +1667,7 @@ msgstr "Abilitato"
 
 # en-hash: aa3045baed0aad489f96655b14b671ac
 msgid "xray_mode_desc"
-msgstr "Aggiunge un pulsante \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"X-Ray\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" al dizionario e ai menu di selezione per ricerche istantanee."
+msgstr "Aggiunge un pulsante \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"X-Ray\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" al dizionario e ai menu di selezione per ricerche istantanee."
 
 # en-hash: 93cba07454f06a4a960172bbd6e2a435
 msgid "yes"

@@ -343,7 +343,7 @@ function XRayBottomPopup:init()
             -- Scan the ORIGINAL entity, not the display copy `e`. The scan cache
             -- and results (.mentions) are keyed by entity identity, so a copy
             -- never reuses a prior scan and writes results to a throwaway. This
-            -- matches the Linked Entries and Fetch More paths.
+            -- matches the Linked Entries and auto-enrich paths.
             local mention_entity = self.source_entity or e
             if plugin then
                 if     plugin.showMentionsForEntity then plugin:showMentionsForEntity(mention_entity)
@@ -355,19 +355,8 @@ function XRayBottomPopup:init()
         table.insert(active_btns, right_btn)
     end
 
-    -- D. Fetch More button — enrich this entry using passages from across the book.
-    if not e.is_timeline and not e.is_conversion then
-        local fetch_more_btn = make_btn(get_loc_t("fetch_more", "Fetch More"), function()
-            UIManager:close(self)
-            -- Enrich the ORIGINAL entry, not the display copy `e`. The copy would
-            -- fail the identity-based dedup and could create a duplicate entry.
-            -- Pass the known type so the enrich path does not have to guess it.
-            if plugin and plugin.fetchMoreDetailsForEntity then
-                plugin:fetchMoreDetailsForEntity(self.source_entity or e, self.entity_type)
-            end
-        end)
-        table.insert(active_btns, fetch_more_btn)
-    end
+    -- The Fetch More button was removed: opening a card now auto-enriches a
+    -- thin or stale entry silently (see _maybeAutoEnrichEntity in xray_fetch).
 
     -- Layout buttons. Up to 3 buttons stay on one row (unchanged look). More than
     -- that wraps into rows of two so labels do not get crushed on narrow screens.
@@ -540,6 +529,10 @@ local function showBottomPopup(plugin, entity, entity_type)
         margin_size   = pad,
     }
     plugin.active_details_dialog = popup
+    -- Track what the open card shows, so a completed auto-enrich can refresh
+    -- it in place (and only it — see _refreshOpenEntityCard).
+    plugin.active_details_entity = entity
+    plugin.active_details_entity_type = entity_type
     UIManager:show(popup)
 end
 
@@ -572,6 +565,56 @@ local function shouldUseBottomPopup(plugin, opts)
         return ui_popup_menu
     end
     return ui_popup_intext
+end
+
+-- Re-show the open entity card after a silent auto-enrich lands new text.
+-- No-op when the card is closed or shows a different entity, so a late result
+-- can never pop a card the reader did not open. Matches by identity first and
+-- by name as a fallback: the merge can land on a reloaded list object (see the
+-- identity-miss fallback in xray_fetch._processSingleWordResult).
+function M:_refreshOpenEntityCard(entity, entity_type)
+    if not self.active_details_dialog then return end
+    local shown = self.active_details_entity
+    if not shown or not entity then return end
+    if self.active_details_entity_type and entity_type
+        and self.active_details_entity_type ~= entity_type then
+        return
+    end
+    local same = (shown == entity)
+    if not same and shown.name and entity.name then
+        same = tostring(shown.name):lower() == tostring(entity.name):lower()
+    end
+    if not same then return end
+
+    UIManager:close(self.active_details_dialog)
+    self.active_details_dialog = nil
+    local opts = self.active_details_opts or { source = "in_text" }
+    if entity_type == "location" then
+        self:showLocationDetails(entity, opts)
+    elseif entity_type == "term" then
+        self:showTermDetails(entity, opts)
+    elseif entity_type == "historical_figure" then
+        self:showHistoricalFigureDetails(entity, opts)
+    else
+        self:showCharacterDetails(entity, opts)
+    end
+end
+
+-- Clear the open-card tracking when the reader dismisses a classic ButtonDialog
+-- card with back or tap-outside. Without this the stale dialog reference passes
+-- the _refreshOpenEntityCard guard, so a late auto-enrich reopens a card the
+-- reader already closed. The bottom popup nils only the dialog reference in its
+-- onCloseWidget, which is enough because _refreshOpenEntityCard guards on the
+-- dialog first.
+--
+-- This relies on ButtonDialog.onClose invoking tap_close_callback for BOTH
+-- back-key and tap-outside, which is true on current KOReader. On an older
+-- frontend where only onTapClose called it, a hardware-back dismiss would leave
+-- the tracking set and allow one stray reopen of the closed card (no crash).
+function M:_onEntityCardDismissed()
+    self.active_details_dialog = nil
+    self.active_details_entity = nil
+    self.active_details_entity_type = nil
 end
 
 function M:showLanguageSelection()
@@ -1273,6 +1316,14 @@ function M:showRelatedEntities(related, opts)
 end
 
 function M:showCharacterDetails(character, opts)
+    -- Auto-enrich a thin or stale entry silently on card open (replaces the
+    -- manual Fetch More button). Runs before the popup-style branch so both
+    -- card styles trigger it; the entity here is the ORIGINAL list entry, so
+    -- the enrich merge lands by identity.
+    self.active_details_opts = opts
+    if type(self._maybeAutoEnrichEntity) == "function" then
+        pcall(function() self:_maybeAutoEnrichEntity(character, "character") end)
+    end
     if shouldUseBottomPopup(self, opts) then
         showBottomPopup(self, character, "character")
         return
@@ -1508,22 +1559,22 @@ function M:showCharacterDetails(character, opts)
         })
     end
 
-    table.insert(buttons, 1, {{
-        text = self.loc:t("fetch_more") or "Fetch More",
-        callback = function()
-            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-            self:fetchMoreDetailsForEntity(character, "character")
-        end,
-    }})
-
     self.active_details_dialog = ButtonDialog:new{
         _added_widgets = { vg },
         buttons = buttons,
+        tap_close_callback = function() self:_onEntityCardDismissed() end,
     }
+    self.active_details_entity = character
+    self.active_details_entity_type = "character"
     UIManager:show(self.active_details_dialog)
 end
 
 function M:showLocationDetails(loc_item, opts)
+    -- Silent auto-enrich on card open; see showCharacterDetails.
+    self.active_details_opts = opts
+    if type(self._maybeAutoEnrichEntity) == "function" then
+        pcall(function() self:_maybeAutoEnrichEntity(loc_item, "location") end)
+    end
     if shouldUseBottomPopup(self, opts) then
         showBottomPopup(self, loc_item, "location")
         return
@@ -1689,22 +1740,22 @@ function M:showLocationDetails(loc_item, opts)
         })
     end
 
-    table.insert(buttons, 1, {{
-        text = self.loc:t("fetch_more") or "Fetch More",
-        callback = function()
-            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-            self:fetchMoreDetailsForEntity(loc_item, "location")
-        end,
-    }})
-
     self.active_details_dialog = ButtonDialog:new{
         _added_widgets = { vg },
         buttons = buttons,
+        tap_close_callback = function() self:_onEntityCardDismissed() end,
     }
+    self.active_details_entity = loc_item
+    self.active_details_entity_type = "location"
     UIManager:show(self.active_details_dialog)
 end
 
 function M:showTermDetails(term, opts)
+    -- Silent auto-enrich on card open; see showCharacterDetails.
+    self.active_details_opts = opts
+    if type(self._maybeAutoEnrichEntity) == "function" then
+        pcall(function() self:_maybeAutoEnrichEntity(term, "term") end)
+    end
     if shouldUseBottomPopup(self, opts) then
         showBottomPopup(self, term, "term")
         return
@@ -1967,18 +2018,13 @@ function M:showTermDetails(term, opts)
         })
     end
 
-    table.insert(buttons, 1, {{
-        text = self.loc:t("fetch_more") or "Fetch More",
-        callback = function()
-            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-            self:fetchMoreDetailsForEntity(term, "term")
-        end,
-    }})
-
     self.active_details_dialog = ButtonDialog:new{
         _added_widgets = { vg },
         buttons = buttons,
+        tap_close_callback = function() self:_onEntityCardDismissed() end,
     }
+    self.active_details_entity = term
+    self.active_details_entity_type = "term"
     UIManager:show(self.active_details_dialog)
 end
 
@@ -2148,6 +2194,33 @@ function M:showAutoDupeCheckSettings()
             UIManager:setDirty(nil, "ui")
         end,
         about_text = self.loc:t("auto_dupe_check_setting_desc") or "When enabled, X-Ray automatically asks the AI to check for duplicate characters and locations after every data fetch. If duplicates are detected, you will be prompted to review and merge them.\n\nDisabling this will stop all background duplicate scanning. You can still merge duplicates manually via the Characters or Locations menu.\n\n[B]Note:[/B] each check uses [B]one[/B] AI API call. Users on free-tier or quota-limited plans may prefer to disable this.",
+    })
+end
+
+function M:showAutoEnrichSettings()
+    local enabled_text = self.loc:t("auto_enrich_enabled") or "Enabled"
+    local disabled_text = self.loc:t("auto_enrich_disabled") or "Disabled"
+    XRaySettingsCard.show(self, {
+        title = self.loc:t("auto_enrich_setting_title") or "Auto-Enrich Cards",
+        description = self.loc:t("auto_enrich_preference_desc") or "Select your preference for automatic card enrichment:",
+        options = {
+            { text = enabled_text, value = true },
+            { text = disabled_text, value = false },
+        },
+        get_current_func = function()
+            -- Mirror the runtime default in xray_fetch._maybeAutoEnrichEntity:
+            -- unset means on for capable devices, off for PW1-class hardware.
+            local val = self.ai_helper.settings.auto_enrich_cards
+            if val == nil then
+                return not (type(utils.isLowPowerDevice) == "function" and utils:isLowPowerDevice())
+            end
+            return val
+        end,
+        save_func = function(val)
+            self.ai_helper:saveSettings({ auto_enrich_cards = val })
+            UIManager:setDirty(nil, "ui")
+        end,
+        about_text = self.loc:t("auto_enrich_setting_desc"),
     })
 end
 
@@ -2854,6 +2927,11 @@ function M:showAuthorInfo()
         }
     }
 
+    -- This is the author-info card, not an entity card. Clear the entity
+    -- tracking so a late auto-enrich result for a previously open entity cannot
+    -- match against stale fields and pop its card over this one.
+    self.active_details_entity = nil
+    self.active_details_entity_type = nil
     self.active_details_dialog = ButtonDialog:new{
         _added_widgets = { vg },
         buttons = buttons,
@@ -3736,6 +3814,11 @@ function M:showTimelineEventDetails(ev, opts)
         })
     end
 
+    -- This is the timeline-event card, not an entity card. Clear the entity
+    -- tracking so a late auto-enrich result for a previously open entity cannot
+    -- match against stale fields and pop its card over this one.
+    self.active_details_entity = nil
+    self.active_details_entity_type = nil
     self.active_details_dialog = ButtonDialog:new{
         _added_widgets = { vg },
         buttons        = buttons,
@@ -3744,6 +3827,11 @@ function M:showTimelineEventDetails(ev, opts)
 end
 
 function M:showHistoricalFigureDetails(fig, opts)
+    -- Silent auto-enrich on card open; see showCharacterDetails.
+    self.active_details_opts = opts
+    if type(self._maybeAutoEnrichEntity) == "function" then
+        pcall(function() self:_maybeAutoEnrichEntity(fig, "historical_figure") end)
+    end
     if shouldUseBottomPopup(self, opts) then
         showBottomPopup(self, fig, "historical_figure")
         return
@@ -3907,18 +3995,13 @@ function M:showHistoricalFigureDetails(fig, opts)
         })
     end
 
-    table.insert(buttons, 1, {{
-        text = self.loc:t("fetch_more") or "Fetch More",
-        callback = function()
-            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-            self:fetchMoreDetailsForEntity(fig, "historical_figure")
-        end,
-    }})
-
     self.active_details_dialog = ButtonDialog:new{
         _added_widgets = { vg },
         buttons = buttons,
+        tap_close_callback = function() self:_onEntityCardDismissed() end,
     }
+    self.active_details_entity = fig
+    self.active_details_entity_type = "historical_figure"
     UIManager:show(self.active_details_dialog)
 end
 

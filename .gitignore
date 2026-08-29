@@ -5,3 +5,4 @@ scratch/
 *.log
 *.log.old
 xray.koplugin/xray_config.lua
+test-books/

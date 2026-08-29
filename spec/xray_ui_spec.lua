@@ -1326,5 +1326,175 @@ describe("xray_ui", function()
             end
         end)
     end)
+
+    describe("auto-enrich on card open", function()
+        local hook_calls
+
+        local function find_texts(w)
+            local texts = {}
+            local seen = {}
+            local function traverse(node)
+                if not node or type(node) ~= "table" or seen[node] then return end
+                seen[node] = true
+                if node.args and node.args.text then
+                    table.insert(texts, tostring(node.args.text))
+                end
+                if node.args and node.args.buttons then
+                    for _, row in ipairs(node.args.buttons) do
+                        for _, btn in ipairs(row) do
+                            if btn.text then table.insert(texts, tostring(btn.text)) end
+                        end
+                    end
+                end
+                for k, v in pairs(node) do
+                    if type(v) == "table" and k ~= "parent" then traverse(v) end
+                end
+                if node.args and type(node.args) == "table" then
+                    for _, v in ipairs(node.args) do
+                        if type(v) == "table" then traverse(v) end
+                    end
+                end
+            end
+            traverse(w)
+            return texts
+        end
+
+        before_each(function()
+            hook_calls = {}
+            plugin._maybeAutoEnrichEntity = function(_, entity, entity_type)
+                table.insert(hook_calls, { entity = entity, entity_type = entity_type })
+            end
+        end)
+
+        it("triggers the hook with the original entity for the bottom popup", function()
+            plugin.ai_helper.settings.ui_popup_intext = true
+            local char = { name = "Bob", description = "A builder" }
+            plugin:showCharacterDetails(char, { source = "in_text" })
+            assert.are.equal(1, #hook_calls)
+            assert.are.equal(char, hook_calls[1].entity)
+            assert.are.equal("character", hook_calls[1].entity_type)
+        end)
+
+        it("triggers the hook for the classic dialog too", function()
+            plugin.ai_helper.settings.ui_popup_intext = false
+            plugin.ai_helper.settings.ui_popup_menu = false
+            local char = { name = "Bob", description = "A builder" }
+            plugin:showCharacterDetails(char)
+            assert.are.equal(1, #hook_calls)
+            assert.are.equal(char, hook_calls[1].entity)
+        end)
+
+        it("passes each entity type through its own card", function()
+            plugin.ai_helper.settings.ui_popup_intext = false
+            plugin.ai_helper.settings.ui_popup_menu = false
+            plugin:showLocationDetails({ name = "District 12", description = "d" })
+            plugin:showTermDetails({ name = "Tessera", definition = "d" })
+            plugin:showHistoricalFigureDetails({ name = "Snow", biography = "b" })
+            assert.are.equal("location", hook_calls[1].entity_type)
+            assert.are.equal("term", hook_calls[2].entity_type)
+            assert.are.equal("historical_figure", hook_calls[3].entity_type)
+        end)
+
+        it("renders no Fetch More button on either card style", function()
+            local char = { name = "Bob", description = "A builder" }
+
+            plugin.ai_helper.settings.ui_popup_intext = false
+            plugin.ai_helper.settings.ui_popup_menu = false
+            plugin:showCharacterDetails(char)
+            for _, t in ipairs(find_texts(_G.ui_tracker.last_shown)) do
+                assert.is_nil(t:find("fetch_more"))
+            end
+
+            plugin.ai_helper.settings.ui_popup_intext = true
+            plugin:showCharacterDetails(char, { source = "in_text" })
+            for _, t in ipairs(find_texts(_G.ui_tracker.last_shown)) do
+                assert.is_nil(t:find("fetch_more"))
+            end
+        end)
+
+        it("tracks the shown entity so a finished enrich can find the card", function()
+            plugin.ai_helper.settings.ui_popup_intext = false
+            plugin.ai_helper.settings.ui_popup_menu = false
+            local char = { name = "Bob", description = "A builder" }
+            plugin:showCharacterDetails(char)
+            assert.are.equal(char, plugin.active_details_entity)
+            assert.are.equal("character", plugin.active_details_entity_type)
+        end)
+    end)
+
+    describe("_refreshOpenEntityCard", function()
+        local reopened
+
+        before_each(function()
+            reopened = {}
+            plugin._maybeAutoEnrichEntity = function() end
+            plugin.showCharacterDetails = function(_, entity, opts)
+                table.insert(reopened, { entity = entity, opts = opts })
+            end
+        end)
+
+        it("re-shows the card when it still shows the enriched entity", function()
+            local char = { name = "Bob", description = "Enriched." }
+            plugin.active_details_dialog = { type = "ButtonDialog" }
+            plugin.active_details_entity = char
+            plugin.active_details_entity_type = "character"
+            plugin.active_details_opts = { source = "menu" }
+
+            plugin:_refreshOpenEntityCard(char, "character")
+
+            assert.are.equal(1, #reopened)
+            assert.are.equal(char, reopened[1].entity)
+            assert.are.equal("menu", reopened[1].opts.source)
+            assert.is_nil(plugin.active_details_dialog)
+        end)
+
+        it("matches by name when the merge landed on a reloaded object", function()
+            plugin.active_details_dialog = { type = "ButtonDialog" }
+            plugin.active_details_entity = { name = "Bob", description = "old" }
+            plugin.active_details_entity_type = "character"
+
+            plugin:_refreshOpenEntityCard({ name = "bob", description = "new" }, "character")
+
+            assert.are.equal(1, #reopened)
+        end)
+
+        it("does nothing when the card is closed", function()
+            plugin.active_details_dialog = nil
+            plugin.active_details_entity = { name = "Bob" }
+            plugin.active_details_entity_type = "character"
+            plugin:_refreshOpenEntityCard({ name = "Bob" }, "character")
+            assert.are.equal(0, #reopened)
+        end)
+
+        it("does nothing when the card shows a different entity", function()
+            plugin.active_details_dialog = { type = "ButtonDialog" }
+            plugin.active_details_entity = { name = "Someone Else" }
+            plugin.active_details_entity_type = "character"
+            plugin:_refreshOpenEntityCard({ name = "Bob" }, "character")
+            assert.are.equal(0, #reopened)
+            -- The open card must stay open.
+            assert.is_not_nil(plugin.active_details_dialog)
+        end)
+
+        it("does nothing when the card shows a different entity type", function()
+            plugin.active_details_dialog = { type = "ButtonDialog" }
+            plugin.active_details_entity = { name = "Bob" }
+            plugin.active_details_entity_type = "location"
+            plugin:_refreshOpenEntityCard({ name = "Bob" }, "character")
+            assert.are.equal(0, #reopened)
+        end)
+
+        it("does nothing when a non-entity card is open (fields cleared)", function()
+            -- Author-info and timeline-event cards clear the entity tracking, so
+            -- a late enrich for a previously open entity must not pop its card
+            -- over the non-entity card the reader now has open.
+            plugin.active_details_dialog = { type = "ButtonDialog" }
+            plugin.active_details_entity = nil
+            plugin.active_details_entity_type = nil
+            plugin:_refreshOpenEntityCard({ name = "Bob" }, "character")
+            assert.are.equal(0, #reopened)
+            assert.is_not_nil(plugin.active_details_dialog)
+        end)
+    end)
 end)
 

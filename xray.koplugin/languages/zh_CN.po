@@ -69,6 +69,26 @@ msgstr "启用后，X-Ray 会在每次获取数据后自动让 AI 检查重复�
 msgid "auto_dupe_check_setting_title"
 msgstr "重复检查"
 
+# en-hash: b9f5c797ebbf55adccdd8539a65a0241
+msgid "auto_enrich_disabled"
+msgstr "已禁用"
+
+# en-hash: 00d23a76e43b46dae9ec7aa9dcbebb32
+msgid "auto_enrich_enabled"
+msgstr "已启用"
+
+# en-hash: c7653170146153e2eee0e36142b6b330
+msgid "auto_enrich_preference_desc"
+msgstr "选择自动丰富卡片的首选项："
+
+# en-hash: 10b0e718ab22bc54c2ee2339d420206c
+msgid "auto_enrich_setting_desc"
+msgstr "当您打开一个内容简短或过时的角色、地点或术语卡片时，X-Ray 可以在后台悄悄让 AI 对其进行丰富，然后用新文本刷新已打开的卡片。\n\n禁用此功能将停止所有自动丰富。\n\n[B]注意：[/B]每次丰富都会使用[B]一次[/B] AI API 调用。此功能[B]在较慢的设备上默认关闭[/B]。免费层或配额受限计划的用户可能更愿意将其保持关闭。"
+
+# en-hash: 6504799dfab3728b5b85d01f0c482ae1
+msgid "auto_enrich_setting_title"
+msgstr "自动丰富卡片"
+
 # en-hash: b7e84428c69c17c5536c4a912a191e54
 msgid "auto_fetch_page_interval_prompt"
 msgstr "页面间隔"
@@ -177,7 +197,7 @@ msgstr "粘贴"
 msgid "cache_cleared"
 msgstr "缓存已清除！\n\n现在可以获取新数据：\n菜单 → X-Ray → 获取 AI 数据"
 
-# en-hash: 1edc355371d87a94d024eebfed9f8815
+# en-hash: 2e361c4db7a5480c21b02780ed4e9e0b
 msgid "cache_save_failed"
 msgstr "保存缓存失败"
 
@@ -437,6 +457,22 @@ msgstr "正在提取更多术语..."
 msgid "fetch_button"
 msgstr "获取"
 
+# en-hash: feabc3a414741d1d0169e608cd79a8d7
+msgid "fetch_more"
+msgstr ""
+
+# en-hash: e6d3f832a078aa4a1b9ac3ec543144b1
+msgid "fetch_more_progress"
+msgstr ""
+
+# en-hash: 689a44e8ec37f6f41391d8ea515e76e9
+msgid "fetch_more_replace_confirm"
+msgstr ""
+
+# en-hash: 43ed5b7ddf5e436ae0dccc841c6d509f
+msgid "fetch_named"
+msgstr ""
+
 # en-hash: 05ab2ce95089e50db065a1bd1ed0cd85
 msgid "fetch_single_word_prompt"
 msgstr "未发现 '%s' 的 X-Ray 数据。是否要查询？"
@@ -445,11 +481,11 @@ msgstr "未发现 '%s' 的 X-Ray 数据。是否要查询？"
 msgid "fetch_successful"
 msgstr "获取成功"
 
-# en-hash: 628671947a82f87c18a98ee9b6ff8b00
+# en-hash: 572e520194e629b3b906bb5b3e5bce2d
 msgid "fetching_ai"
 msgstr "正在获取 X-Ray..."
 
-# en-hash: cfecb2031470d0e28420642fc37ab55f
+# en-hash: 2b05ded75b73f463504a742fe3492e55
 msgid "fetching_author"
 msgstr "正在从 %s 获取作者信息..."
 
@@ -577,7 +613,7 @@ msgstr "已禁用"
 msgid "linked_entries_enabled"
 msgstr "已启用"
 
-# en-hash: f2cb4c8134446083c3d2859f02c963f6
+# en-hash: 1790c02ad98e9267ed7bb8ab23c5916e
 msgid "linked_entries_setting_desc"
 msgstr "“关联条目”会在角色、地点和历史人物在彼此的描述中被提到时自动建立连接。\n\n禁用此功能将隐藏详情对话框中的“关联条目”按钮。"
 
@@ -1020,6 +1056,10 @@ msgstr "确定"
 # en-hash: 386b384e3eec6bf9bf55d32b5018de15
 msgid "pair_rejected"
 msgstr "Pair marked as not a duplicate."
+
+# en-hash: 6ce50515ff472af170d4655b7a90f6be
+msgid "partial_matches"
+msgstr ""
 
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"
@@ -1505,7 +1545,7 @@ msgstr "X-Ray 已是最新版本 (%s)。"
 msgid "updater_whats_new"
 msgstr "更新内容："
 
-# en-hash: 46667b51ced49ca8828f897cf83e89b8
+# en-hash: 362b2e695aa7299e20bb0d9ce320f58d
 msgid "updating_ai"
 msgstr "正在更新 X-Ray 数据..."
 

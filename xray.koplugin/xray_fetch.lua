@@ -303,11 +303,15 @@ end
 -- THIS existing entity. We route by the caller's type and merge into the exact
 -- object, so a name variant or a reclassification from the AI cannot create a
 -- duplicate entry in a different list.
-function M:_processSingleWordResult(result, text, book_text, current_page, skip_resort, known_entity, known_type)
+function M:_processSingleWordResult(result, text, book_text, current_page, skip_resort, known_entity, known_type, opts)
     if self.destroyed or not self.ui or not self.ui.document then return end
+    -- Silent mode (auto-enrich): background work must never surface a dialog.
+    -- Errors are logged and dropped; success refreshes the open card in place.
+    local silent = opts and opts.silent
     local safe_text = type(text) == "string" and text or tostring(text or "")
     if type(result) ~= "table" then
         local err = self.loc:t("entity_not_found", safe_text:sub(1, 20))
+        if silent then return self:log("XRayPlugin: auto-enrich result invalid: " .. tostring(err)) end
         UIManager:show(InfoMessage:new{ text = err, timeout = 5 })
         return
     end
@@ -318,6 +322,7 @@ function M:_processSingleWordResult(result, text, book_text, current_page, skip_
         local shown_item = item
         if type(item) ~= "table" or not item.name then
             local err = result.error_message or self.loc:t("entity_not_found", safe_text:sub(1, 20))
+            if silent then return self:log("XRayPlugin: auto-enrich result missing item: " .. tostring(err)) end
             UIManager:show(InfoMessage:new{ text = err, timeout = 5 })
             return
         end
@@ -425,6 +430,12 @@ function M:_processSingleWordResult(result, text, book_text, current_page, skip_
                         table.insert(existing.history, hist_entry)
                     end
                 end
+
+                -- Record how far the book was read when this entry was last
+                -- enriched. The auto-enrich staleness gate reads this back.
+                if known_entity and type(current_page) == "number" then
+                    existing.last_enrich_page = current_page
+                end
             end
 
             -- Check if already exists. On Fetch More (known_entity set), match
@@ -509,9 +520,18 @@ function M:_processSingleWordResult(result, text, book_text, current_page, skip_
         
         -- Always show result if it's valid, even if it didn't merge into a target_list.
         -- On a merge, show the enriched entry (its preserved name), not the raw AI item.
-        self.lookup_manager:showResult(shown_item, item_type)
+        if silent then
+            -- Auto-enrich: refresh the card only if it is still open and still
+            -- shows this entity; never open a new one.
+            if type(self._refreshOpenEntityCard) == "function" then
+                pcall(function() self:_refreshOpenEntityCard(shown_item, item_type) end)
+            end
+        else
+            self.lookup_manager:showResult(shown_item, item_type)
+        end
     else
         local err = result.error_message or self.loc:t("entity_not_found", safe_text:sub(1, 20))
+        if silent then return self:log("XRayPlugin: auto-enrich failed: " .. tostring(err)) end
         UIManager:show(InfoMessage:new{ text = err, timeout = 5 })
     end
 end
@@ -658,6 +678,96 @@ function M:_buildEnrichContext(entity, entity_type, passages, samples, limit_per
     return context, book_text
 end
 
+-- Rank mention passages by relevance before the enrich budget is spent, so the
+-- best passages win the 18KB budget instead of whichever came first by page.
+-- Score favors (a) dense stretches of the book where the entity appears a lot
+-- and (b) recency: mentions near the entity's last appearance and near the
+-- reader's current position. The selection is returned in page order because
+-- the prompt reads better chronologically. Pure function so it can be tested
+-- without the UI or a live document.
+--   mentions : list of mention rows ({page=..., snippet=...}) or plain strings
+--   opts     : { current_page, total_pages, budget }
+-- Returns: budget-bounded, deduplicated, chronologically ordered mention list.
+function M:_rankEnrichPassages(mentions, opts)
+    if type(mentions) ~= "table" or #mentions == 0 then return {} end
+    opts = opts or {}
+    local total_pages = math.max(1, tonumber(opts.total_pages) or 1)
+    local current_page = tonumber(opts.current_page) or 0
+    local budget = tonumber(opts.budget) or 18000
+
+    -- Bucket mentions into page windows (~2.5% of the book each) so a cluster
+    -- of nearby mentions scores as one dense region.
+    local window = math.max(5, math.ceil(total_pages / 40))
+    local density, max_density = {}, 0
+    local rows = {}
+    local last_page = 0
+    for i, m in ipairs(mentions) do
+        local snippet = (type(m) == "table") and m.snippet or m
+        local page = (type(m) == "table") and tonumber(m.page) or nil
+        if type(snippet) == "string" and #snippet > 0 then
+            local bucket
+            if page then
+                bucket = math.floor((page - 1) / window)
+                density[bucket] = (density[bucket] or 0) + 1
+                if density[bucket] > max_density then max_density = density[bucket] end
+                if page > last_page then last_page = page end
+            end
+            table.insert(rows, { m = m, snippet = snippet, page = page, bucket = bucket, idx = i })
+        end
+    end
+    if #rows == 0 then return {} end
+
+    -- Linear proximity falloff over 15% of the book around an anchor page.
+    local span = math.max(1, total_pages * 0.15)
+    local function prox(p, anchor)
+        return math.max(0, 1 - math.abs(p - anchor) / span)
+    end
+    for _, r in ipairs(rows) do
+        if r.page and max_density > 0 then
+            r.score = (density[r.bucket] / max_density)
+                + 0.8 * prox(r.page, last_page)
+                + 0.6 * prox(r.page, current_page)
+        else
+            -- A page-less mention cannot be placed in the book; keep it only
+            -- when budget remains after every placeable passage.
+            r.score = -1
+        end
+    end
+
+    -- Chronological tiebreak: page ascending, page-less passages last, then the
+    -- original index. Shared by the ranking sort and the final emit sort so both
+    -- order equal inputs the same way.
+    local function byPageThenIdx(a, b)
+        local pa, pb = a.page or math.huge, b.page or math.huge
+        if pa ~= pb then return pa < pb end
+        return a.idx < b.idx
+    end
+
+    -- Deterministic order: score descending, then the chronological tiebreak,
+    -- so equal inputs always produce the same selection.
+    table.sort(rows, function(a, b)
+        if a.score ~= b.score then return a.score > b.score end
+        return byPageThenIdx(a, b)
+    end)
+
+    -- Greedy fill: best first. Dedup on exact snippet text (the same rule as
+    -- _buildEnrichContext) so a repeated sentence cannot spend the budget.
+    local seen, picked = {}, {}
+    for _, r in ipairs(rows) do
+        if not seen[r.snippet] and budget - #r.snippet >= 0 then
+            seen[r.snippet] = true
+            budget = budget - #r.snippet
+            table.insert(picked, r)
+        end
+    end
+
+    -- Emit chronologically; page-less passages go last, in input order.
+    table.sort(picked, byPageThenIdx)
+    local out = {}
+    for _, r in ipairs(picked) do table.insert(out, r.m) end
+    return out
+end
+
 -- Fetch More: enrich ONE existing entity's entry using passages from across the
 -- book where the entity actually appears. This reads wider than the reader's
 -- current page, so the entity is described from its real scenes and not only
@@ -667,10 +777,28 @@ end
 -- current reading position; full-book scans the whole book. The improved text
 -- is written back through the same merge path a single-word lookup uses, so the
 -- existing entry and the new details combine into one rewritten summary.
-function M:fetchMoreDetailsForEntity(entity, entity_type)
+function M:fetchMoreDetailsForEntity(entity, entity_type, opts)
     if not entity or not entity.name then return end
+    -- Silent mode (auto-enrich on card open): no dialogs, no wifi prompt, no
+    -- ConfirmBox; every blocked path is a logged skip. Auto-enrich is the only
+    -- production caller, so it always runs silent. The non-silent branch
+    -- (progress dialog, busy-slot ConfirmBox, interactive error) has no shipping
+    -- caller after the Fetch More buttons were removed, but stays in place: the
+    -- fetch specs still drive it, and it is the entry point if an interactive
+    -- caller returns. Keep it silent-safe on any change here.
+    local silent = opts and opts.silent
 
-    require("ui/network/manager"):runWhenOnline(function()
+    -- Auto-enrich marks the entity attempted before it schedules this fetch. If a
+    -- silent run bails out WITHOUT firing a request (no key, offline, slot busy),
+    -- clear that mark so a later open of the same card can retry this session.
+    local function allowRetry()
+        local k = opts and opts.auto_enrich_key
+        if k and self._auto_enrich_attempted then
+            self._auto_enrich_attempted[k] = nil
+        end
+    end
+
+    local function startFetch()
         if self.destroyed or not self.ui or not self.ui.document or not self.ui.getCurrentPage then return end
 
         entity_type = entity_type or self:_inferEntityType(entity)
@@ -681,12 +809,23 @@ function M:fetchMoreDetailsForEntity(entity, entity_type)
             self.ai_helper:init(self.path)
         end
 
-        if self.ai_helper and type(self.ai_helper.hasApiKey) == "function" and not self.ai_helper:hasApiKey() then
+        if silent then
+            -- Stricter than the interactive gate: a missing hasApiKey (partial
+            -- or mocked environment) must no-op instead of proceeding.
+            if not (self.ai_helper and type(self.ai_helper.hasApiKey) == "function" and self.ai_helper:hasApiKey()) then
+                allowRetry()
+                return self:log("XRayPlugin: auto-enrich skipped: no API key")
+            end
+        elseif self.ai_helper and type(self.ai_helper.hasApiKey) == "function" and not self.ai_helper:hasApiKey() then
             if self.showWelcomeCard then self:showWelcomeCard() end
             return
         end
 
         if self._active_ai_cancel or (self.ai_helper and self.ai_helper._async_child_pid) then
+            if silent then
+                allowRetry()
+                return self:log("XRayPlugin: auto-enrich skipped: another AI request is active")
+            end
             -- A comprehensive fetch can run for many minutes; replacing it
             -- silently would throw that work away. Ask before cancelling it.
             local ConfirmBox = require("ui/widget/confirmbox")
@@ -695,10 +834,17 @@ function M:fetchMoreDetailsForEntity(entity, entity_type)
                 ok_text = self.loc:t("fetch_more"),
                 ok_callback = function()
                     self:cancelActiveAIRequest("Previous AI request replaced by fetch-more")
-                    self:fetchMoreDetailsForEntity(entity, entity_type)
+                    self:fetchMoreDetailsForEntity(entity, entity_type, opts)
                 end,
             })
             return
+        end
+
+        -- A background enrich must yield to a user-initiated Find Mentions, not
+        -- steal its scan slot (the shared-slot claim below cancels the holder).
+        if silent and self.active_mention_scan then
+            allowRetry()
+            return self:log("XRayPlugin: auto-enrich skipped: a mention scan is active")
         end
 
         local current_page = self.ui:getCurrentPage()
@@ -734,6 +880,10 @@ function M:fetchMoreDetailsForEntity(entity, entity_type)
         end
 
         local function showError(err_code, err_msg)
+            if silent then
+                return self:log("XRayPlugin: auto-enrich error (suppressed dialog): "
+                    .. tostring(err_code) .. " " .. tostring(err_msg))
+            end
             local ButtonDialog2 = require("ui/widget/buttondialog")
             local title, text_msg = utils:getFriendlyError(err_code, err_msg, self.loc)
             local err_dlg
@@ -764,18 +914,23 @@ function M:fetchMoreDetailsForEntity(entity, entity_type)
         end
         self._fetch_more_cancel = cancelFetch
 
-        progress_msg = ButtonDialog:new{
-            title = self.loc:t("fetch_more_progress") or "Fetching more details...",
-            text = tostring(entity.name) .. "\n\n" .. (self.loc:t("fetching_wait") or "This may take a moment.\nTap Cancel to stop."),
-            buttons = {{{
-                text = self.loc:t("cancel") or "Cancel",
-                callback = function() cancelFetch("Fetch-more cancelled by user") end,
-            }}},
-        }
-        self._active_ai_dialog = progress_msg
+        if not silent then
+            progress_msg = ButtonDialog:new{
+                title = self.loc:t("fetch_more_progress") or "Fetching more details...",
+                text = tostring(entity.name) .. "\n\n" .. (self.loc:t("fetching_wait") or "This may take a moment.\nTap Cancel to stop."),
+                buttons = {{{
+                    text = self.loc:t("cancel") or "Cancel",
+                    callback = function() cancelFetch("Fetch-more cancelled by user") end,
+                }}},
+            }
+            self._active_ai_dialog = progress_msg
+            UIManager:show(progress_msg)
+            UIManager:forceRePaint()
+        end
+        -- Registered even in silent mode: destroy and suspend cancel through
+        -- this handle, which is what stops a background request from running on
+        -- (and draining) a sleeping device.
         self._active_ai_cancel = cancelFetch
-        UIManager:show(progress_msg)
-        UIManager:forceRePaint()
 
         -- Two ticks so the dialog is painted before any blocking extraction.
         UIManager:scheduleIn(0.3, function()
@@ -809,6 +964,15 @@ function M:fetchMoreDetailsForEntity(entity, entity_type)
                 -- firing twice after a coroutine error). One request per fetch.
                 if request_pid then return end
                 if self.destroyed or not self.ui or not self.ui.document then return cancelFetch("Fetch-more stopped: document unavailable") end
+
+                -- Rank before the samples check: ranking also dedups, so a
+                -- duplicate-heavy mention list can shrink below the fallback
+                -- threshold and still get chapter samples as backup signal.
+                passages = self:_rankEnrichPassages(passages, {
+                    current_page = current_page,
+                    total_pages = total_pages,
+                    budget = 18000,
+                })
 
                 -- The distributed whole-book samples are a heavy extraction (up to
                 -- 100 chapters). The targeted passages are the primary signal for
@@ -860,7 +1024,7 @@ function M:fetchMoreDetailsForEntity(entity, entity_type)
                     else
                         closeProgress()
                         if not is_cancelled then
-                            self:_processSingleWordResult(data, entity.name, book_text, current_page, true, entity, entity_type)
+                            self:_processSingleWordResult(data, entity.name, book_text, current_page, true, entity, entity_type, opts)
                         end
                     end
                 end
@@ -967,6 +1131,128 @@ function M:fetchMoreDetailsForEntity(entity, entity_type)
                 )
             end
         end)
+    end
+
+    if silent then
+        -- Background trigger: test connectivity without the wifi prompt, the
+        -- same way the background merge fetch does in main.lua.
+        local net_ok, NetworkMgr = pcall(require, "ui/network/manager")
+        if not net_ok or type(NetworkMgr) ~= "table"
+            or type(NetworkMgr.isConnected) ~= "function" or type(NetworkMgr.isOnline) ~= "function" then
+            allowRetry()
+            return
+        end
+        local ok, online = pcall(function() return NetworkMgr:isConnected() and NetworkMgr:isOnline() end)
+        if not ok or not online then
+            allowRetry()
+            return self:log("XRayPlugin: auto-enrich skipped: offline")
+        end
+        startFetch()
+    else
+        require("ui/network/manager"):runWhenOnline(startFetch)
+    end
+end
+
+-- Auto-enrich: opening an entity card triggers the enrich above silently when
+-- the entry is thin or stale. This replaced the manual Fetch More card button.
+
+-- The page at which this entity was last enriched. Falls back to the history
+-- pages written by _processSingleWordResult, then to the comprehensive fetch
+-- position, so entries from older caches are not treated as never-enriched.
+function M:_lastEnrichPage(entity)
+    if type(entity.last_enrich_page) == "number" then return entity.last_enrich_page end
+    local max_p
+    if type(entity.history) == "table" then
+        for _, h in ipairs(entity.history) do
+            local p = tonumber(h.page)
+            if p and (not max_p or p > max_p) then max_p = p end
+        end
+    end
+    if max_p then return max_p end
+    local last_fetch = self.book_data and tonumber(self.book_data.last_fetch_page)
+    return last_fetch or 0
+end
+
+-- Enrich when the entry is thin (main text well under the user's target
+-- length) or stale (the reader moved well past the last enrich point, so new
+-- material exists). Pure predicate; returns ok, reason ("thin"|"stale"|nil).
+function M:_shouldAutoEnrich(entity, entity_type, current_page, total_pages)
+    local s = self.ai_helper and self.ai_helper.settings or {}
+    local target
+    if entity_type == "location" then
+        target = tonumber(s.loc_desc_len) or 100
+    elseif entity_type == "historical_figure" then
+        target = tonumber(s.hist_fig_bio_len) or 100
+    elseif entity_type == "term" then
+        target = tonumber(s.term_def_len) or 100
+    else
+        target = tonumber(s.char_desc_len) or 200
+    end
+    local desc = entity[self:_descKeyForType(entity_type)]
+    if type(desc) ~= "string" or #desc < math.floor(target * 0.6) then
+        return true, "thin"
+    end
+    local stale_gap = math.max(20, math.floor((tonumber(total_pages) or 0) * 0.10))
+    if (tonumber(current_page) or 0) - self:_lastEnrichPage(entity) >= stale_gap then
+        return true, "stale"
+    end
+    return false, nil
+end
+
+-- The on-card-open hook. Never shows UI; every blocked path is a silent skip.
+-- Called by every entity details card in xray_ui.lua.
+function M:_maybeAutoEnrichEntity(entity, entity_type)
+    if not entity or not entity.name or entity.name == "" then return end
+    if entity.is_timeline or entity.is_conversion then return end
+    if self.destroyed or not self.ui or not self.ui.document or not self.ui.getCurrentPage then return end
+
+    -- Auto-enrich spends a metered AI call on card open, so it must be opt-out.
+    -- Honor an explicit setting; when unset, default on, but OFF on the slowest
+    -- hardware (PW1-class), where an unprompted request per card open is too
+    -- costly. The user can override either way from settings.
+    local settings = (self.ai_helper and self.ai_helper.settings) or {}
+    local enabled = settings.auto_enrich_cards
+    if enabled == nil then
+        enabled = not (type(utils.isLowPowerDevice) == "function" and utils:isLowPowerDevice())
+    end
+    if not enabled then
+        return self:log("XRayPlugin: auto-enrich disabled (setting or low-power device)")
+    end
+
+    entity_type = entity_type or self:_inferEntityType(entity)
+
+    -- One attempt per entity per session (the plugin instance dies with the
+    -- document), so a failed request or a short AI answer cannot re-fire on
+    -- every card open.
+    self._auto_enrich_attempted = self._auto_enrich_attempted or {}
+    local key = entity_type .. ":" .. tostring(entity.name):lower()
+    if self._auto_enrich_attempted[key] then return end
+
+    -- Busy: another AI request or a mention scan owns the single slot. Skip
+    -- WITHOUT marking attempted, so the next card open can retry.
+    if self._active_ai_cancel or (self.ai_helper and self.ai_helper._async_child_pid) or self.active_mention_scan then
+        return
+    end
+
+    local ok_page, current_page = pcall(function() return self.ui:getCurrentPage() end)
+    if not ok_page or type(current_page) ~= "number" then return end
+    local total_pages = (type(self.ui.document.getPageCount) == "function" and self.ui.document:getPageCount()) or 1
+
+    local should, reason = self:_shouldAutoEnrich(entity, entity_type, current_page, total_pages)
+    if not should then return end
+
+    self._auto_enrich_attempted[key] = true
+    self:log("XRayPlugin: auto-enrich queued (" .. tostring(reason) .. "): " .. tostring(entity.name))
+    -- Let the card paint first; e-ink repaints are slow, and the fetch itself
+    -- staggers another 0.3s before any blocking extraction.
+    UIManager:scheduleIn(0.8, function()
+        if self.destroyed or not self.ui or not self.ui.document then return end
+        if self._active_ai_cancel or (self.ai_helper and self.ai_helper._async_child_pid) or self.active_mention_scan then
+            -- The slot was taken while waiting; allow a retry on the next open.
+            self._auto_enrich_attempted[key] = nil
+            return
+        end
+        self:fetchMoreDetailsForEntity(entity, entity_type, { silent = true, auto_enrich_key = key })
     end)
 end
 

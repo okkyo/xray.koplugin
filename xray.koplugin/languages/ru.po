@@ -69,6 +69,26 @@ msgstr "Если включено, X-Ray автоматически запраш
 msgid "auto_dupe_check_setting_title"
 msgstr "Проверка дубликатов"
 
+# en-hash: b9f5c797ebbf55adccdd8539a65a0241
+msgid "auto_enrich_disabled"
+msgstr "Выключено"
+
+# en-hash: 00d23a76e43b46dae9ec7aa9dcbebb32
+msgid "auto_enrich_enabled"
+msgstr "Включено"
+
+# en-hash: c7653170146153e2eee0e36142b6b330
+msgid "auto_enrich_preference_desc"
+msgstr "Выберите предпочтение для автоматического обогащения карточек:"
+
+# en-hash: 10b0e718ab22bc54c2ee2339d420206c
+msgid "auto_enrich_setting_desc"
+msgstr "Когда вы открываете карточку персонажа, локации или термина, которая является краткой или устаревшей, X-Ray может незаметно запросить у ИИ ее обогащение в фоновом режиме, а затем обновить открытую карточку новым текстом.\n\nОтключение этой опции останавливает всё автоматическое обогащение.\n\n[B]Примечание:[/B] каждое обогащение использует [B]один[/B] запрос к API ИИ. Эта опция [B]отключена по умолчанию на более медленных устройствах[/B]. Пользователи бесплатных или ограниченных тарифных планов могут предпочесть оставить её отключённой."
+
+# en-hash: 6504799dfab3728b5b85d01f0c482ae1
+msgid "auto_enrich_setting_title"
+msgstr "Автообогащение карточек"
+
 # en-hash: b7e84428c69c17c5536c4a912a191e54
 msgid "auto_fetch_page_interval_prompt"
 msgstr "Интервал страниц"
@@ -177,7 +197,7 @@ msgstr "Вставить"
 msgid "cache_cleared"
 msgstr "Кэш очищен!\n\nТеперь вы можете получить новые данные:\nМеню → X-Ray → Получить данные ИИ"
 
-# en-hash: 1edc355371d87a94d024eebfed9f8815
+# en-hash: 2e361c4db7a5480c21b02780ed4e9e0b
 msgid "cache_save_failed"
 msgstr "Не удалось сохранить кэш"
 
@@ -437,6 +457,22 @@ msgstr "Извлечение дополнительных терминов..."
 msgid "fetch_button"
 msgstr "Получить"
 
+# en-hash: feabc3a414741d1d0169e608cd79a8d7
+msgid "fetch_more"
+msgstr ""
+
+# en-hash: e6d3f832a078aa4a1b9ac3ec543144b1
+msgid "fetch_more_progress"
+msgstr ""
+
+# en-hash: 689a44e8ec37f6f41391d8ea515e76e9
+msgid "fetch_more_replace_confirm"
+msgstr ""
+
+# en-hash: 43ed5b7ddf5e436ae0dccc841c6d509f
+msgid "fetch_named"
+msgstr ""
+
 # en-hash: 05ab2ce95089e50db065a1bd1ed0cd85
 msgid "fetch_single_word_prompt"
 msgstr "Данные X-Ray для '%s' не найдены. Хотите выполнить поиск?"
@@ -445,11 +481,11 @@ msgstr "Данные X-Ray для '%s' не найдены. Хотите вып�
 msgid "fetch_successful"
 msgstr "Данные успешно получены"
 
-# en-hash: 628671947a82f87c18a98ee9b6ff8b00
+# en-hash: 572e520194e629b3b906bb5b3e5bce2d
 msgid "fetching_ai"
 msgstr "Получение X-Ray..."
 
-# en-hash: cfecb2031470d0e28420642fc37ab55f
+# en-hash: 2b05ded75b73f463504a742fe3492e55
 msgid "fetching_author"
 msgstr "Получение информации об авторе из %s..."
 
@@ -577,7 +613,7 @@ msgstr "Отключено"
 msgid "linked_entries_enabled"
 msgstr "Включено"
 
-# en-hash: f2cb4c8134446083c3d2859f02c963f6
+# en-hash: 1790c02ad98e9267ed7bb8ab23c5916e
 msgid "linked_entries_setting_desc"
 msgstr "Linked Entries автоматически связывает персонажей, места и исторических личностей, когда они упоминаются в описаниях друг друга.\n\nОтключение этого параметра скроет кнопку «Linked Entries» в диалоговых окнах с подробной информацией."
 
@@ -1020,6 +1056,10 @@ msgstr "ОК"
 # en-hash: 386b384e3eec6bf9bf55d32b5018de15
 msgid "pair_rejected"
 msgstr "Pair marked as not a duplicate."
+
+# en-hash: 6ce50515ff472af170d4655b7a90f6be
+msgid "partial_matches"
+msgstr ""
 
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"
@@ -1505,7 +1545,7 @@ msgstr "Установлена последняя версия X-Ray (%s)."
 msgid "updater_whats_new"
 msgstr "Что нового:"
 
-# en-hash: 46667b51ced49ca8828f897cf83e89b8
+# en-hash: 362b2e695aa7299e20bb0d9ce320f58d
 msgid "updating_ai"
 msgstr "Обновление данных X-Ray..."
 

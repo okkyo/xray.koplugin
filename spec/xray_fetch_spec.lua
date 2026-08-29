@@ -849,4 +849,305 @@ describe("xray_fetch", function()
             assert.is_nil(book_text:find("Keep naming these related entities", 1, true))
         end)
     end)
+
+    describe("enrich passage ranking", function()
+        local function pagesOf(list)
+            local pages = {}
+            for _, m in ipairs(list) do table.insert(pages, m.page) end
+            return pages
+        end
+
+        it("returns an empty list for empty or nil input", function()
+            assert.are.same({}, plugin:_rankEnrichPassages(nil, {}))
+            assert.are.same({}, plugin:_rankEnrichPassages({}, {}))
+        end)
+
+        it("keeps a dense cluster and drops an isolated early mention when the budget is tight", function()
+            local s = string.rep("x", 100)
+            local mentions = {
+                { page = 4,  snippet = "A" .. s },
+                { page = 10, snippet = "B" .. s },
+                { page = 11, snippet = "C" .. s },
+                { page = 12, snippet = "D" .. s },
+            }
+            local out = plugin:_rankEnrichPassages(mentions, {
+                current_page = 12, total_pages = 100, budget = 310,
+            })
+            assert.are.same({ 10, 11, 12 }, pagesOf(out))
+        end)
+
+        it("prefers a mention near the current page over an equally dense distant one", function()
+            local s = string.rep("x", 100)
+            local mentions = {
+                { page = 5,  snippet = "A" .. s },
+                { page = 90, snippet = "B" .. s },
+            }
+            local out = plugin:_rankEnrichPassages(mentions, {
+                current_page = 90, total_pages = 100, budget = 101,
+            })
+            assert.are.same({ 90 }, pagesOf(out))
+        end)
+
+        it("emits the selection in page order regardless of score order", function()
+            local mentions = {
+                { page = 80, snippet = "late" },
+                { page = 5,  snippet = "early" },
+                { page = 40, snippet = "middle" },
+            }
+            local out = plugin:_rankEnrichPassages(mentions, {
+                current_page = 80, total_pages = 100, budget = 18000,
+            })
+            assert.are.same({ 5, 40, 80 }, pagesOf(out))
+        end)
+
+        it("drops duplicate snippets before spending the budget", function()
+            local mentions = {
+                { page = 10, snippet = "same text" },
+                { page = 20, snippet = "same text" },
+                { page = 30, snippet = "different" },
+            }
+            local out = plugin:_rankEnrichPassages(mentions, {
+                current_page = 30, total_pages = 100, budget = 18000,
+            })
+            assert.are.equal(2, #out)
+        end)
+
+        it("ranks page-less mentions last but keeps them when budget remains", function()
+            local mentions = {
+                { snippet = "floating" },
+                { page = 50, snippet = "anchored" },
+            }
+            local out = plugin:_rankEnrichPassages(mentions, {
+                current_page = 50, total_pages = 100, budget = 18000,
+            })
+            assert.are.equal(2, #out)
+            assert.are.equal("anchored", out[1].snippet)
+            assert.are.equal("floating", out[2].snippet)
+        end)
+    end)
+
+    describe("auto-enrich gate", function()
+        it("triggers on a thin description", function()
+            local ok, reason = plugin:_shouldAutoEnrich(
+                { name = "Madge", description = "Short." }, "character", 10, 300)
+            assert.is_true(ok)
+            assert.are.equal("thin", reason)
+        end)
+
+        it("triggers when the reader moved well past the last enrich point", function()
+            local ok, reason = plugin:_shouldAutoEnrich(
+                { name = "Madge", description = string.rep("x", 200), last_enrich_page = 50 },
+                "character", 200, 300)
+            assert.is_true(ok)
+            assert.are.equal("stale", reason)
+        end)
+
+        it("does not trigger for a long and fresh entry", function()
+            local ok = plugin:_shouldAutoEnrich(
+                { name = "Madge", description = string.rep("x", 200), last_enrich_page = 95 },
+                "character", 100, 300)
+            assert.is_false(ok)
+        end)
+
+        it("uses the per-type target length", function()
+            -- 80 chars is thin for a character (target 200) but fine for a
+            -- location (target 100, 60% = 60).
+            local desc = string.rep("x", 80)
+            local fresh = { name = "E", description = desc, last_enrich_page = 100 }
+            assert.is_true(plugin:_shouldAutoEnrich(fresh, "character", 100, 100))
+            assert.is_false(plugin:_shouldAutoEnrich(fresh, "location", 100, 100))
+        end)
+
+        it("resolves the last enrich page from field, history, then fetch position", function()
+            assert.are.equal(42, plugin:_lastEnrichPage({ last_enrich_page = 42 }))
+            assert.are.equal(30, plugin:_lastEnrichPage({
+                history = { { page = 10 }, { page = 30 }, { page = 20 } },
+            }))
+            plugin.book_data = { last_fetch_page = 7 }
+            assert.are.equal(7, plugin:_lastEnrichPage({ name = "X" }))
+            plugin.book_data = nil
+            assert.are.equal(0, plugin:_lastEnrichPage({ name = "X" }))
+        end)
+    end)
+
+    describe("auto-enrich trigger", function()
+        local fetch_calls
+
+        before_each(function()
+            fetch_calls = {}
+            plugin.ui.getCurrentPage = function() return 100 end
+            plugin.ui.document.getPageCount = function() return 300 end
+            -- The mock device reports as PW1-class (low power), where auto-enrich
+            -- defaults off. Opt in explicitly so these tests exercise the fetch path.
+            plugin.ai_helper = { settings = { auto_enrich_cards = true } }
+            plugin.fetchMoreDetailsForEntity = function(_, entity, entity_type, opts)
+                table.insert(fetch_calls, { entity = entity, entity_type = entity_type, opts = opts })
+            end
+        end)
+
+        it("fetches silently once per entity per session", function()
+            local madge = { name = "Madge", description = "Short." }
+            plugin:_maybeAutoEnrichEntity(madge, "character")
+            plugin:_maybeAutoEnrichEntity(madge, "character")
+            assert.are.equal(1, #fetch_calls)
+            assert.are.equal(madge, fetch_calls[1].entity)
+            assert.are.equal("character", fetch_calls[1].entity_type)
+            assert.is_true(fetch_calls[1].opts.silent)
+        end)
+
+        it("skips while another AI request runs, without burning the attempt", function()
+            local madge = { name = "Madge", description = "Short." }
+            plugin._active_ai_cancel = function() end
+            plugin:_maybeAutoEnrichEntity(madge, "character")
+            assert.are.equal(0, #fetch_calls)
+            plugin._active_ai_cancel = nil
+            plugin:_maybeAutoEnrichEntity(madge, "character")
+            assert.are.equal(1, #fetch_calls)
+        end)
+
+        it("skips while a mention scan runs, without burning the attempt", function()
+            local madge = { name = "Madge", description = "Short." }
+            plugin.active_mention_scan = { entity_name = "Other" }
+            plugin:_maybeAutoEnrichEntity(madge, "character")
+            assert.are.equal(0, #fetch_calls)
+        end)
+
+        it("never fires for timeline or conversion entries", function()
+            plugin:_maybeAutoEnrichEntity({ name = "Event", is_timeline = true, description = "" }, "character")
+            plugin:_maybeAutoEnrichEntity({ name = "3 miles", is_conversion = true, description = "" }, "character")
+            assert.are.equal(0, #fetch_calls)
+        end)
+
+        it("does not fire for a long and fresh entry", function()
+            plugin:_maybeAutoEnrichEntity(
+                { name = "Madge", description = string.rep("x", 200), last_enrich_page = 95 },
+                "character")
+            assert.are.equal(0, #fetch_calls)
+        end)
+
+        it("respects an explicit opt-out setting", function()
+            plugin.ai_helper.settings.auto_enrich_cards = false
+            plugin:_maybeAutoEnrichEntity({ name = "Madge", description = "Short." }, "character")
+            assert.are.equal(0, #fetch_calls)
+        end)
+
+        it("defaults off on a low-power device when the setting is unset", function()
+            -- The mock device is PW1-class, so an unset setting must not spend a
+            -- metered AI call on card open.
+            plugin.ai_helper.settings.auto_enrich_cards = nil
+            plugin:_maybeAutoEnrichEntity({ name = "Madge", description = "Short." }, "character")
+            assert.are.equal(0, #fetch_calls)
+        end)
+    end)
+
+    describe("silent fetch-more", function()
+        local entity
+
+        before_each(function()
+            entity = { name = "Madge Undersee", mentions = {}, description = "Short." }
+            plugin.ai_helper = {
+                hasApiKey = function() return true end,
+                settings = { spoiler_setting = "full_book" },
+                lookupSingleWordAsync = function() return nil, "error_api", "No API key configured" end,
+                cancelAsyncChild = function() end,
+            }
+            plugin.chapter_analyzer = {
+                getEndPageForCurrentPage = function() return 10 end,
+                getDetailedChapterSamples = function() return "samples", {} end,
+                scanMentionsAsync = function(_, _, _, _, _, _, _, on_complete)
+                    on_complete({})
+                    return { cancel = function() end }
+                end,
+            }
+            plugin.ui.getCurrentPage = function() return 10 end
+            plugin.ui.document.getPageCount = function() return 100 end
+            plugin._buildEnrichContext = function() return {}, "book text" end
+            plugin._sweepStaleFetchFiles = function() end
+            plugin.findRelatedEntities = function() return {} end
+            plugin.saveMentionsToCache = function() end
+        end)
+
+        it("suppresses the error dialog on a failed start", function()
+            local shown_before = #_G.ui_tracker.shown
+            plugin:fetchMoreDetailsForEntity(entity, "character", { silent = true })
+            assert.are.equal(shown_before, #_G.ui_tracker.shown)
+        end)
+
+        it("shows no progress dialog while running", function()
+            plugin:fetchMoreDetailsForEntity(entity, "character", { silent = true })
+            assert.is_nil(plugin._active_ai_dialog)
+        end)
+
+        it("skips when offline without any dialog", function()
+            local net = package.loaded["ui/network/manager"]
+            local old_connected = net.isConnected
+            net.isConnected = function() return false end
+            local started = false
+            plugin.ai_helper.lookupSingleWordAsync = function() started = true; return 1 end
+            local shown_before = #_G.ui_tracker.shown
+
+            plugin:fetchMoreDetailsForEntity(entity, "character", { silent = true })
+
+            net.isConnected = old_connected
+            assert.is_false(started)
+            assert.are.equal(shown_before, #_G.ui_tracker.shown)
+        end)
+
+        it("yields to an active mention scan instead of stealing its slot", function()
+            plugin.active_mention_scan = { entity_name = "Other", cancel_handle = { cancel = function() end } }
+            local started = false
+            plugin.ai_helper.lookupSingleWordAsync = function() started = true; return 1 end
+
+            plugin:fetchMoreDetailsForEntity(entity, "character", { silent = true })
+
+            assert.is_false(started)
+            assert.is_not_nil(plugin.active_mention_scan)
+        end)
+    end)
+
+    describe("silent result processing", function()
+        local madge
+
+        before_each(function()
+            madge = { name = "Madge Undersee", description = "Mayor's daughter and friend." }
+            plugin.characters = { madge }
+        end)
+
+        it("refreshes the open card instead of opening a result view", function()
+            local shown_result, refreshed
+            plugin.lookup_manager = { showResult = function(_, item) shown_result = item end }
+            plugin._refreshOpenEntityCard = function(_, item, item_type)
+                refreshed = { item = item, item_type = item_type }
+            end
+
+            plugin:_processSingleWordResult(
+                { is_valid = true, type = "character",
+                  item = { name = "Madge", description = "Enriched long text." } },
+                "Madge", "book text", 42, true, madge, "character", { silent = true })
+
+            assert.is_nil(shown_result)
+            assert.are.equal(madge, refreshed.item)
+            assert.are.equal("character", refreshed.item_type)
+            assert.are.equal("Enriched long text.", madge.description)
+        end)
+
+        it("records the enrich position on the entry", function()
+            plugin.lookup_manager = { showResult = function() end }
+            plugin:_processSingleWordResult(
+                { is_valid = true, type = "character",
+                  item = { name = "Madge", description = "Enriched long text." } },
+                "Madge", "book text", 42, true, madge, "character", { silent = true })
+            assert.are.equal(42, madge.last_enrich_page)
+        end)
+
+        it("drops an invalid result without any dialog", function()
+            local shown_before = #_G.ui_tracker.shown
+            plugin:_processSingleWordResult(
+                { is_valid = false, error_message = "nope" },
+                "Madge", "book text", 42, true, madge, "character", { silent = true })
+            plugin:_processSingleWordResult(
+                "not a table", "Madge", "book text", 42, true, madge, "character", { silent = true })
+            assert.are.equal(shown_before, #_G.ui_tracker.shown)
+        end)
+    end)
 end)

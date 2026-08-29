@@ -69,6 +69,26 @@ msgstr "عند تمكينه، يطلب X-Ray تلقائيًا من الذكاء 
 msgid "auto_dupe_check_setting_title"
 msgstr "التحقق من التكرار"
 
+# en-hash: b9f5c797ebbf55adccdd8539a65a0241
+msgid "auto_enrich_disabled"
+msgstr "معطل"
+
+# en-hash: 00d23a76e43b46dae9ec7aa9dcbebb32
+msgid "auto_enrich_enabled"
+msgstr "ممكن"
+
+# en-hash: c7653170146153e2eee0e36142b6b330
+msgid "auto_enrich_preference_desc"
+msgstr "حدد تفضيلك للإثراء التلقائي للبطاقات:"
+
+# en-hash: 10b0e718ab22bc54c2ee2339d420206c
+msgid "auto_enrich_setting_desc"
+msgstr "عند فتح بطاقة شخصية أو موقع أو مصطلح تكون قصيرة أو قديمة، يمكن لـ X-Ray أن يطلب بهدوء من الذكاء الاصطناعي إثراءها في الخلفية، ثم تحديث البطاقة المفتوحة بالنص الجديد.\n\nيؤدي تعطيل هذا إلى إيقاف جميع عمليات الإثراء التلقائي.\n\n[B]ملاحظة:[/B] يستخدم كل إثراء استدعاءً [B]واحدًا[/B] لـ API الذكاء الاصطناعي. هذا [B]معطل افتراضيًا على الأجهزة الأبطأ[/B]. قد يفضل المستخدمون في المستويات المجانية أو المحدودة الحصة تركه معطلاً."
+
+# en-hash: 6504799dfab3728b5b85d01f0c482ae1
+msgid "auto_enrich_setting_title"
+msgstr "إثراء البطاقات تلقائيًا"
+
 # en-hash: b7e84428c69c17c5536c4a912a191e54
 msgid "auto_fetch_page_interval_prompt"
 msgstr "فاصل الصفحات"
@@ -177,7 +197,7 @@ msgstr "لصق"
 msgid "cache_cleared"
 msgstr "تم مسح الذاكرة المؤقتة!\n\nيمكنك الآن جلب بيانات جديدة:\nالقائمة ← X-Ray ← جلب بيانات الذكاء الاصطناعي"
 
-# en-hash: 1edc355371d87a94d024eebfed9f8815
+# en-hash: 2e361c4db7a5480c21b02780ed4e9e0b
 msgid "cache_save_failed"
 msgstr "فشل حفظ الذاكرة المؤقتة"
 
@@ -437,6 +457,22 @@ msgstr "جاري استخراج مصطلحات إضافية..."
 msgid "fetch_button"
 msgstr "جلب"
 
+# en-hash: feabc3a414741d1d0169e608cd79a8d7
+msgid "fetch_more"
+msgstr ""
+
+# en-hash: e6d3f832a078aa4a1b9ac3ec543144b1
+msgid "fetch_more_progress"
+msgstr ""
+
+# en-hash: 689a44e8ec37f6f41391d8ea515e76e9
+msgid "fetch_more_replace_confirm"
+msgstr ""
+
+# en-hash: 43ed5b7ddf5e436ae0dccc841c6d509f
+msgid "fetch_named"
+msgstr ""
+
 # en-hash: 05ab2ce95089e50db065a1bd1ed0cd85
 msgid "fetch_single_word_prompt"
 msgstr "لم يتم العثور على بيانات X-Ray لـ '%s'. هل ترغب في البحث عنها؟"
@@ -445,11 +481,11 @@ msgstr "لم يتم العثور على بيانات X-Ray لـ '%s'. هل تر�
 msgid "fetch_successful"
 msgstr "تم الجلب بنجاح"
 
-# en-hash: 628671947a82f87c18a98ee9b6ff8b00
+# en-hash: 572e520194e629b3b906bb5b3e5bce2d
 msgid "fetching_ai"
 msgstr "جاري جلب X-Ray..."
 
-# en-hash: cfecb2031470d0e28420642fc37ab55f
+# en-hash: 2b05ded75b73f463504a742fe3492e55
 msgid "fetching_author"
 msgstr "جاري جلب معلومات المؤلف من %s..."
 
@@ -577,7 +613,7 @@ msgstr "معطل"
 msgid "linked_entries_enabled"
 msgstr "ممكن"
 
-# en-hash: f2cb4c8134446083c3d2859f02c963f6
+# en-hash: 1790c02ad98e9267ed7bb8ab23c5916e
 msgid "linked_entries_setting_desc"
 msgstr "تقوم الإدخالات المرتبطة تلقائيًا بربط الشخصيات والمواقع والشخصيات التاريخية عندما يتم ذكرها في أوصاف بعضها البعض.\n\nسيؤدي تعطيل هذا إلى إخفاء زر 'الإدخالات المرتبطة' من حوارات التفاصيل."
 
@@ -1020,6 +1056,10 @@ msgstr "موافق"
 # en-hash: 386b384e3eec6bf9bf55d32b5018de15
 msgid "pair_rejected"
 msgstr "تم تحديد الزوج على أنه ليس مكررًا."
+
+# en-hash: 6ce50515ff472af170d4655b7a90f6be
+msgid "partial_matches"
+msgstr ""
 
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"
@@ -1505,7 +1545,7 @@ msgstr "إصدار X-Ray محدث بالفعل (%s)."
 msgid "updater_whats_new"
 msgstr "ما الجديد:"
 
-# en-hash: 46667b51ced49ca8828f897cf83e89b8
+# en-hash: 362b2e695aa7299e20bb0d9ce320f58d
 msgid "updating_ai"
 msgstr "جاري تحديث بيانات X-Ray..."
 

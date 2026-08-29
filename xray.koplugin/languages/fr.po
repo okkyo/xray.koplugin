@@ -69,6 +69,26 @@ msgstr "Lorsqu'il est activé, X-Ray demande automatiquement à l'IA de vérifie
 msgid "auto_dupe_check_setting_title"
 msgstr "Vérification des doublons"
 
+# en-hash: b9f5c797ebbf55adccdd8539a65a0241
+msgid "auto_enrich_disabled"
+msgstr "Désactivé"
+
+# en-hash: 00d23a76e43b46dae9ec7aa9dcbebb32
+msgid "auto_enrich_enabled"
+msgstr "Activé"
+
+# en-hash: c7653170146153e2eee0e36142b6b330
+msgid "auto_enrich_preference_desc"
+msgstr "Sélectionnez votre préférence pour l'enrichissement automatique des fiches :"
+
+# en-hash: 10b0e718ab22bc54c2ee2339d420206c
+msgid "auto_enrich_setting_desc"
+msgstr "Lorsque vous ouvrez une fiche de personnage, de lieu ou de terme qui est courte ou obsolète, X-Ray peut discrètement demander à l'IA de l'enrichir en arrière-plan, puis actualiser la fiche ouverte avec le nouveau texte.\n\nDésactiver cette option arrête tout enrichissement automatique.\n\n[B]Remarque :[/B] chaque enrichissement utilise [B]un[/B] appel à l'API IA. Cette option est [B]désactivée par défaut sur les appareils plus lents[/B]. Les utilisateurs disposant d'un forfait gratuit ou limité en quota préféreront peut-être la laisser désactivée."
+
+# en-hash: 6504799dfab3728b5b85d01f0c482ae1
+msgid "auto_enrich_setting_title"
+msgstr "Enrichir les fiches automatiquement"
+
 # en-hash: b7e84428c69c17c5536c4a912a191e54
 msgid "auto_fetch_page_interval_prompt"
 msgstr "Intervalle de pages"
@@ -177,7 +197,7 @@ msgstr "Coller"
 msgid "cache_cleared"
 msgstr "Cache vidé !\n\nVous pouvez maintenant récupérer de nouvelles données :\nMenu → X-Ray → Récupérer les données IA"
 
-# en-hash: 1edc355371d87a94d024eebfed9f8815
+# en-hash: 2e361c4db7a5480c21b02780ed4e9e0b
 msgid "cache_save_failed"
 msgstr "Échec de l'enregistrement dans le cache"
 
@@ -437,6 +457,22 @@ msgstr "Extraction de termes supplémentaires..."
 msgid "fetch_button"
 msgstr "Récupérer"
 
+# en-hash: feabc3a414741d1d0169e608cd79a8d7
+msgid "fetch_more"
+msgstr ""
+
+# en-hash: e6d3f832a078aa4a1b9ac3ec543144b1
+msgid "fetch_more_progress"
+msgstr ""
+
+# en-hash: 689a44e8ec37f6f41391d8ea515e76e9
+msgid "fetch_more_replace_confirm"
+msgstr ""
+
+# en-hash: 43ed5b7ddf5e436ae0dccc841c6d509f
+msgid "fetch_named"
+msgstr ""
+
 # en-hash: 05ab2ce95089e50db065a1bd1ed0cd85
 msgid "fetch_single_word_prompt"
 msgstr "Aucune donnée X-Ray trouvée pour '%s'. Voulez-vous la rechercher ?"
@@ -445,11 +481,11 @@ msgstr "Aucune donnée X-Ray trouvée pour '%s'. Voulez-vous la rechercher ?"
 msgid "fetch_successful"
 msgstr "Récupération réussie"
 
-# en-hash: 628671947a82f87c18a98ee9b6ff8b00
+# en-hash: 572e520194e629b3b906bb5b3e5bce2d
 msgid "fetching_ai"
 msgstr "Récupération de X-Ray..."
 
-# en-hash: cfecb2031470d0e28420642fc37ab55f
+# en-hash: 2b05ded75b73f463504a742fe3492e55
 msgid "fetching_author"
 msgstr "Récupération des infos auteur depuis %s..."
 
@@ -577,7 +613,7 @@ msgstr "Désactivé"
 msgid "linked_entries_enabled"
 msgstr "Activé"
 
-# en-hash: f2cb4c8134446083c3d2859f02c963f6
+# en-hash: 1790c02ad98e9267ed7bb8ab23c5916e
 msgid "linked_entries_setting_desc"
 msgstr "Les entrées liées connectent automatiquement les personnages, les lieux et les personnages historiques lorsqu'ils sont mentionnés dans leurs descriptions respectives.\n\nDésactiver ceci masquera le bouton « Entrées liées » des boîtes de dialogue de détails."
 
@@ -1020,6 +1056,10 @@ msgstr "OK"
 # en-hash: 386b384e3eec6bf9bf55d32b5018de15
 msgid "pair_rejected"
 msgstr "Pair marked as not a duplicate."
+
+# en-hash: 6ce50515ff472af170d4655b7a90f6be
+msgid "partial_matches"
+msgstr ""
 
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"
@@ -1505,7 +1545,7 @@ msgstr "X-Ray est à jour (%s)."
 msgid "updater_whats_new"
 msgstr "Quoi de neuf :"
 
-# en-hash: 46667b51ced49ca8828f897cf83e89b8
+# en-hash: 362b2e695aa7299e20bb0d9ce320f58d
 msgid "updating_ai"
 msgstr "Mise à jour des données X-Ray..."
 

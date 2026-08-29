@@ -53,6 +53,21 @@ msgstr "When enabled, X-Ray automatically asks the AI to check for duplicate cha
 msgid "auto_dupe_check_setting_title"
 msgstr "Duplicate Check"
 
+msgid "auto_enrich_disabled"
+msgstr "Disabled"
+
+msgid "auto_enrich_enabled"
+msgstr "Enabled"
+
+msgid "auto_enrich_preference_desc"
+msgstr "Select your preference for automatic card enrichment:"
+
+msgid "auto_enrich_setting_desc"
+msgstr "When you open a character, location, or term card that is short or out of date, X-Ray can quietly ask the AI to enrich it in the background, then refresh the open card with the new text.\n\nDisabling this stops all automatic enrichment.\n\n[B]Note:[/B] each enrichment uses [B]one[/B] AI API call. This is [B]off by default on slower devices[/B]. Users on free-tier or quota-limited plans may prefer to leave it off."
+
+msgid "auto_enrich_setting_title"
+msgstr "Auto-Enrich Cards"
+
 msgid "auto_fetch_page_interval_prompt"
 msgstr "Page Interval"
 
@@ -135,7 +150,7 @@ msgid "cache_cleared"
 msgstr "Cache cleared!\n\nYou can now fetch new data:\nMenu → X-Ray → Fetch AI Data"
 
 msgid "cache_save_failed"
-msgstr "✗ Cache failed."
+msgstr "[Save failed]"
 
 msgid "cache_save_success"
 msgstr "✓ Cache updated."
@@ -329,6 +344,18 @@ msgstr "Extracting additional terms..."
 msgid "fetch_button"
 msgstr "Fetch"
 
+msgid "fetch_more"
+msgstr "Fetch More"
+
+msgid "fetch_more_progress"
+msgstr "Fetching more details..."
+
+msgid "fetch_more_replace_confirm"
+msgstr "Another X-Ray request is still running. Cancel it and fetch details for this entity instead?"
+
+msgid "fetch_named"
+msgstr "Fetch '%s'"
+
 msgid "fetch_single_word_prompt"
 msgstr "No X-Ray data found for '%s'. Would you like to look it up?"
 
@@ -336,10 +363,10 @@ msgid "fetch_successful"
 msgstr "Fetch successful"
 
 msgid "fetching_ai"
-msgstr "Fetching X-Ray..."
+msgstr "Fetching from %s..."
 
 msgid "fetching_author"
-msgstr "Fetching Author..."
+msgstr "Fetching author info from %s..."
 
 msgid "fetching_series_context"
 msgstr "Fetching series context: Book %d of %d…"
@@ -435,7 +462,7 @@ msgid "linked_entries_enabled"
 msgstr "Enabled"
 
 msgid "linked_entries_setting_desc"
-msgstr "Linked Entries automatically connects characters, locations, and historical figures when they are mentioned in each other's descriptions.\n\nDisabling this will hide the [B]Linked Entries[/B] button from detail dialogs."
+msgstr "Linked Entries automatically connects characters, locations, and historical figures when they are named in each other's descriptions or in their found mentions.\n\nDisabling this will hide the [B]Linked Entries[/B] button from detail dialogs."
 
 msgid "local_setup_title"
 msgstr "Connect via Local Wi-Fi"
@@ -716,12 +743,6 @@ msgstr "This book is in %s. Switch X-Ray language to match?"
 msgid "multiple_matches"
 msgstr "Multiple matches for '%s'. Which did you mean?"
 
-msgid "partial_matches"
-msgstr "No exact match for '%s'. Tap a related entry, or fetch it:"
-
-msgid "fetch_named"
-msgstr "Fetch '%s'"
-
 msgid "new_feature"
 msgstr "New Feature"
 
@@ -772,6 +793,9 @@ msgstr "OK"
 
 msgid "pair_rejected"
 msgstr "Pair marked as not a duplicate."
+
+msgid "partial_matches"
+msgstr "No exact match for '%s'. Tap a related entry, or fetch it:"
 
 msgid "paste_clipboard_confirm"
 msgstr "Use the API key found in clipboard for %s?"
@@ -1137,7 +1161,7 @@ msgid "updater_whats_new"
 msgstr "What's new:"
 
 msgid "updating_ai"
-msgstr "Updating X-Ray..."
+msgstr "Updating X-Ray Data..."
 
 msgid "val"
 msgstr "???"

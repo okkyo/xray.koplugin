@@ -959,6 +959,11 @@ function XRayPlugin:getSubMenuItems()
                                 keep_menu_open = true,
                                 callback = function() self:showAutoDupeCheckSettings() end,
                             },
+                            {
+                                text = self.loc:t("auto_enrich_setting_title") or "Auto-Enrich Cards",
+                                keep_menu_open = true,
+                                callback = function() self:showAutoEnrichSettings() end,
+                            },
                         }
                     },
                     {
