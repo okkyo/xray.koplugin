@@ -778,7 +778,7 @@ function M:scanBookForUnits(force)
             -- Sort all aliases descending by length to prevent prefix shadowing
             local sorted_aliases = {}
             for _, alias in ipairs(aliases) do
-                table.insert(sorted_aliases, alias:lower())
+                table.insert(sorted_aliases, xray_units.utf8Lower(alias))
             end
             table.sort(sorted_aliases, function(a, b)
                 return #a > #b
@@ -934,7 +934,7 @@ function M:scanBookForUnits(force)
             -- Sort descending by length to prevent shadowing issues (e.g. "m" matching before "mm")
             local sorted_aliases = {}
             for _, alias in ipairs(aliases) do
-                table.insert(sorted_aliases, alias:lower())
+                table.insert(sorted_aliases, xray_units.utf8Lower(alias))
             end
             table.sort(sorted_aliases, function(a, b)
                 return #a > #b
@@ -955,7 +955,7 @@ function M:scanBookForUnits(force)
                 local is_vague = false
                 
                 local matched_text = (hit.matched_text or "")
-                local lower_matched = matched_text:lower():gsub("\194\160", " "):gsub("%s+", " ")
+                local lower_matched = xray_units.utf8Lower(matched_text):gsub("\194\160", " "):gsub("\226\128\175", " "):gsub("%s+", " ")
                 
                 -- Extract unit alias using suffix_map lookup by iterating suffixes
                 local matched_alias = nil
@@ -1097,7 +1097,7 @@ function M:scanBookForUnits(force)
                     if not u then
                         for _, unit_def in ipairs(xray_units.UNITS or {}) do
                             for _, alias in ipairs(unit_def.aliases) do
-                                if alias:lower() == matched_unit then
+                                if xray_units.utf8Lower(alias) == matched_unit then
                                     u = unit_def
                                     break
                                 end
@@ -1160,9 +1160,9 @@ function M:scanBookForUnits(force)
                                 end
                                 valid = true
                                 if not is_range then
-                                    local lower_orig = original_text:gsub("−", "-"):gsub("–", "-"):gsub("—", "-"):lower():gsub("\194\160", " "):gsub("%s+", " ")
-                                    local lower_num = num_str:gsub("^%s+", ""):gsub("%s+$", ""):lower():gsub("\194\160", " "):gsub("%s+", " ")
-                                    local lower_match = hit.matched_text:lower():gsub("\194\160", " "):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+                                    local lower_orig = xray_units.utf8Lower(original_text:gsub("−", "-"):gsub("–", "-"):gsub("—", "-")):gsub("\194\160", " "):gsub("\226\128\175", " "):gsub("%s+", " ")
+                                    local lower_num = xray_units.utf8Lower(num_str:gsub("^%s+", ""):gsub("%s+$", "")):gsub("\194\160", " "):gsub("\226\128\175", " "):gsub("%s+", " ")
+                                    local lower_match = xray_units.utf8Lower(hit.matched_text):gsub("\194\160", " "):gsub("\226\128\175", " "):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
                                     
                                     if lower_orig ~= lower_match then
                                         if lower_orig:sub(1, #lower_num) == lower_num then
