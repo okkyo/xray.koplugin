@@ -187,6 +187,18 @@ describe("xray_imagemanager", function()
             assert.are.equal(1, cover_entry.page)
         end)
 
+        it("returns immediately without disk lookup if entry already has valid page", function()
+            local mock_ui = {
+                document = {
+                    file = "/path/to/book.epub",
+                    getPageCount = function() return 500 end,
+                }
+            }
+            local entry = { id = "img1", title = "Map of Roshar", href = "images/map.jpg", page = 42 }
+            local res = img_mgr:resolveImagePage(mock_ui, entry)
+            assert.are.equal(42, res)
+        end)
+
         it("falls back to entry page when no document is open", function()
             local entry = { id = "img1", title = "Map", href = "map.jpg", page = 12 }
             local res = img_mgr:resolveImagePage(nil, entry)

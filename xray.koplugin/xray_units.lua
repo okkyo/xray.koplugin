@@ -1,61 +1,11 @@
 -- xray_units.lua - Core logic for unit detection, conversion and formatting
+local plugin_path = ((...) or ""):match("(.-)[^%.]+$") or ""
+local utils = require(plugin_path .. "xray_utils")
+
 local M = {}
 
--- Fast UTF-8 lowercasing in pure Lua covering ASCII, Cyrillic (ru, uk, sr, bg),
--- Latin-1 Supplement & Extended (de, fr, es, it, pt, pl, tr, hu, nl, etc.), and Greek.
 local function utf8Lower(str)
-    if not str then return "" end
-    local res = str:lower()
-    
-    -- Cyrillic UTF-8:
-    -- А-П: \xD0\x90-\xD0\x9F -> \xD0\xB0-\xD0\xBF
-    -- Р-Я: \xD0\xA0-\xD0\xAF -> \xD1\x80-\xD1\x8F
-    res = res:gsub("\208([\144-\159])", function(b)
-        return "\208" .. string.char(string.byte(b) + 32)
-    end)
-    res = res:gsub("\208([\160-\175])", function(b)
-        return "\209" .. string.char(string.byte(b) - 32)
-    end)
-    res = res:gsub("\208\129", "\209\145") -- Ё -> ё
-    res = res:gsub("\208\132", "\209\148") -- Є -> є (uk)
-    res = res:gsub("\208\134", "\209\150") -- І -> і (uk/be)
-    res = res:gsub("\208\135", "\209\151") -- Ї -> ї (uk)
-    res = res:gsub("\210\144", "\210\145") -- Ґ -> ґ (uk)
-    res = res:gsub("\208\130", "\209\146") -- Ђ -> ђ (sr)
-    res = res:gsub("\208\136", "\209\152") -- Ј -> ј (sr)
-    res = res:gsub("\208\137", "\209\153") -- Љ -> љ (sr)
-    res = res:gsub("\208\138", "\209\154") -- Њ -> њ (sr)
-    res = res:gsub("\208\139", "\209\155") -- Ћ -> ћ (sr)
-    res = res:gsub("\208\143", "\209\159") -- Џ -> џ (sr)
-
-    -- Latin-1 Supplement accented characters (À-Ö, Ø-Þ -> à-ö, ø-þ)
-    -- \xC3\x80-\x96 -> \xC3\xA0-\xB6
-    -- \xC3\x98-\x9E -> \xC3\xB8-\xBE
-    res = res:gsub("\195([\128-\150])", function(b)
-        return "\195" .. string.char(string.byte(b) + 32)
-    end)
-    res = res:gsub("\195([\152-\158])", function(b)
-        return "\195" .. string.char(string.byte(b) + 32)
-    end)
-    
-    -- Latin Extended:
-    res = res:gsub("\196\176", "i")          -- İ -> i (Turkish dotted capital I)
-    res = res:gsub("\197\129", "\197\130")   -- Ł -> ł (Polish)
-    res = res:gsub("\196\132", "\196\133")   -- Ą -> ą (Polish)
-    res = res:gsub("\196\134", "\196\135")   -- Ć -> ć (Polish)
-    res = res:gsub("\196\152", "\196\153")   -- Ę -> ę (Polish)
-    res = res:gsub("\197\131", "\197\132")   -- Ń -> ń (Polish)
-    res = res:gsub("\197\154", "\197\155")   -- Ś -> ś (Polish)
-    res = res:gsub("\197\185", "\197\186")   -- Ź -> ź (Polish)
-    res = res:gsub("\197\187", "\197\188")   -- Ż -> ż (Polish)
-    res = res:gsub("\197\144", "\197\145")   -- Ő -> ő (Hungarian)
-    res = res:gsub("\197\176", "\197\177")   -- Ű -> ű (Hungarian)
-    res = res:gsub("\196\140", "\196\141")   -- Č -> č (Serbian/Czech)
-    res = res:gsub("\197\160", "\197\161")   -- Š -> š (Serbian/Czech)
-    res = res:gsub("\197\189", "\197\190")   -- Ž -> ž (Serbian/Czech)
-    res = res:gsub("\196\144", "\196\145")   -- Đ -> đ (Serbian)
-    
-    return res
+    return utils:utf8Lower(str)
 end
 
 M.utf8Lower = utf8Lower

@@ -455,13 +455,19 @@ function ImageManager:resolveImagePage(ui, image_entry)
         return 1
     end
 
+    -- 2. Fast path: If the image already has a valid positive page, return it immediately without disk/process overhead
+    local existing = tonumber(image_entry.page)
+    if existing and existing > 0 then
+        return existing
+    end
+
     if not ui or not ui.document or not ui.document.file then
-        return tonumber(image_entry.page) or 1
+        return existing or 1
     end
 
     local book_path = ui.document.file
     if not book_path:lower():match("%.epub$") then
-        return tonumber(image_entry.page) or 1
+        return existing or 1
     end
 
     local escaped_book = book_path:gsub("'", "'\\''")
@@ -469,99 +475,131 @@ function ImageManager:resolveImagePage(ui, image_entry)
                      or (type(ui.document.getTotalPages) == "function" and ui.document:getTotalPages()) 
                      or 1
 
-    -- 2. Fast list files in EPUB
-    local opf_path, ncx_path, nav_path = nil, nil, nil
-    local list_pipe = io.popen(string.format("unzip -l '%s'", escaped_book))
-    if list_pipe then
-        for line in list_pipe:lines() do
-            local fname = line:match("^%s*%d+%s+[%d%-%s:]+%s+(.+)%s*$")
-            if fname then
-                local f_lower = fname:lower()
-                if f_lower:match("%.opf$") then opf_path = fname
-                elseif f_lower:match("%.ncx$") then ncx_path = fname
-                elseif f_lower:match("nav%.xhtml$") or f_lower:match("nav%.html$") then nav_path = fname end
+    -- 3. Retrieve or build cached EPUB spine structure
+    self._epub_spine_cache = self._epub_spine_cache or {}
+    local meta = self._epub_spine_cache[book_path]
+
+    if not meta then
+        local opf_path, ncx_path, nav_path = nil, nil, nil
+        local list_pipe = io.popen(string.format("unzip -l '%s'", escaped_book))
+        if list_pipe then
+            for line in list_pipe:lines() do
+                local fname = line:match("^%s*%d+%s+[%d%-%s:]+%s+(.+)%s*$")
+                if fname then
+                    local f_lower = fname:lower()
+                    if f_lower:match("%.opf$") then opf_path = fname
+                    elseif f_lower:match("%.ncx$") then ncx_path = fname
+                    elseif f_lower:match("nav%.xhtml$") or f_lower:match("nav%.html$") then nav_path = fname end
+                end
+            end
+            list_pipe:close()
+        end
+        if not opf_path then return existing or 1 end
+
+        local opf_content = ""
+        local opf_pipe = io.popen(string.format("unzip -p '%s' '%s'", escaped_book, opf_path:gsub("'", "'\\''")))
+        if opf_pipe then opf_content = opf_pipe:read("*a") or ""; opf_pipe:close() end
+
+        local opf_dir = opf_path:match("^(.*/)") or ""
+        local manifest = {}
+        local manifest_id_to_spine = {}
+        for item_tag in opf_content:gmatch("<item%s+[^>]+>") do
+            local id = item_tag:match('id=["\']([^"\']+)["\']')
+            local item_href = item_tag:match('href=["\']([^"\']+)["\']')
+            if id and item_href then
+                local full = (opf_dir .. item_href):gsub("[^/]+/%.%./", ""):gsub("%./", "")
+                manifest[id] = full
             end
         end
-        list_pipe:close()
-    end
-    if not opf_path then return tonumber(image_entry.page) or 1 end
 
-    -- 3. Parse OPF to get manifest and spine
-    local opf_content = ""
-    local opf_pipe = io.popen(string.format("unzip -p '%s' '%s'", escaped_book, opf_path:gsub("'", "'\\''")))
-    if opf_pipe then opf_content = opf_pipe:read("*a") or ""; opf_pipe:close() end
-
-    local opf_dir = opf_path:match("^(.*/)") or ""
-    local manifest = {}
-    local manifest_id_to_spine = {}
-    for item_tag in opf_content:gmatch("<item%s+[^>]+>") do
-        local id = item_tag:match('id=["\']([^"\']+)["\']')
-        local item_href = item_tag:match('href=["\']([^"\']+)["\']')
-        if id and item_href then
-            local full = (opf_dir .. item_href):gsub("[^/]+/%.%./", ""):gsub("%./", "")
-            manifest[id] = full
+        local spine_items = {}
+        for itemref in opf_content:gmatch("<itemref%s+[^>]+>") do
+            local idref = itemref:match('idref=["\']([^"\']+)["\']')
+            if idref and manifest[idref] then
+                table.insert(spine_items, manifest[idref])
+                manifest_id_to_spine[idref] = #spine_items
+            end
         end
-    end
 
-    local spine_items = {}
-    for itemref in opf_content:gmatch("<itemref%s+[^>]+>") do
-        local idref = itemref:match('idref=["\']([^"\']+)["\']')
-        if idref and manifest[idref] then
-            table.insert(spine_items, manifest[idref])
-            manifest_id_to_spine[idref] = #spine_items
+        local file_to_toc_idx = self:getTocFileMapping(escaped_book, ncx_path, nav_path)
+
+        local flat_toc = {}
+        if ui.document.getToc then
+            local ok_toc, raw_toc = pcall(function() return ui.document:getToc() or {} end)
+            if ok_toc and raw_toc then
+                local utils_ok, utils = pcall(require, plugin_path .. "xray_utils")
+                flat_toc = (utils_ok and utils and utils.flattenTOC and utils:flattenTOC(raw_toc)) or raw_toc
+            end
         end
+
+        local spine_page_map = self:buildSpinePageMap(ui, spine_items, manifest_id_to_spine, total_pages, file_to_toc_idx)
+
+        meta = {
+            spine_items = spine_items,
+            manifest_id_to_spine = manifest_id_to_spine,
+            file_to_toc_idx = file_to_toc_idx,
+            flat_toc = flat_toc,
+            spine_page_map = spine_page_map,
+            spine_contents = {},
+            image_to_spine = {},
+        }
+        self._epub_spine_cache[book_path] = meta
     end
 
-    -- 4. Get NCX / Nav file mapping to TOC indices
-    local file_to_toc_idx = self:getTocFileMapping(escaped_book, ncx_path, nav_path)
+    local spine_items = meta.spine_items or {}
+    local file_to_toc_idx = meta.file_to_toc_idx or {}
+    local flat_toc = meta.flat_toc or {}
+    local spine_page_map = meta.spine_page_map or {}
 
-    -- 5. Flatten KOReader live TOC
-    local flat_toc = {}
-    if ui.document.getToc then
-        local ok_toc, raw_toc = pcall(function() return ui.document:getToc() or {} end)
-        if ok_toc and raw_toc then
-            local utils_ok, utils = pcall(require, plugin_path .. "xray_utils")
-            flat_toc = (utils_ok and utils and utils.flattenTOC and utils:flattenTOC(raw_toc)) or raw_toc
-        end
-    end
-
-    -- 6. Find which spine XHTML files reference this image
-    local matches = {}
-    for s_idx, s_href in ipairs(spine_items) do
-        local s_lower = s_href:lower()
-        if s_lower:match("%.xhtml$") or s_lower:match("%.html$") or s_lower:match("%.htm$") then
-            local cmd = string.format("unzip -p '%s' '%s'", escaped_book, s_href:gsub("'", "'\\''"))
-            local sp = io.popen(cmd)
-            if sp then
-                local content = sp:read("*a") or ""
-                sp:close()
-                local pos = content:find(base_href, 1, true) or (href ~= "" and content:find(href, 1, true))
-                if pos then
-                    local score = 0
-                    local spine_name = s_lower:match("([^/]+)$") or s_lower
-                    if spine_name:find("map") or spine_name:find("illus") or spine_name:find("image") or spine_name:find("plate") or spine_name:find("figure") then
-                        score = score + 100
+    -- 4. Find which spine XHTML file references this image (cached per image base href)
+    local best = meta.image_to_spine[base_href]
+    if not best then
+        local matches = {}
+        for s_idx, s_href in ipairs(spine_items) do
+            local s_lower = s_href:lower()
+            if s_lower:match("%.xhtml$") or s_lower:match("%.html$") or s_lower:match("%.htm$") then
+                local content = meta.spine_contents[s_href]
+                if not content then
+                    local cmd = string.format("unzip -p '%s' '%s'", escaped_book, s_href:gsub("'", "'\\''"))
+                    local sp = io.popen(cmd)
+                    if sp then
+                        content = sp:read("*a") or ""
+                        sp:close()
+                        meta.spine_contents[s_href] = content
                     end
-                    local size = #content
-                    if size < 2500 then score = score + 50
-                    elseif size < 5000 then score = score + 20
-                    elseif size > 20000 then score = score - 20 end
-                    table.insert(matches, { s_idx = s_idx, href = s_href, score = score, rel_pos = pos / math.max(1, #content) })
+                end
+                if content then
+                    local pos = content:find(base_href, 1, true) or (href ~= "" and content:find(href, 1, true))
+                    if pos then
+                        local score = 0
+                        local spine_name = s_lower:match("([^/]+)$") or s_lower
+                        if spine_name:find("map") or spine_name:find("illus") or spine_name:find("image") or spine_name:find("plate") or spine_name:find("figure") then
+                            score = score + 100
+                        end
+                        local size = #content
+                        if size < 2500 then score = score + 50
+                        elseif size < 5000 then score = score + 20
+                        elseif size > 20000 then score = score - 20 end
+                        table.insert(matches, { s_idx = s_idx, href = s_href, score = score, rel_pos = pos / math.max(1, #content) })
+                        if score >= 100 then
+                            break
+                        end
+                    end
                 end
             end
         end
+
+        if #matches > 0 then
+            table.sort(matches, function(a, b)
+                if a.score ~= b.score then return a.score > b.score end
+                return a.s_idx > b.s_idx
+            end)
+            best = matches[1]
+            meta.image_to_spine[base_href] = best
+        end
     end
 
-    local best = nil
-    if #matches > 0 then
-        table.sort(matches, function(a, b)
-            if a.score ~= b.score then return a.score > b.score end
-            return a.s_idx > b.s_idx
-        end)
-        best = matches[1]
-    end
-
-    -- 7. If best spine match is found, resolve directly through file_to_toc_idx -> flat_toc!
+    -- 5. If best spine match is found, resolve directly through file_to_toc_idx -> flat_toc
     if best then
         local base_file = best.href:match("([^/]+)$") or best.href
         local t_idx = file_to_toc_idx[base_file]
@@ -579,8 +617,7 @@ function ImageManager:resolveImagePage(ui, image_entry)
         end
     end
 
-    -- 8. Fallback: build verified spine page map and interpolate
-    local spine_page_map = self:buildSpinePageMap(ui, spine_items, manifest_id_to_spine, total_pages, file_to_toc_idx)
+    -- 6. Fallback: use verified spine page map and interpolate
     if best and spine_page_map[best.s_idx] and spine_page_map[best.s_idx] > 1 then
         local base_pg = spine_page_map[best.s_idx]
         local next_pg = spine_page_map[best.s_idx + 1] or base_pg
@@ -591,7 +628,6 @@ function ImageManager:resolveImagePage(ui, image_entry)
         return resolved
     end
 
-    local existing = tonumber(image_entry.page)
     return (existing and existing > 1) and existing or (existing or 1)
 end
 

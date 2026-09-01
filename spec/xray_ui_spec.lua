@@ -1268,7 +1268,7 @@ describe("xray_ui", function()
     end)
 
     describe("showImageActions", function()
-        it("should render image actions dialog without crashing and show action options", function()
+        it("should render image actions dialog without crashing and without unnecessary page resolution or cache saving", function()
             local img = {
                 id = "map_01",
                 title = "Roshar Map",
@@ -1276,10 +1276,20 @@ describe("xray_ui", function()
                 is_favorite = false,
                 is_hidden = false,
             }
+            local resolve_called = false
+            local save_called = false
+            plugin.image_manager = {
+                resolveImagePage = function() resolve_called = true; return 12 end,
+            }
+            plugin.cache_manager = {
+                asyncSaveCache = function() save_called = true end,
+            }
             local ok, err = pcall(function()
                 plugin:showImageActions(img)
             end)
             assert.is_true(ok, "showImageActions failed: " .. tostring(err))
+            assert.is_false(resolve_called, "resolveImagePage should not be called when page is valid")
+            assert.is_false(save_called, "asyncSaveCache should not be called on read-only menu open")
             local last = _G.ui_tracker.last_shown
             assert.is_not_nil(last)
             assert.are.equal("InputContainer", last.type)

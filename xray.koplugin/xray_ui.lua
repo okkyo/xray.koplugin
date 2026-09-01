@@ -2189,14 +2189,14 @@ end
 
 function M:findTermByName(word)
     if not word or not self.terms then return nil end
-    local query = word:lower()
+    local query = utils:utf8Lower(word)
     for _, term in ipairs(self.terms) do
-        if (term.name or ""):lower() == query then
+        if utils:utf8Lower(term.name or "") == query then
             return term
         end
         if term.aliases and type(term.aliases) == "table" then
             for _, alias in ipairs(term.aliases) do
-                if tostring(alias):lower() == query then
+                if utils:utf8Lower(tostring(alias)) == query then
                     return term
                 end
             end
@@ -6523,7 +6523,11 @@ function M:showImageActions(image_entry)
     local card_border = sc(2)
     local inner_w = dialog_w - (card_padding * 2) - (card_border * 2)
 
+    local _asset_path_cache = {}
     local function getAssetPath(filename)
+        if _asset_path_cache[filename] then
+            return _asset_path_cache[filename]
+        end
         local info = debug.getinfo(1, "S")
         local file_dir = (info and info.source and info.source:match("^@?(.*[/\\])")) or ""
         local candidates = {
@@ -6534,9 +6538,15 @@ function M:showImageActions(image_entry)
         }
         for _, path in ipairs(candidates) do
             local f = io.open(path, "r")
-            if f then f:close(); return path end
+            if f then
+                f:close()
+                _asset_path_cache[filename] = path
+                return path
+            end
         end
-        return "plugins/xray.koplugin/assets/" .. filename
+        local fallback = "plugins/xray.koplugin/assets/" .. filename
+        _asset_path_cache[filename] = fallback
+        return fallback
     end
 
     local overlay
@@ -6611,7 +6621,9 @@ function M:showImageActions(image_entry)
         -- 2. Series References
         local series_slug = (self.book_data and self.book_data.series_slug) or (self.book_data and self.book_data.series and self.series_manager and self.series_manager:makeSlug(self.book_data.series)) or (self.book_data and self.book_data.title and self.series_manager and self.series_manager:makeSlug(self.book_data.title)) or "series"
         local is_in_series = false
-        if self.series_manager then
+        if type(image_entry.is_series) == "boolean" then
+            is_in_series = image_entry.is_series
+        elseif self.series_manager then
             local s_imgs = self.series_manager:getSeriesImages(series_slug, 999) or {}
             local cur_id = image_entry.id or image_entry.href or image_entry.src
             for _, s_item in ipairs(s_imgs) do
@@ -6918,12 +6930,9 @@ function M:showImageActions(image_entry)
         end
     end
 
-    -- Initial build
-    if self.image_manager and self.image_manager.resolveImagePage then
+    -- Initial build: only resolve page if missing or non-positive
+    if (not image_entry.page or tonumber(image_entry.page) <= 0) and self.image_manager and self.image_manager.resolveImagePage then
         self.image_manager:resolveImagePage(self.ui, image_entry)
-        if self.cache_manager and self.ui and self.ui.document and self.ui.document.file and self.book_data then
-            self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
-        end
     end
     buildActionItemsList()
     local card = buildDialogWidget()
@@ -7131,7 +7140,7 @@ end
 
 function M:jumpToImagePage(page, image_entry)
     local pg = tonumber(page)
-    if image_entry and self.image_manager and self.image_manager.resolveImagePage then
+    if (not pg or pg <= 0) and image_entry and self.image_manager and self.image_manager.resolveImagePage then
         local resolved = self.image_manager:resolveImagePage(self.ui, image_entry)
         if resolved and resolved > 0 then pg = resolved end
         if self.cache_manager and self.ui and self.ui.document and self.ui.document.file and self.book_data then

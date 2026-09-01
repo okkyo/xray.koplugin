@@ -109,6 +109,136 @@ function M:getFriendlyError(error_code, error_msg, loc)
     return loc:t(title_key), loc:t(desc_key, desc_arg)
 end
 
+-- Fast UTF-8 lowercasing in pure Lua covering ASCII, Cyrillic (ru, uk, sr, bg, mk, be),
+-- Latin-1 Supplement & Extended (de, fr, es, it, pt, pl, tr, hu, nl, etc.), and Greek.
+function M:utf8Lower(str)
+    if not str then return "" end
+    local res = str:lower()
+    
+    -- Cyrillic UTF-8:
+    -- А-П: \xD0\x90-\xD0\x9F -> \xD0\xB0-\xD0\xBF
+    -- Р-Я: \xD0\xA0-\xD0\xAF -> \xD1\x80-\xD1\x8F
+    res = res:gsub("\208([\144-\159])", function(b)
+        return "\208" .. string.char(string.byte(b) + 32)
+    end)
+    res = res:gsub("\208([\160-\175])", function(b)
+        return "\209" .. string.char(string.byte(b) - 32)
+    end)
+    res = res:gsub("\208\129", "\209\145") -- Ё -> ё
+    res = res:gsub("\208\130", "\209\146") -- Ђ -> ђ (sr)
+    res = res:gsub("\208\131", "\209\147") -- Ѓ -> ѓ (mk)
+    res = res:gsub("\208\132", "\209\148") -- Є -> є (uk)
+    res = res:gsub("\208\133", "\209\149") -- Ѕ -> ѕ (mk)
+    res = res:gsub("\208\134", "\209\150") -- І -> і (uk/be)
+    res = res:gsub("\208\135", "\209\151") -- Ї -> ї (uk)
+    res = res:gsub("\208\136", "\209\152") -- Ј -> ј (sr/mk)
+    res = res:gsub("\208\137", "\209\153") -- Љ -> љ (sr/mk)
+    res = res:gsub("\208\138", "\209\154") -- Њ -> њ (sr/mk)
+    res = res:gsub("\208\139", "\209\155") -- Ћ -> ћ (sr)
+    res = res:gsub("\208\140", "\209\156") -- Ќ -> ќ (mk)
+    res = res:gsub("\208\142", "\209\158") -- Ў -> ў (be)
+    res = res:gsub("\208\143", "\209\159") -- Џ -> џ (sr/mk)
+    res = res:gsub("\210\144", "\210\145") -- Ґ -> ґ (uk)
+
+    -- Latin-1 Supplement accented characters (À-Ö, Ø-Þ -> à-ö, ø-þ)
+    -- \xC3\x80-\x96 -> \xC3\xA0-\xB6
+    -- \xC3\x98-\x9E -> \xC3\xB8-\xBE
+    res = res:gsub("\195([\128-\150])", function(b)
+        return "\195" .. string.char(string.byte(b) + 32)
+    end)
+    res = res:gsub("\195([\152-\158])", function(b)
+        return "\195" .. string.char(string.byte(b) + 32)
+    end)
+    
+    -- Latin Extended:
+    res = res:gsub("\196\176", "i")          -- İ -> i (Turkish dotted capital I)
+    res = res:gsub("\197\129", "\197\130")   -- Ł -> ł (Polish)
+    res = res:gsub("\196\132", "\196\133")   -- Ą -> ą (Polish)
+    res = res:gsub("\196\134", "\196\135")   -- Ć -> ć (Polish)
+    res = res:gsub("\196\152", "\196\153")   -- Ę -> ę (Polish)
+    res = res:gsub("\197\131", "\197\132")   -- Ń -> ń (Polish)
+    res = res:gsub("\197\154", "\197\155")   -- Ś -> ś (Polish)
+    res = res:gsub("\197\185", "\197\186")   -- Ź -> ź (Polish)
+    res = res:gsub("\197\187", "\197\188")   -- Ż -> ż (Polish)
+    res = res:gsub("\197\144", "\197\145")   -- Ő -> ő (Hungarian)
+    res = res:gsub("\197\176", "\197\177")   -- Ű -> ű (Hungarian)
+    res = res:gsub("\196\140", "\196\141")   -- Č -> č (Serbian/Czech)
+    res = res:gsub("\197\160", "\197\161")   -- Š -> š (Serbian/Czech)
+    res = res:gsub("\197\189", "\197\190")   -- Ž -> ž (Serbian/Czech)
+    res = res:gsub("\196\144", "\196\145")   -- Đ -> đ (Serbian)
+    res = res:gsub("\196\142", "\196\143")   -- Ď -> ď (Czech/Slovak)
+    res = res:gsub("\197\164", "\197\165")   -- Ť -> ť (Czech/Slovak)
+    res = res:gsub("\197\135", "\197\136")   -- Ň -> ň (Czech/Slovak)
+    res = res:gsub("\197\152", "\197\153")   -- Ř -> ř (Czech)
+    res = res:gsub("\197\174", "\197\175")   -- Ů -> ů (Czech)
+    res = res:gsub("\196\130", "\196\131")   -- Ă -> ă (Romanian)
+    res = res:gsub("\197\158", "\197\159")   -- Ş -> ş (Romanian/Turkish)
+    res = res:gsub("\197\162", "\197\163")   -- Ţ -> ţ (Romanian)
+    res = res:gsub("\200\152", "\200\153")   -- Ș -> ș (Romanian)
+    res = res:gsub("\200\154", "\200\155")   -- Ț -> ț (Romanian)
+    
+    -- Greek:
+    -- Α-Ο: \xCE\x91-\xCE\x9F -> \xCE\xB1-\xCE\xBF
+    -- Π-Ω: \xCE\xA0-\xCE\xA9 -> \xCF\x80-\xCF\x89
+    res = res:gsub("\206([\145-\159])", function(b)
+        return "\206" .. string.char(string.byte(b) + 32)
+    end)
+    res = res:gsub("\206([\160-\169])", function(b)
+        return "\207" .. string.char(string.byte(b) - 32)
+    end)
+    res = res:gsub("\206\134", "\206\172") -- Ά -> ά
+    res = res:gsub("\206\136", "\206\173") -- Έ -> έ
+    res = res:gsub("\206\137", "\206\174") -- Ή -> ή
+    res = res:gsub("\206\138", "\206\175") -- Ί -> ί
+    res = res:gsub("\206\140", "\207\140") -- Ό -> ό
+    res = res:gsub("\206\142", "\207\141") -- Ύ -> ύ
+    res = res:gsub("\206\143", "\207\142") -- Ώ -> ώ
+    
+    return res
+end
+
+-- Safely trims leading and trailing punctuation, quotes (ASCII and Unicode),
+-- brackets, dashes, and whitespace without stripping multibyte word characters.
+function M:trimPunctuation(text)
+    if type(text) ~= "string" or text == "" then return "" end
+    local s = text
+    
+    -- Normalize Unicode whitespace, non-breaking spaces, and BOM
+    s = s:gsub("\194\160", " "):gsub("\226\128\175", " "):gsub("\226\128\139", ""):gsub("\239\187\191", "")
+    
+    local changed = true
+    while changed do
+        local prev = s
+        -- Strip ASCII whitespace and ASCII punctuation from start and end
+        s = s:gsub("^[%s%p]+", ""):gsub("[%s%p]+$", "")
+        
+        -- Strip common Unicode punctuation / quotes / dashes from start
+        s = s:gsub("^\194\171", "") -- «
+        s = s:gsub("^\194\187", "") -- »
+        s = s:gsub("^\194\191", "") -- ¿
+        s = s:gsub("^\194\161", "") -- ¡
+        s = s:gsub("^\194\183", "") -- ·
+        s = s:gsub("^\226\128[\144-\191]", "") -- General Punctuation U+2000-U+206F (quotes “ ” ‘ ’ „ ‚ dashes — – … etc.)
+        s = s:gsub("^\226\136\146", "") -- − (minus)
+        s = s:gsub("^\227\128[\128-\191]", "") -- CJK symbols and punctuation (、 。 「 」 『 』 【 】 《 》 etc.)
+        s = s:gsub("^\239\188[\128-\191]", "") -- Fullwidth ASCII variants (！（），： etc.)
+        
+        -- Strip common Unicode punctuation / quotes / dashes from end
+        s = s:gsub("\194\171$", "") -- «
+        s = s:gsub("\194\187$", "") -- »
+        s = s:gsub("\194\191$", "") -- ¿
+        s = s:gsub("\194\161$", "") -- ¡
+        s = s:gsub("\194\183$", "") -- ·
+        s = s:gsub("\226\128[\144-\191]$", "") -- General Punctuation
+        s = s:gsub("\226\136\146$", "") -- − (minus)
+        s = s:gsub("\227\128[\128-\191]$", "") -- CJK symbols and punctuation
+        s = s:gsub("\239\188[\128-\191]$", "") -- Fullwidth ASCII variants
+        
+        changed = (s ~= prev)
+    end
+    return s
+end
+
 -- Returns true if the text contains CJK characters (U+3000–U+9FFF, etc.)
 function M:textHasCJK(text)
     if type(text) ~= "string" then return false end
