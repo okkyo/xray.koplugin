@@ -513,6 +513,114 @@ msgstr "Mode Buku Penuh"
 msgid "gemini_key_hint"
 msgstr "Masukkan kunci Gemini gratis dari Google AI Studio (dimulai dengan AQ. atau AIzaSy...):"
 
+# en-hash: 8365f32698c816ead0032549239eaf01
+msgid "img_attach_button"
+msgstr "Cari Gambar"
+
+# en-hash: 35b194540e169fa76f7cd2479f3c79b3
+msgid "img_change_button"
+msgstr "Ubah Gambar"
+
+# en-hash: 4a347cb48e5cec0e8a15f6f87c0072ec
+msgid "img_download_failed"
+msgstr "Gagal mengunduh gambar."
+
+# en-hash: 00885f153fa418496a300385d7f8e20f
+msgid "img_downloading"
+msgstr "Mengunduh gambar..."
+
+# en-hash: 9d54d95fa23744ea7042056e2827db99
+msgid "img_error"
+msgstr "Pencarian gagal: %s"
+
+# en-hash: 2bcf4d0012d8fec18f5b97a1f307c958
+msgid "img_key_saved"
+msgstr "Disimpan."
+
+# en-hash: 6ad9a851e6b0ab3cb2f3b75e87cd234a
+msgid "img_key_title"
+msgstr "Kunci API Tavily"
+
+# en-hash: d3da97e2d9aee5c8fbe03156ad051c99
+msgid "img_more"
+msgstr "Lainnya"
+
+# en-hash: 10ac3d04253ef7e1ddc73e6091c0cd55
+msgid "img_next"
+msgstr "Berikutnya"
+
+# en-hash: b79b9ffffededdcf093dc9f81e0a4412
+msgid "img_no_preview"
+msgstr "(Pratinjau tidak tersedia)"
+
+# en-hash: 5db1e02d891c15e428428c0e6e83c363
+msgid "img_no_results"
+msgstr "Tidak ada gambar ditemukan."
+
+# en-hash: dd1f775e443ff3b9a89270713580a51b
+msgid "img_prev"
+msgstr "Sebelumnya"
+
+# en-hash: 8c93ef5d97f9db40581e27c212df1525
+msgid "img_processing"
+msgstr "Memproses gambar..."
+
+# en-hash: 67a68190ce74fbbee740d8c7d03e360c
+msgid "img_provider_hint"
+msgstr "Default: DuckDuckGo (tidak perlu kunci)."
+
+# en-hash: fc35ec973f5b3a16f0d4b009834f39a6
+msgid "img_remove"
+msgstr "Hapus Gambar"
+
+# en-hash: 747f75c6bd9dc1efd3a82fbacd80b8ac
+msgid "img_remove_confirm"
+msgstr "Hapus gambar yang dilampirkan?"
+
+# en-hash: 75bf4e0be95a1b79b306de6513864ff5
+msgid "img_removed"
+msgstr "Gambar dihapus."
+
+# en-hash: 6fe2ab43d39c389ef5f665a86121f95c
+msgid "img_result_count"
+msgstr "Hasil %1$d dari %2$d"
+
+# en-hash: c3612962736fa980b8a853fbc9fa981c
+msgid "img_saved"
+msgstr "Gambar dilampirkan."
+
+# en-hash: 13348442cc6a27032d2b4aa28b75a5d3
+msgid "img_search_button"
+msgstr "Cari"
+
+# en-hash: 1690ed1486025401d8e2c66784ff7a5c
+msgid "img_search_hint"
+msgstr "Masukkan nama untuk mencari"
+
+# en-hash: c3c11d5165ffe0f67f9dad2d573079fb
+msgid "img_search_title"
+msgstr "Cari Gambar"
+
+# en-hash: 18b09f99ac64aaeb622d5feb886b9c03
+msgid "img_searching"
+msgstr "Mencari gambar..."
+
+# en-hash: 772eeb0a8a4e1193a21b9d2631e4a508
+msgid "img_source_suffix"
+msgstr "  (%s)"
+
+# en-hash: e3cea90d4e14007d88412e5a300c97ff
+msgid "img_tavily_fallback"
+msgstr "Tavily tidak tersedia. Menampilkan hasil DuckDuckGo."
+
+# en-hash: c54c117a6b6dfeed9d6276e093a6aa15
+msgid "img_use_this"
+msgstr "Gunakan Gambar Ini"
+
+# en-hash: c4f1dea83d1eb17400190339311b3482
+msgid "img_view"
+msgstr "Lihat Gambar"
+
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
 msgstr "Berkas xray_key.txt tidak ditemukan di penyimpanan utama atau direktori pengaturan."
@@ -800,6 +908,10 @@ msgstr "Frekuensi"
 # en-hash: 60b01aa51c38e7a952d2760bf1584915
 msgid "menu_historical_figures"
 msgstr "Tokoh Sejarah"
+
+# en-hash: 811f06595d24dab410afdee9cf25e49e
+msgid "menu_image_search"
+msgstr "Pencarian Gambar"
 
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"

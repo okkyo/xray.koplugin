@@ -1496,5 +1496,274 @@ describe("xray_ui", function()
             assert.is_not_nil(plugin.active_details_dialog)
         end)
     end)
+
+    describe("_persistEntityImage", function()
+        local saved
+
+        before_each(function()
+            saved = nil
+            -- Fake cache manager: capture the saved cache, never touch disk.
+            plugin.cache_manager = {
+                asyncSaveCache = function(_, _file, cache) saved = cache end,
+                loadCache = function() return {} end,
+            }
+        end)
+
+        it("sets image_path on the exact entity object (identity hit)", function()
+            local alice = { name = "Alice" }
+            plugin.book_data = { characters = { alice, { name = "Bob" } } }
+
+            local ok = plugin:_persistEntityImage(alice, "character", "/img/alice.jpg")
+
+            assert.is_true(ok)
+            assert.are.equal("/img/alice.jpg", alice.image_path)
+            assert.is_not_nil(saved)
+            assert.are.equal("/img/alice.jpg", saved.characters[1].image_path)
+        end)
+
+        it("falls back to a case-insensitive name match on a different object", function()
+            plugin.book_data = { locations = { { name = "The Shire" } } }
+            -- A distinct entity object with the same name (e.g. from a stale card).
+            local card_entity = { name = "the shire" }
+
+            local ok = plugin:_persistEntityImage(card_entity, "location", "/img/shire.png")
+
+            assert.is_true(ok)
+            -- The cached list entry (not the passed object) receives the path.
+            assert.are.equal("/img/shire.png", saved.locations[1].image_path)
+        end)
+
+        it("still saves and keeps the live path when no cache entry matches", function()
+            plugin.book_data = { terms = { { name = "Mithril" } } }
+            local orphan = { name = "Unknown Term" }
+
+            local ok = plugin:_persistEntityImage(orphan, "term", "/img/orphan.jpg")
+
+            assert.is_true(ok)
+            -- Live object keeps the path so the current card renders it...
+            assert.are.equal("/img/orphan.jpg", orphan.image_path)
+            -- ...but no cached entry was mutated (path is lost on reload).
+            assert.is_nil(saved.terms[1].image_path)
+        end)
+
+        it("does not attach to an arbitrary entry when the name match is ambiguous", function()
+            -- Two cached entries share a name (case-insensitive). A name-only
+            -- fallback must not silently pick one, or the image mis-attaches.
+            plugin.book_data = { characters = { { name = "John" }, { name = "john" } } }
+            local card_entity = { name = "John" }
+
+            local ok = plugin:_persistEntityImage(card_entity, "character", "/img/john.jpg")
+
+            assert.is_true(ok)
+            -- Neither same-named cache entry receives the path.
+            assert.is_nil(saved.characters[1].image_path)
+            assert.is_nil(saved.characters[2].image_path)
+            -- The live object still keeps it so the current card renders.
+            assert.are.equal("/img/john.jpg", card_entity.image_path)
+        end)
+
+        it("returns false when there is no open document", function()
+            plugin.ui.document = nil
+            local ok = plugin:_persistEntityImage({ name = "Alice" }, "character", "/img/a.jpg")
+            assert.is_false(ok)
+        end)
+    end)
+
+    describe("_isFictionForImage", function()
+        it("is true when the book type is fiction", function()
+            plugin.book_type = "fiction"
+            assert.is_true(plugin:_isFictionForImage())
+        end)
+
+        it("is false when the book type is non_fiction", function()
+            plugin.book_type = "non_fiction"
+            assert.is_false(plugin:_isFictionForImage())
+        end)
+
+        it("uses the finer format label when the type is auto/unset", function()
+            plugin.book_type = nil
+            plugin.getEffectiveBookType = function() return "manga" end
+            assert.is_true(plugin:_isFictionForImage())
+
+            plugin.getEffectiveBookType = function() return "textbook" end
+            assert.is_false(plugin:_isFictionForImage())
+        end)
+    end)
+
+    describe("image attach flow", function()
+        local ImageSearch = require("xray_imagesearch")
+        local saved = {}
+
+        -- Find the first button with the given text across the nested
+        -- ButtonDialog rows.
+        local function findButton(dialog, text)
+            local rows = (dialog and dialog.args and dialog.args.buttons) or {}
+            for _, row in ipairs(rows) do
+                for _, btn in ipairs(row) do
+                    if btn.text == text then return btn end
+                end
+            end
+            return nil
+        end
+
+        -- Every shown widget of a given type, in show order.
+        local function shownOfType(t)
+            local out = {}
+            for _, w in ipairs(_G.ui_tracker.shown) do
+                if w.type == t then out[#out + 1] = w end
+            end
+            return out
+        end
+
+        before_each(function()
+            saved.destPathFor = ImageSearch.destPathFor
+            saved.download = ImageSearch.download
+            saved.makeVariants = ImageSearch.makeVariants
+            saved.searchAndFetchThumbs = ImageSearch.searchAndFetchThumbs
+            saved.clearTempDir = ImageSearch.clearTempDir
+            saved.getTempDir = ImageSearch.getTempDir
+            -- Neutralize disk/network by default; each test overrides as needed.
+            ImageSearch.destPathFor = function() return "/sc/character_frodo_1.jpg" end
+            ImageSearch.clearTempDir = function() end
+            ImageSearch.getTempDir = function() return "/tmp/xray_test" end
+            -- Persistence and card refresh are covered elsewhere; keep them inert.
+            plugin._reopenEntityCard = function() end
+            plugin._persistEntityImage = function(_, entity, etype, img, thumb)
+                plugin._persisted = { entity = entity, etype = etype, img = img, thumb = thumb }
+                return true
+            end
+        end)
+
+        after_each(function()
+            ImageSearch.destPathFor = saved.destPathFor
+            ImageSearch.download = saved.download
+            ImageSearch.makeVariants = saved.makeVariants
+            ImageSearch.searchAndFetchThumbs = saved.searchAndFetchThumbs
+            ImageSearch.clearTempDir = saved.clearTempDir
+            ImageSearch.getTempDir = saved.getTempDir
+            plugin._persisted = nil
+        end)
+
+        describe("showImageAttachFlow", function()
+            it("opens a search dialog prefilled with the entity name", function()
+                plugin.book_type = "non_fiction"   -- do not append the book title
+                plugin:showImageAttachFlow({ name = "Frodo" }, "character")
+                local dlg = _G.ui_tracker.last_shown
+                assert.are.equal("InputDialog", dlg.type)
+                assert.are.equal("Frodo", dlg.args.input)
+            end)
+
+            it("does nothing when the entity is missing", function()
+                plugin:showImageAttachFlow(nil, "character")
+                assert.is_nil(_G.ui_tracker.last_shown)
+            end)
+        end)
+
+        describe("_runImageSearch", function()
+            it("shows a candidate picker when the search returns results", function()
+                ImageSearch.searchAndFetchThumbs = function()
+                    return { { full = "http://x/a.jpg", title = "A" } }, "duckduckgo"
+                end
+                plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                assert.are.equal("ButtonDialog", _G.ui_tracker.last_shown.type)
+            end)
+
+            it("shows an error notice when the search fails", function()
+                ImageSearch.searchAndFetchThumbs = function()
+                    return nil, "duckduckgo", "HTTP 500"
+                end
+                plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                local msgs = shownOfType("InfoMessage")
+                assert.is_true(#msgs >= 1)
+                assert.is_truthy(msgs[#msgs].args.text:find("img_error", 1, true))
+            end)
+
+            it("warns when a configured Tavily key fell back to DuckDuckGo", function()
+                plugin.ai_helper.tavily_api_key = "tvly-KEY"
+                ImageSearch.searchAndFetchThumbs = function()
+                    return { { full = "http://x/a.jpg", title = "A" } }, "duckduckgo"
+                end
+                plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                local warned = false
+                for _, w in ipairs(shownOfType("InfoMessage")) do
+                    if w.args.text:find("img_tavily_fallback", 1, true) then warned = true end
+                end
+                assert.is_true(warned)
+            end)
+
+            it("does not warn about fallback when no Tavily key is set", function()
+                plugin.ai_helper.tavily_api_key = ""
+                ImageSearch.searchAndFetchThumbs = function()
+                    return { { full = "http://x/a.jpg", title = "A" } }, "duckduckgo"
+                end
+                plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                for _, w in ipairs(shownOfType("InfoMessage")) do
+                    assert.is_falsy(w.args.text:find("img_tavily_fallback", 1, true))
+                end
+            end)
+        end)
+
+        describe("_showImageCandidates", function()
+            it("wires 'Use This Image' to attach the shown candidate", function()
+                local attached
+                plugin._attachChosenImage = function(_, entity, etype, url) attached = url end
+                local results = {
+                    { full = "http://x/a.jpg", title = "A" },
+                    { full = "http://x/b.jpg", title = "B" },
+                }
+                plugin:_showImageCandidates({ name = "Frodo" }, "character", results, "duckduckgo")
+                local dlg = plugin._img_candidates_dialog
+                assert.is_not_nil(dlg)
+                local use = findButton(dlg, plugin.loc:t("img_use_this"))
+                assert.is_not_nil(use)
+                use.callback()
+                assert.are.equal("http://x/a.jpg", attached)
+            end)
+
+            it("offers Next but not Previous on the first result", function()
+                local results = {
+                    { full = "http://x/a.jpg", title = "A" },
+                    { full = "http://x/b.jpg", title = "B" },
+                }
+                plugin:_showImageCandidates({ name = "Frodo" }, "character", results, "duckduckgo")
+                local dlg = plugin._img_candidates_dialog
+                assert.is_not_nil(findButton(dlg, plugin.loc:t("img_next")))
+                assert.is_nil(findButton(dlg, plugin.loc:t("img_prev")))
+            end)
+        end)
+
+        describe("_attachChosenImage", function()
+            it("stores the downscaled variants the resize produced", function()
+                ImageSearch.download = function() return true end
+                ImageSearch.makeVariants = function()
+                    return "/sc/frodo.jpg", "/sc/frodo.thumb.jpg"
+                end
+                plugin:_attachChosenImage({ name = "Frodo" }, "character", "http://x/a.jpg")
+                assert.is_not_nil(plugin._persisted)
+                assert.are.equal("/sc/frodo.jpg", plugin._persisted.img)
+                assert.are.equal("/sc/frodo.thumb.jpg", plugin._persisted.thumb)
+            end)
+
+            it("falls back to the full download when resizing fails", function()
+                ImageSearch.download = function() return true end
+                ImageSearch.makeVariants = function() return nil, "decode failed" end
+                plugin:_attachChosenImage({ name = "Frodo" }, "character", "http://x/a.jpg")
+                assert.are.equal("/sc/character_frodo_1.jpg", plugin._persisted.img)
+                assert.is_nil(plugin._persisted.thumb)
+            end)
+
+            it("shows an error and stores nothing when the download fails", function()
+                ImageSearch.download = function() return nil, "HTTP 500" end
+                ImageSearch.makeVariants = function()
+                    error("must not resize after a failed download")
+                end
+                plugin:_attachChosenImage({ name = "Frodo" }, "character", "http://x/a.jpg")
+                assert.is_nil(plugin._persisted)
+                local msgs = shownOfType("InfoMessage")
+                assert.is_true(#msgs >= 1)
+                assert.is_truthy(msgs[#msgs].args.text:find("img_download_failed", 1, true))
+            end)
+        end)
+    end)
 end)
 

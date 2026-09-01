@@ -355,6 +355,32 @@ function XRayBottomPopup:init()
         table.insert(active_btns, right_btn)
     end
 
+    -- D. Image button. The compact in-text popup has no thumbnail, so give it a
+    -- button that opens the full detail card (the same window as X-Ray >
+    -- Characters), where the image thumbnail and Search Images button live. The
+    -- label reflects the image state so the reader knows what the card offers.
+    -- Only for the four entity types that support images, never for conversions
+    -- or timeline events. Act on the ORIGINAL list entity so the card and any
+    -- image change land on the real object.
+    local IMG_TYPES = {
+        character = "showCharacterDetails",
+        location = "showLocationDetails",
+        term = "showTermDetails",
+        historical_figure = "showHistoricalFigureDetails",
+    }
+    local detail_method = self.entity_type and IMG_TYPES[self.entity_type]
+    if plugin and detail_method and plugin[detail_method]
+        and not e.is_conversion and not e.is_timeline then
+        local img_entity = self.source_entity or e
+        -- The button always opens the full card (which itself shows the image or a
+        -- Search Images button), so keep one consistent label regardless of state.
+        local img_btn = make_btn(get_loc_t("img_more", "More"), function()
+            UIManager:close(self)
+            plugin[detail_method](plugin, img_entity, { force_full_card = true })
+        end)
+        table.insert(active_btns, img_btn)
+    end
+
     -- The Fetch More button was removed: opening a card now auto-enriches a
     -- thin or stale entry silently (see _maybeAutoEnrichEntity in xray_fetch).
 
@@ -537,6 +563,9 @@ local function showBottomPopup(plugin, entity, entity_type)
 end
 
 local function shouldUseBottomPopup(plugin, opts)
+    -- Explicit override: the compact in-text popup can request the full detail
+    -- card (e.g. its image button), so honour that regardless of the setting.
+    if opts and opts.force_full_card then return false end
     local settings = plugin.ai_helper and plugin.ai_helper.settings
     if not settings then return false end
 
@@ -1465,71 +1494,7 @@ function M:showCharacterDetails(character, opts)
     local related = linked_enabled and self:findRelatedEntities(resolved_desc or "", character.name, self:_mentionScanText(character)) or {}
     local mentions_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.mentions_enabled ~= false
     
-    local buttons = {}
-    if #related > 0 then
-        buttons = {
-            {
-                {
-                    text = self.loc:t("linked_entries") or "Linked Entries",
-                    callback = function()
-                        self:showRelatedEntities(related, opts)
-                    end,
-                }
-            },
-            {
-                {
-                    text = self.loc:t("find_mentions") or "Find Mentions",
-                    callback = function()
-                        if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-                        self:showMentionsForEntity(character)
-                    end,
-                },
-                {
-                    text = self.loc:t("close") or "Close",
-                    callback = function()
-                        if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                        self.active_details_dialog = nil
-                    end,
-                }
-            }
-        }
-        if not mentions_enabled then
-            table.remove(buttons[2], 1)
-        end
-    else
-        if mentions_enabled then
-            buttons = {
-                {
-                    {
-                        text = self.loc:t("find_mentions") or "Find Mentions",
-                        callback = function()
-                            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-                            self:showMentionsForEntity(character)
-                        end,
-                    },
-                    {
-                        text = self.loc:t("close") or "Close",
-                        callback = function()
-                            if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                            self.active_details_dialog = nil
-                        end,
-                    }
-                }
-            }
-        else
-            buttons = {
-                {
-                    {
-                        text = self.loc:t("close") or "Close",
-                        callback = function()
-                            if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                            self.active_details_dialog = nil
-                        end,
-                    }
-                }
-            }
-        end
-    end
+    local buttons = self:_stdEntityCardButtons(character, related, mentions_enabled, opts)
 
     if is_truncated then
         table.insert(buttons, 1, {
@@ -1559,8 +1524,9 @@ function M:showCharacterDetails(character, opts)
         })
     end
 
+    self:_addImageButton(buttons, character, "character")
     self.active_details_dialog = ButtonDialog:new{
-        _added_widgets = { vg },
+        _added_widgets = self:_withEntityImage({ vg }, character, title_group_width, "character"),
         buttons = buttons,
         tap_close_callback = function() self:_onEntityCardDismissed() end,
     }
@@ -1656,71 +1622,7 @@ function M:showLocationDetails(loc_item, opts)
     local related = linked_enabled and self:findRelatedEntities(desc, loc_item.name, self:_mentionScanText(loc_item)) or {}
     local mentions_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.mentions_enabled ~= false
     
-    local buttons = {}
-    if #related > 0 then
-        buttons = {
-            {
-                {
-                    text = self.loc:t("linked_entries") or "Linked Entries",
-                    callback = function()
-                        self:showRelatedEntities(related, opts)
-                    end,
-                }
-            },
-            {
-                {
-                    text = self.loc:t("find_mentions") or "Find Mentions",
-                    callback = function()
-                        if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-                        self:showMentionsForEntity(loc_item)
-                    end,
-                },
-                {
-                    text = self.loc:t("close") or "Close",
-                    callback = function()
-                        if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                        self.active_details_dialog = nil
-                    end,
-                }
-            }
-        }
-        if not mentions_enabled then
-            table.remove(buttons[2], 1)
-        end
-    else
-        if mentions_enabled then
-            buttons = {
-                {
-                    {
-                        text = self.loc:t("find_mentions") or "Find Mentions",
-                        callback = function()
-                            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-                            self:showMentionsForEntity(loc_item)
-                        end,
-                    },
-                    {
-                        text = self.loc:t("close") or "Close",
-                        callback = function()
-                            if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                            self.active_details_dialog = nil
-                        end,
-                    }
-                }
-            }
-        else
-            buttons = {
-                {
-                    {
-                        text = self.loc:t("close") or "Close",
-                        callback = function()
-                            if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                            self.active_details_dialog = nil
-                        end,
-                    }
-                }
-            }
-        end
-    end
+    local buttons = self:_stdEntityCardButtons(loc_item, related, mentions_enabled, opts)
 
     if is_truncated then
         table.insert(buttons, 1, {
@@ -1740,8 +1642,9 @@ function M:showLocationDetails(loc_item, opts)
         })
     end
 
+    self:_addImageButton(buttons, loc_item, "location")
     self.active_details_dialog = ButtonDialog:new{
-        _added_widgets = { vg },
+        _added_widgets = self:_withEntityImage({ vg }, loc_item, title_group_width, "location"),
         buttons = buttons,
         tap_close_callback = function() self:_onEntityCardDismissed() end,
     }
@@ -1902,95 +1805,9 @@ function M:showTermDetails(term, opts)
         }
     end
 
-    local buttons = {}
-    if #related > 0 then
-        buttons = {
-            {
-                {
-                    text = self.loc:t("linked_entries") or "Linked Entries",
-                    callback = function()
-                        self:showRelatedEntities(related, opts)
-                    end,
-                }
-            },
-            {
-                {
-                    text = self.loc:t("find_mentions") or "Find Mentions",
-                    callback = function()
-                        if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-                        self:showMentionsForEntity(term)
-                    end,
-                },
-                {
-                    text = self.loc:t("close") or "Close",
-                    callback = function()
-                        if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                        self.active_details_dialog = nil
-                    end,
-                }
-            }
-        }
-        if not mentions_enabled then table.remove(buttons[2], 1) end
-        if opts and opts.low_confidence then
-            table.insert(buttons, 1, get_relookup_row())
-        end
-    else
-        if opts and opts.low_confidence then
-            buttons = { get_relookup_row() }
-            if mentions_enabled then
-                table.insert(buttons, {
-                    {
-                        text = self.loc:t("find_mentions") or "Find Mentions",
-                        callback = function()
-                            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-                            self:showMentionsForEntity(term)
-                        end,
-                    }
-                })
-            end
-            table.insert(buttons, {
-                {
-                    text = self.loc:t("close") or "Close",
-                    callback = function()
-                        if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                        self.active_details_dialog = nil
-                    end,
-                }
-            })
-        else
-            if mentions_enabled then
-                buttons = {
-                    {
-                        {
-                            text = self.loc:t("find_mentions") or "Find Mentions",
-                            callback = function()
-                                if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-                                self:showMentionsForEntity(term)
-                            end,
-                        },
-                        {
-                            text = self.loc:t("close") or "Close",
-                            callback = function()
-                                if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                                self.active_details_dialog = nil
-                            end,
-                        }
-                    }
-                }
-            else
-                buttons = {
-                    {
-                        {
-                            text = self.loc:t("close") or "Close",
-                            callback = function()
-                                if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                                self.active_details_dialog = nil
-                            end,
-                        }
-                    }
-                }
-            end
-        end
+    local buttons = self:_stdEntityCardButtons(term, related, mentions_enabled, opts)
+    if opts and opts.low_confidence then
+        table.insert(buttons, 1, get_relookup_row())
     end
 
     if is_truncated then
@@ -2018,8 +1835,9 @@ function M:showTermDetails(term, opts)
         })
     end
 
+    self:_addImageButton(buttons, term, "term")
     self.active_details_dialog = ButtonDialog:new{
-        _added_widgets = { vg },
+        _added_widgets = self:_withEntityImage({ vg }, term, title_group_width, "term"),
         buttons = buttons,
         tap_close_callback = function() self:_onEntityCardDismissed() end,
     }
@@ -3911,71 +3729,7 @@ function M:showHistoricalFigureDetails(fig, opts)
     local related = linked_enabled and self:findRelatedEntities(bio, fig.name, self:_mentionScanText(fig)) or {}
     local mentions_enabled = self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.mentions_enabled ~= false
     
-    local buttons = {}
-    if #related > 0 then
-        buttons = {
-            {
-                {
-                    text = self.loc:t("linked_entries") or "Linked Entries",
-                    callback = function()
-                        self:showRelatedEntities(related, opts)
-                    end,
-                }
-            },
-            {
-                {
-                    text = self.loc:t("find_mentions") or "Find Mentions",
-                    callback = function()
-                        if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-                        self:showMentionsForEntity(fig)
-                    end,
-                },
-                {
-                    text = self.loc:t("close") or "Close",
-                    callback = function()
-                        if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                        self.active_details_dialog = nil
-                    end,
-                }
-            }
-        }
-        if not mentions_enabled then
-            table.remove(buttons[2], 1)
-        end
-    else
-        if mentions_enabled then
-            buttons = {
-                {
-                    {
-                        text = self.loc:t("find_mentions") or "Find Mentions",
-                        callback = function()
-                            if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
-                            self:showMentionsForEntity(fig)
-                        end,
-                    },
-                    {
-                        text = self.loc:t("close") or "Close",
-                        callback = function()
-                            if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                            self.active_details_dialog = nil
-                        end,
-                    }
-                }
-            }
-        else
-            buttons = {
-                {
-                    {
-                        text = self.loc:t("close") or "Close",
-                        callback = function()
-                            if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
-                            self.active_details_dialog = nil
-                        end,
-                    }
-                }
-            }
-        end
-    end
+    local buttons = self:_stdEntityCardButtons(fig, related, mentions_enabled, opts)
 
     if is_truncated then
         table.insert(buttons, 1, {
@@ -3995,8 +3749,9 @@ function M:showHistoricalFigureDetails(fig, opts)
         })
     end
 
+    self:_addImageButton(buttons, fig, "historical_figure")
     self.active_details_dialog = ButtonDialog:new{
-        _added_widgets = { vg },
+        _added_widgets = self:_withEntityImage({ vg }, fig, title_group_width, "historical_figure"),
         buttons = buttons,
         tap_close_callback = function() self:_onEntityCardDismissed() end,
     }
@@ -4867,6 +4622,9 @@ function M:getAPIKeysMenu()
             sub_item_table_func = function() return self:getProviderKeySubMenu(pid, pname) end
         })
     end
+
+    -- Note: the image-search (Tavily) key is NOT AI-related, so it lives under
+    -- Settings > Image Search, not in this AI key menu.
 
     -- Clear All Configured Keys button
     table.insert(menu_items, {
@@ -5995,6 +5753,705 @@ function M:handleUnitConversionLookup(text)
         return true
     end
     return false
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Attach an image to an entity (character/location/historical figure/term)
+--
+-- Search: Tavily (image mode) when a Tavily API key is set, else DuckDuckGo
+-- image search (no key). The chosen image is stored inside the book's .sdr
+-- sidecar so it travels with the book. See xray_imagesearch.lua.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Map an entity type to the book_data list key and the show* card method.
+local IMG_LIST_KEYS = {
+    character = "characters",
+    location = "locations",
+    term = "terms",
+    historical_figure = "historical_figures",
+}
+
+-- Return the entity's attached image path only when it points at a readable file.
+function M:_entityImagePath(entity)
+    if not entity then return nil end
+    local p = entity.image_path
+    if type(p) ~= "string" or #p == 0 then return nil end
+    local f = io.open(p, "rb")
+    if not f then return nil end
+    f:close()
+    return p
+end
+
+-- Longest edge (px) for a card thumbnail on this device. The card renders at
+-- ~half the short edge, so match that (with the module's small-device floor).
+function M:_thumbEdge()
+    local short_edge = math.min(Screen:getWidth(), Screen:getHeight())
+    return math.floor(short_edge * 0.5)
+end
+
+-- Return a readable card-thumbnail path for the entity, or nil. Prefers the
+-- persisted path, then the deterministic path next to the image (so migrated
+-- entries are found without a stored field).
+function M:_entityThumbPath(entity)
+    if not entity then return nil end
+    local ImageSearch = require(plugin_path .. "xray_imagesearch")
+    local candidates = {}
+    if type(entity.image_thumb_path) == "string" and #entity.image_thumb_path > 0 then
+        candidates[#candidates + 1] = entity.image_thumb_path
+    end
+    if type(entity.image_path) == "string" and #entity.image_path > 0 then
+        candidates[#candidates + 1] = ImageSearch.thumbPathFor(entity.image_path)
+    end
+    for _, p in ipairs(candidates) do
+        local f = io.open(p, "rb")
+        if f then f:close(); return p end
+    end
+    return nil
+end
+
+-- Bare ImageWidget scaled to best-fit a box, keeping aspect ratio.
+-- alpha=true so a transparent PNG (e.g. a Wikipedia logo) composites over the
+-- white dialog instead of rendering its transparent pixels as solid black.
+-- It is a no-op for opaque images (the blend treats a missing alpha as opaque).
+function M:_imageWidget(path, box_w, box_h)
+    local ImageWidget = require("ui/widget/imagewidget")
+    return ImageWidget:new{
+        file = path,
+        width = box_w,
+        height = box_h,
+        scale_factor = 0,
+        alpha = true,
+    }
+end
+
+-- Tappable thumbnail for an entity card. Tap opens the full-screen ImageViewer.
+-- Returns a widget, or nil when the entity has no readable image.
+function M:_buildEntityImageWidget(entity, box_w, entity_type)
+    local path = self:_entityImagePath(entity)
+    if not path then return nil end
+    -- The card renders a small thumbnail when one exists on disk. Do NOT decode
+    -- and re-encode a thumbnail inline here: that blocks the UI thread with no
+    -- spinner during card build and can freeze a slow e-ink device. New entries
+    -- get their thumbnail at attach time; a legacy entry with no thumbnail just
+    -- renders the full image, scaled to the card box.
+    local card_path = self:_entityThumbPath(entity) or path
+    local CenterContainer = require("ui/widget/container/centercontainer")
+    local short_edge = math.min(Screen:getWidth(), Screen:getHeight())
+    local thumb_w = math.floor(math.min(box_w or short_edge, math.floor(short_edge * 0.5)))
+    local thumb_h = math.floor(thumb_w * 0.9)
+
+    local img = self:_imageWidget(card_path, thumb_w, thumb_h)
+    local frame = FrameContainer:new{
+        bordersize = 0,
+        padding = 0,
+        margin = 0,
+        CenterContainer:new{
+            dimen = Geom:new{ w = box_w or thumb_w, h = thumb_h },
+            img,
+        },
+    }
+    local tappable = InputContainer:new{ frame }
+    local function image_range()
+        return frame.dimen or Geom:new{ x = 0, y = 0, w = box_w or thumb_w, h = thumb_h }
+    end
+    -- KOReader opens images with a long-press (hold), so keep hold as the direct
+    -- zoom gesture to match that convention. Tap opens a small action menu
+    -- (View/Change/Remove) so the card itself stays free of extra buttons.
+    tappable.ges_events = {
+        Tap = { GestureRange:new{ ges = "tap", range = image_range } },
+        Hold = { GestureRange:new{ ges = "hold", range = image_range } },
+    }
+    local function open_viewer()
+        local ImageViewer = require("ui/widget/imageviewer")
+        UIManager:show(ImageViewer:new{
+            file = path,
+            fullscreen = true,
+            with_title_bar = false,
+        })
+        return true
+    end
+    tappable.onHold = open_viewer
+    tappable.onTap = function()
+        self:_showImageActionMenu(entity, entity_type, open_viewer)
+        return true
+    end
+
+    return VerticalGroup:new{
+        align = "center",
+        tappable,
+        VerticalSpan:new{ width = (Size.padding and Size.padding.default) or 8 },
+    }
+end
+
+-- Prepend the entity thumbnail (if any) to a ButtonDialog _added_widgets list.
+function M:_withEntityImage(list, entity, box_w, entity_type)
+    local w = self:_buildEntityImageWidget(entity, box_w, entity_type)
+    if w then table.insert(list, 1, w) end
+    return list
+end
+
+-- Show the tap-menu for an attached thumbnail: View, Change, or Remove.
+-- Hold on the thumbnail still opens the fullscreen viewer directly, so this
+-- keeps the entity card free of a Change/Remove button row.
+function M:_showImageActionMenu(entity, entity_type, open_viewer)
+    local dlg
+    dlg = ButtonDialog:new{
+        -- Shrink to fit the buttons instead of the default 90%-screen width.
+        shrink_unneeded_width = true,
+        buttons = {
+            {{
+                text = self.loc:t("img_view") or "View Image",
+                callback = function()
+                    UIManager:close(dlg)
+                    open_viewer()
+                end,
+            }},
+            {{
+                text = self.loc:t("img_change_button") or "Change Image",
+                callback = function()
+                    UIManager:close(dlg)
+                    if self.active_details_dialog then
+                        UIManager:close(self.active_details_dialog)
+                        self.active_details_dialog = nil
+                    end
+                    self:showImageAttachFlow(entity, entity_type)
+                end,
+            }},
+            {{
+                text = self.loc:t("img_remove") or "Remove Image",
+                callback = function()
+                    UIManager:close(dlg)
+                    -- Deleting the sidecar image is destructive and a mis-tap on
+                    -- slow e-ink is easy; confirm before removing.
+                    local ConfirmBox = require("ui/widget/confirmbox")
+                    UIManager:show(ConfirmBox:new{
+                        text = self.loc:t("img_remove_confirm")
+                            or "Remove the attached image?",
+                        ok_text = self.loc:t("img_remove") or "Remove Image",
+                        icon = false,
+                        ok_callback = function()
+                            self:_removeEntityImage(entity, entity_type)
+                        end,
+                    })
+                end,
+            }},
+        },
+    }
+    UIManager:show(dlg)
+end
+
+-- Build the standard button rows for an entity detail card:
+--   Row 1: Linked Entries | Find Mentions (whichever are enabled/available)
+--   Row 2: Close (always alone on the final row)
+-- Callers add their own extra rows (Read More, re-lookup) around these, and
+-- _addImageButton inserts the image row just above Close.
+function M:_stdEntityCardButtons(entity, related, mentions_enabled, opts)
+    local rows = {}
+    local primary = {}
+    if related and #related > 0 then
+        table.insert(primary, {
+            text = self.loc:t("linked_entries") or "Linked Entries",
+            callback = function()
+                self:showRelatedEntities(related, opts)
+            end,
+        })
+    end
+    if mentions_enabled then
+        table.insert(primary, {
+            text = self.loc:t("find_mentions") or "Find Mentions",
+            callback = function()
+                if self.active_details_dialog then UIManager:close(self.active_details_dialog); self.active_details_dialog = nil end
+                self:showMentionsForEntity(entity)
+            end,
+        })
+    end
+    if #primary > 0 then table.insert(rows, primary) end
+    table.insert(rows, {
+        {
+            text = self.loc:t("close") or "Close",
+            callback = function()
+                if self.active_details_dialog then UIManager:close(self.active_details_dialog) end
+                self.active_details_dialog = nil
+            end,
+        }
+    })
+    return rows
+end
+
+-- Insert the "Search Images" attach button on its own row just above the final
+-- Close row, but only when no image is attached yet. Once an image exists,
+-- management moves to the thumbnail tap-menu (see _showImageActionMenu), keeping
+-- the card clean.
+function M:_addImageButton(buttons, entity, entity_type)
+    if self:_entityImagePath(entity) ~= nil then return end
+    -- #buttons is the Close row; insert before it so Close stays last.
+    table.insert(buttons, math.max(1, #buttons), {
+        {
+            text = self.loc:t("img_attach_button") or "Search Images",
+            callback = function()
+                if self.active_details_dialog then
+                    UIManager:close(self.active_details_dialog)
+                    self.active_details_dialog = nil
+                end
+                self:showImageAttachFlow(entity, entity_type)
+            end,
+        },
+    })
+end
+
+-- Persist an entity's image path (and card thumbnail path) into the book cache.
+-- Mutates the live object and the matching object inside self.book_data, then
+-- saves asynchronously.
+function M:_persistEntityImage(entity, entity_type, image_path, thumb_path)
+    entity.image_path = image_path
+    entity.image_thumb_path = thumb_path
+    local doc_file = self.ui and self.ui.document and self.ui.document.file
+    if not doc_file then return false end
+    if not self.cache_manager then
+        self.cache_manager = require(plugin_path .. "xray_cachemanager"):new()
+    end
+    local cache = self.book_data
+    if type(cache) ~= "table" then
+        cache = self.cache_manager:loadCache(doc_file) or {}
+        self.book_data = cache
+    end
+    local list_key = IMG_LIST_KEYS[entity_type]
+    local list = list_key and cache[list_key]
+    if type(list) == "table" then
+        local found = false
+        for _, e in ipairs(list) do
+            if e == entity then e.image_path = image_path; e.image_thumb_path = thumb_path; found = true; break end
+        end
+        if not found and entity.name then
+            -- Fall back to a name match, but only when it is unambiguous. If two
+            -- entries share a name (case-insensitive), attaching to the first
+            -- would silently mis-assign the image, so leave it unmatched and let
+            -- the warning below fire instead.
+            local target = tostring(entity.name):lower()
+            local match, ambiguous = nil, false
+            for _, e in ipairs(list) do
+                if e.name and tostring(e.name):lower() == target then
+                    if match then ambiguous = true; break end
+                    match = e
+                end
+            end
+            if match and not ambiguous then
+                match.image_path = image_path
+                match.image_thumb_path = thumb_path
+                found = true
+            end
+        end
+        -- The live object keeps the path (line above) so the current card shows
+        -- it, but if no cache entry matched, the path is lost on the next reload.
+        -- Log it so the orphaned sidecar file is diagnosable.
+        if not found then
+            local ok_log, XRayLogger = pcall(require, plugin_path .. "xray_logger")
+            if ok_log and type(XRayLogger) == "table" and type(XRayLogger.warn) == "function" then
+                XRayLogger.warn("image not persisted to cache: no '" .. tostring(list_key)
+                    .. "' entry matches entity '" .. tostring(entity.name) .. "'")
+            end
+        end
+    end
+    self.cache_manager:asyncSaveCache(doc_file, cache)
+    return true
+end
+
+-- Re-open the classic entity card (used after attach/remove to show the result).
+function M:_reopenEntityCard(entity, entity_type)
+    local opts = self.active_details_opts or { source = "menu" }
+    -- Close the card that is still open (e.g. after Remove Image) before showing
+    -- the refreshed one, so the new card replaces it instead of stacking on top.
+    if self.active_details_dialog then
+        UIManager:close(self.active_details_dialog)
+        self.active_details_dialog = nil
+    end
+    if entity_type == "location" then
+        self:showLocationDetails(entity, opts)
+    elseif entity_type == "term" then
+        self:showTermDetails(entity, opts)
+    elseif entity_type == "historical_figure" then
+        self:showHistoricalFigureDetails(entity, opts)
+    else
+        self:showCharacterDetails(entity, opts)
+    end
+end
+
+function M:_removeEntityImage(entity, entity_type)
+    local old = self:_entityImagePath(entity)
+    local old_thumb = self:_entityThumbPath(entity)
+    self:_persistEntityImage(entity, entity_type, nil, nil)
+    if old then pcall(os.remove, old) end
+    if old_thumb and old_thumb ~= old then pcall(os.remove, old_thumb) end
+    UIManager:show(InfoMessage:new{ text = self.loc:t("img_removed") or "Image removed.", timeout = 2 })
+    self:_reopenEntityCard(entity, entity_type)
+end
+
+-- Entry point from the card button: ask for a search query, then search.
+-- True when appending the book title makes the image search more specific.
+-- Fiction (incl. manga, graphic novels, children's books) uses generic
+-- character/place names that the title disambiguates. Real-world entities in
+-- non-fiction want a clean name, so the title is left off there.
+function M:_isFictionForImage()
+    if self.book_type == "fiction" then return true end
+    if self.book_type == "non_fiction" then return false end
+    -- Auto / unset: fall back to the finer format label.
+    local label = self.getEffectiveBookType and self:getEffectiveBookType() or nil
+    return label == "prose_fiction" or label == "manga"
+        or label == "graphic_novel" or label == "children"
+        or label == "poetry"
+end
+
+-- Best available book title, trimmed; nil when none is known.
+function M:_bookTitleForImage()
+    local title
+    if self.ui and self.ui.document and self.ui.document.getProps then
+        local ok, props = pcall(function() return self.ui.document:getProps() end)
+        if ok and props then title = props.title end
+    end
+    if (not title or title == "") and self.book_data then
+        title = self.book_data.book_title
+    end
+    if type(title) == "string" then
+        title = title:gsub("^%s+", ""):gsub("%s+$", "")
+        if title ~= "" then return title end
+    end
+    return nil
+end
+
+function M:showImageAttachFlow(entity, entity_type)
+    if not entity then return end
+    local InputDialog = require("ui/widget/inputdialog")
+    local prefill = tostring(entity.name or "")
+    if prefill ~= "" and self:_isFictionForImage() then
+        local book_title = self:_bookTitleForImage()
+        if book_title then
+            prefill = prefill .. " " .. book_title
+        end
+    end
+    local dlg
+    dlg = InputDialog:new{
+        title = self.loc:t("img_search_title") or "Search Image",
+        input = prefill,
+        input_hint = self.loc:t("img_search_hint") or "Enter a name to search",
+        buttons = {{
+            {
+                text = self.loc:t("cancel") or "Cancel",
+                callback = function() UIManager:close(dlg) end,
+            },
+            {
+                text = self.loc:t("img_search_button") or "Search",
+                is_enter_default = true,
+                callback = function()
+                    local query = dlg:getInputText()
+                    UIManager:close(dlg)
+                    if query and #query > 0 then
+                        self:_runImageSearch(entity, entity_type, query)
+                    end
+                end,
+            },
+        }},
+    }
+    UIManager:show(dlg)
+    dlg:onShowKeyboard()
+end
+
+-- Run the search (in a dismissable subprocess when Trapper is available).
+function M:_runImageSearch(entity, entity_type, query)
+    local ImageSearch = require(plugin_path .. "xray_imagesearch")
+    -- Tavily key drives the primary provider; empty means DuckDuckGo (no key).
+    local tavily_key = (self.ai_helper and self.ai_helper.tavily_api_key) or ""
+    local tmp_dir = ImageSearch.getTempDir()
+
+    local function finish(results, source, err)
+        if not results then
+            local msg = self.loc:t("img_error", tostring(err or "unknown")) or ("Search failed: " .. tostring(err))
+            UIManager:show(InfoMessage:new{ text = msg, timeout = 4 })
+            return
+        end
+        if #results == 0 then
+            UIManager:show(InfoMessage:new{ text = self.loc:t("img_no_results") or "No images found.", timeout = 3 })
+            return
+        end
+        -- A configured Tavily key that came back as DuckDuckGo means Tavily
+        -- failed or was empty and the search fell back. Tell the user, so a
+        -- broken paid key does not look like it is silently working.
+        if source == "duckduckgo" and #tavily_key > 0 then
+            UIManager:show(InfoMessage:new{
+                text = self.loc:t("img_tavily_fallback")
+                    or "Tavily unavailable. Showing DuckDuckGo results.",
+                timeout = 3,
+            })
+        end
+        self:_showImageCandidates(entity, entity_type, results, source)
+    end
+
+    local ok_tr, Trapper = pcall(require, "ui/trapper")
+    if ok_tr and Trapper and Trapper.wrap then
+        Trapper:wrap(function()
+            local progress = InfoMessage:new{ text = self.loc:t("img_searching") or "Searching for images..." }
+            UIManager:show(progress)
+            UIManager:forceRePaint()
+            local completed, results, source, err = Trapper:dismissableRunInSubprocess(function()
+                return ImageSearch.searchAndFetchThumbs(query, tavily_key, tmp_dir)
+            end, progress)
+            UIManager:close(progress)
+            if not completed then return end
+            finish(results, source, err)
+        end)
+    else
+        -- Best-effort fallback: Trapper is effectively always present in KOReader.
+        -- Without it, the thumbnail downloads run on the UI thread with no cancel
+        -- (a brief freeze on slow e-ink). Acceptable only as a degraded path.
+        local results, source, err = ImageSearch.searchAndFetchThumbs(query, tavily_key, tmp_dir)
+        finish(results, source, err)
+    end
+end
+
+-- Show search results one at a time with Previous/Next/Use This Image.
+function M:_showImageCandidates(entity, entity_type, results, source)
+    local ImageSearch = require(plugin_path .. "xray_imagesearch")
+    local dialog_width = math.floor(math.min(Screen:getWidth(), Screen:getHeight()) * 0.9)
+    -- Reserve the ButtonDialog left+right chrome (border + inner padding),
+    -- scaled by DPI so it holds on hi-DPI screens.
+    local dialog_hpadding = Screen:scaleBySize(40)
+    local content_width = dialog_width - dialog_hpadding
+    local preview_edge = math.floor(math.min(Screen:getWidth(), Screen:getHeight()) * 0.6)
+    local total = #results
+
+    local function render(index)
+        if index < 1 then index = 1 end
+        if index > total then index = total end
+        local cand = results[index]
+
+        local vg_components = { align = "center" }
+        if cand.local_thumb then
+            table.insert(vg_components, self:_imageWidget(cand.local_thumb, content_width, preview_edge))
+        else
+            table.insert(vg_components, TextBoxWidget:new{
+                text = self.loc:t("img_no_preview") or "(No preview available)",
+                face = Font:getFace("cfont", 16),
+                width = content_width,
+                alignment = "center",
+            })
+        end
+        table.insert(vg_components, VerticalSpan:new{ width = (Size.padding and Size.padding.default) or 8 })
+        -- Truncate on a character boundary (UTF-8 safe), not a byte offset, so a
+        -- non-Latin title does not end in a broken glyph.
+        local caption, caption_cut = _getTruncatedText(tostring(cand.title or ""), 90)
+        if caption_cut then caption = caption .. "..." end
+        local source_brand = (source == "tavily" and "Tavily")
+            or (source == "duckduckgo" and "DuckDuckGo") or nil
+        local source_label = source_brand
+            and (self.loc:t("img_source_suffix", source_brand) or ("  (" .. source_brand .. ")"))
+            or ""
+        caption = self.loc:t("img_result_count", index, total)
+            .. source_label
+            .. (#caption > 0 and ("\n" .. caption) or "")
+        table.insert(vg_components, TextBoxWidget:new{
+            text = caption,
+            face = Font:getFace("cfont", 14),
+            width = content_width,
+            alignment = "center",
+        })
+        local vg = VerticalGroup:new(vg_components)
+
+        local nav_row = {}
+        if index > 1 then
+            table.insert(nav_row, {
+                text = self.loc:t("img_prev") or "Previous",
+                callback = function()
+                    if self._img_candidates_dialog then UIManager:close(self._img_candidates_dialog) end
+                    render(index - 1)
+                end,
+            })
+        end
+        if index < total then
+            table.insert(nav_row, {
+                text = self.loc:t("img_next") or "Next",
+                callback = function()
+                    if self._img_candidates_dialog then UIManager:close(self._img_candidates_dialog) end
+                    render(index + 1)
+                end,
+            })
+        end
+
+        local buttons = {}
+        if #nav_row > 0 then table.insert(buttons, nav_row) end
+        table.insert(buttons, {{
+            text = self.loc:t("img_use_this") or "Use This Image",
+            callback = function()
+                if self._img_candidates_dialog then UIManager:close(self._img_candidates_dialog) end
+                self._img_candidates_dialog = nil
+                ImageSearch.clearTempDir()
+                self:_attachChosenImage(entity, entity_type, cand.full)
+            end,
+        }})
+        table.insert(buttons, {{
+            text = self.loc:t("cancel") or "Cancel",
+            callback = function()
+                if self._img_candidates_dialog then UIManager:close(self._img_candidates_dialog) end
+                self._img_candidates_dialog = nil
+                ImageSearch.clearTempDir()
+            end,
+        }})
+
+        self._img_candidates_dialog = ButtonDialog:new{
+            _added_widgets = { vg },
+            buttons = buttons,
+            tap_close_callback = function()
+                self._img_candidates_dialog = nil
+                ImageSearch.clearTempDir()
+            end,
+        }
+        UIManager:show(self._img_candidates_dialog)
+    end
+
+    render(1)
+end
+
+-- Download the chosen full image, store it in the sidecar, attach and refresh.
+function M:_attachChosenImage(entity, entity_type, full_url)
+    if not full_url then return end
+    local ImageSearch = require(plugin_path .. "xray_imagesearch")
+    local doc_file = self.ui and self.ui.document and self.ui.document.file
+    if not doc_file then
+        UIManager:show(InfoMessage:new{ text = self.loc:t("img_download_failed") or "Could not download image.", timeout = 3 })
+        return
+    end
+    local ext = ImageSearch.extFromUrl(full_url)
+    local dest = ImageSearch.destPathFor(doc_file, entity_type, entity.name, ext)
+    if not dest then
+        UIManager:show(InfoMessage:new{ text = self.loc:t("img_download_failed") or "Could not download image.", timeout = 3 })
+        return
+    end
+
+    local function finish(ok, err, trapper)
+        if not ok then
+            local msg = self.loc:t("img_download_failed") or "Could not download image."
+            if err then msg = msg .. " (" .. tostring(err) .. ")" end
+            UIManager:show(InfoMessage:new{ text = msg, timeout = 4 })
+            return
+        end
+        local old = self:_entityImagePath(entity)
+        local old_thumb = self:_entityThumbPath(entity)
+        -- Cap the stored image and build a small card thumbnail from a single
+        -- decode. The decode+scale+re-encode of a large image can freeze a slow
+        -- e-ink device for several seconds. Compute the thumbnail edge here (in
+        -- the parent) and run the heavy work in a cancellable subprocess, the
+        -- same way the download above runs. On failure or cancel, fall back to
+        -- the full image for the card.
+        local thumb_edge = self:_thumbEdge()
+        local processing = InfoMessage:new{ text = self.loc:t("img_processing") or "Processing image..." }
+        UIManager:show(processing)
+        UIManager:forceRePaint()
+        local display_path, thumb_path
+        if trapper then
+            -- A killed child may leave a partial ".jpg"; harmless because we then
+            -- keep the original download for display.
+            local completed, dp, tp = trapper:dismissableRunInSubprocess(function()
+                return ImageSearch.makeVariants(dest, thumb_edge)
+            end, processing)
+            if completed then display_path, thumb_path = dp, tp end
+        else
+            -- Trapper absent (degraded path): resize inline, blocks the UI thread.
+            display_path, thumb_path = ImageSearch.makeVariants(dest, thumb_edge)
+        end
+        UIManager:close(processing)
+        if not display_path then display_path, thumb_path = dest, nil end
+        self:_persistEntityImage(entity, entity_type, display_path, thumb_path)
+        if old and old ~= display_path then pcall(os.remove, old) end
+        if old_thumb and old_thumb ~= thumb_path and old_thumb ~= display_path then
+            pcall(os.remove, old_thumb)
+        end
+        UIManager:show(InfoMessage:new{ text = self.loc:t("img_saved") or "Image attached.", timeout = 2 })
+        self:_reopenEntityCard(entity, entity_type)
+    end
+
+    local ok_tr, Trapper = pcall(require, "ui/trapper")
+    if ok_tr and Trapper and Trapper.wrap then
+        Trapper:wrap(function()
+            local progress = InfoMessage:new{ text = self.loc:t("img_downloading") or "Downloading image..." }
+            UIManager:show(progress)
+            UIManager:forceRePaint()
+            local completed, ok, err = Trapper:dismissableRunInSubprocess(function()
+                return ImageSearch.download(full_url, dest)
+            end, progress)
+            UIManager:close(progress)
+            if not completed then
+                -- Cancelled download can leave a partial file. Remove it so the
+                -- book sidecar does not accumulate orphans (each attach uses a
+                -- fresh timestamped name, so this file is never reused).
+                pcall(os.remove, dest)
+                return
+            end
+            -- Still inside the wrapped coroutine, so the resize can also run in a
+            -- cancellable subprocess.
+            finish(ok, err, Trapper)
+        end)
+    else
+        -- Best-effort fallback (Trapper absent): the download blocks the UI thread
+        -- with no cancel. Degraded path only; Trapper is present in practice.
+        local ok, err = ImageSearch.download(full_url, dest)
+        finish(ok, err, nil)
+    end
+end
+
+-- Image-search settings submenu. DuckDuckGo works with no key; an optional
+-- Tavily key switches the primary provider to Tavily (better relevance).
+function M:getImageSearchKeySubMenu()
+    local function keyStatus()
+        local k = (self.ai_helper and self.ai_helper.tavily_api_key) or ""
+        local v = (#k > 0) and "tvly-..." or "(None)"
+        return (self.loc:t("img_key_title") or "Tavily API Key") .. ": " .. v
+    end
+    return {
+        {
+            -- Non-tappable hint explaining the no-key default.
+            text = self.loc:t("img_provider_hint")
+                or "Default: DuckDuckGo (no key needed).",
+            enabled = false,
+        },
+        {
+            text = keyStatus(), text_func = keyStatus, keep_menu_open = true,
+            callback = function()
+                self:_promptImageSearchValue("tavily_api_key",
+                    self.loc:t("img_key_title") or "Tavily API Key")
+            end,
+        },
+    }
+end
+
+function M:_promptImageSearchValue(config_key, title)
+    local InputDialog = require("ui/widget/inputdialog")
+    local current = (self.ai_helper and self.ai_helper[config_key]) or ""
+    local dlg
+    dlg = InputDialog:new{
+        title = title,
+        input = current,
+        buttons = {{
+            {
+                text = self.loc:t("cancel") or "Cancel",
+                callback = function() UIManager:close(dlg) end,
+            },
+            {
+                text = self.loc:t("save") or "Save",
+                is_enter_default = true,
+                callback = function()
+                    -- Trim surrounding whitespace so a pasted key with a
+                    -- trailing newline does not become "Bearer <key>\n" (401).
+                    local val = (dlg:getInputText() or ""):match("^%s*(.-)%s*$")
+                    UIManager:close(dlg)
+                    if self.ai_helper then
+                        self.ai_helper[config_key] = val
+                        self.ai_helper:updateConfigKey(config_key, val)
+                    end
+                    UIManager:show(InfoMessage:new{ text = self.loc:t("img_key_saved") or "Saved.", timeout = 2 })
+                end,
+            },
+        }},
+    }
+    UIManager:show(dlg)
+    dlg:onShowKeyboard()
 end
 
 return M

@@ -386,6 +386,87 @@ msgstr "Full Book Mode"
 msgid "gemini_key_hint"
 msgstr "Enter your free Gemini key from Google AI Studio (starts with AQ. or AIzaSy...):"
 
+msgid "img_attach_button"
+msgstr "Search Images"
+
+msgid "img_change_button"
+msgstr "Change Image"
+
+msgid "img_download_failed"
+msgstr "Could not download image."
+
+msgid "img_downloading"
+msgstr "Downloading image..."
+
+msgid "img_error"
+msgstr "Search failed: %s"
+
+msgid "img_key_saved"
+msgstr "Saved."
+
+msgid "img_key_title"
+msgstr "Tavily API Key"
+
+msgid "img_more"
+msgstr "More"
+
+msgid "img_next"
+msgstr "Next"
+
+msgid "img_no_preview"
+msgstr "(No preview available)"
+
+msgid "img_no_results"
+msgstr "No images found."
+
+msgid "img_prev"
+msgstr "Previous"
+
+msgid "img_processing"
+msgstr "Processing image..."
+
+msgid "img_provider_hint"
+msgstr "Default: DuckDuckGo (no key needed)."
+
+msgid "img_remove"
+msgstr "Remove Image"
+
+msgid "img_remove_confirm"
+msgstr "Remove the attached image?"
+
+msgid "img_removed"
+msgstr "Image removed."
+
+msgid "img_result_count"
+msgstr "Result %1$d of %2$d"
+
+msgid "img_saved"
+msgstr "Image attached."
+
+msgid "img_search_button"
+msgstr "Search"
+
+msgid "img_search_hint"
+msgstr "Enter a name to search"
+
+msgid "img_search_title"
+msgstr "Search Image"
+
+msgid "img_searching"
+msgstr "Searching for images..."
+
+msgid "img_source_suffix"
+msgstr "  (%s)"
+
+msgid "img_tavily_fallback"
+msgstr "Tavily unavailable. Showing DuckDuckGo results."
+
+msgid "img_use_this"
+msgstr "Use This Image"
+
+msgid "img_view"
+msgstr "View Image"
+
 msgid "import_file_not_found"
 msgstr "No xray_key.txt file found in storage root or settings directory."
 
@@ -601,6 +682,9 @@ msgstr "Frequency"
 
 msgid "menu_historical_figures"
 msgstr "Historical Figures"
+
+msgid "menu_image_search"
+msgstr "Image Search"
 
 msgid "menu_import_file"
 msgstr "Import Keys from xray_key.txt"

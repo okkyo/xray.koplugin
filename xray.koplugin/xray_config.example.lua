@@ -37,4 +37,11 @@ return {
     custom2_endpoint = "",   -- e.g., "http://localhost:11434/v1/chat/completions"
     custom2_model = "",   -- e.g., "llama3"
     custom2_format = "",   -- optional: "openai" or "anthropic" (default: auto-detected from endpoint)
+
+    -- Image Search (optional): attach a picture to a character/location/etc.
+    -- By default this uses DuckDuckGo image search, which needs NO key.
+    -- Add a Tavily key to use Tavily instead (often more relevant results).
+    --   Tavily key (free tier): https://app.tavily.com/
+    -- Leave empty to keep the no-key DuckDuckGo default.
+    tavily_api_key = "",
 }
