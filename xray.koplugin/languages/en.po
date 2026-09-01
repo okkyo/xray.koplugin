@@ -1203,7 +1203,7 @@ msgid "web_setup_title"
 msgstr "Connect via Phone/PC"
 
 msgid "welcome_action_ask_later"
-msgstr "Ask Later"
+msgstr "Ask Me Later"
 
 msgid "welcome_action_continue"
 msgstr "Continue"
@@ -1245,7 +1245,7 @@ msgid "welcome_opt_ereader_title"
 msgstr "Enter Key on E-Reader"
 
 msgid "welcome_opt_file_desc"
-msgstr "Auto-import keys from an xray_key.txt file, or view wiki setup instructions."
+msgstr "Place key in koreader/settings/xray_key.txt or select existing configured provider."
 
 msgid "welcome_opt_file_title"
 msgstr "Import via Text File (xray_key.txt) or Config"
@@ -1255,6 +1255,12 @@ msgstr "Scan a QR code to enter your key online via Cloud Relay or local Wi-Fi."
 
 msgid "welcome_opt_phone_title"
 msgstr "Set from Phone/PC (Recommended)"
+
+msgid "welcome_opt_skip_desc"
+msgstr "Use local word counts, reading metrics, and cached series info without AI."
+
+msgid "welcome_opt_skip_title"
+msgstr "Skip for Now (Offline Features Only)"
 
 msgid "welcome_select_provider"
 msgstr "Select AI Provider"

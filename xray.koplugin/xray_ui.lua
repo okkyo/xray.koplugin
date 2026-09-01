@@ -851,7 +851,7 @@ local function _patchButtonDialog()
             -- 5. Trap events within the dialog so unhandled keys do not leak to background menus
             self.stop_events_propagation = true
 
-            -- 6. Immediately highlight & focus the initial/default button
+            -- 6. Set initial default coordinates; immediately highlight ONLY on non-touch devices
             if self.layout and #self.layout > 0 and #self.layout[1] > 0 then
                 local def_x, def_y = 1, 1
                 for y, row in ipairs(self.layout) do
@@ -863,11 +863,25 @@ local function _patchButtonDialog()
                     end
                 end
                 self.selected = { x = def_x, y = def_y }
-                local target_btn = self.layout[def_y] and self.layout[def_y][def_x]
-                if target_btn and target_btn.handleEvent then
-                    local ok_ev, Event = pcall(require, "ui/event")
-                    if ok_ev and Event then
-                        target_btn:handleEvent(Event:new("Focus"))
+
+                local is_touch = true
+                local ok_dev_touch, DevTouch = pcall(require, "device")
+                if ok_dev_touch and DevTouch then
+                    if type(DevTouch.isTouchDevice) == "function" then
+                        local ok2, res = pcall(DevTouch.isTouchDevice, DevTouch)
+                        if ok2 and res ~= nil then is_touch = (res == true) end
+                    elseif DevTouch.isTouchDevice ~= nil then
+                        is_touch = (DevTouch.isTouchDevice == true)
+                    end
+                end
+
+                if not is_touch then
+                    local target_btn = self.layout[def_y] and self.layout[def_y][def_x]
+                    if target_btn and target_btn.handleEvent then
+                        local ok_ev, Event = pcall(require, "ui/event")
+                        if ok_ev and Event then
+                            target_btn:handleEvent(Event:new("Focus"))
+                        end
                     end
                 end
             end
@@ -875,7 +889,7 @@ local function _patchButtonDialog()
 
         local orig_btndlg_onPress = ButtonDialog.onPress
         function ButtonDialog:onPress()
-            local item = (self.getFocusItem and self:getFocusItem()) or (self.layout and self.layout[1] and self.layout[1][1])
+            local item = (self.getFocusItem and self:getFocusItem()) or (self.layout and self.selected and self.layout[self.selected.y] and self.layout[self.selected.y][self.selected.x]) or (self.layout and self.layout[1] and self.layout[1][1])
             if item then
                 if item.onTapSelectButton then
                     return item:onTapSelectButton()
@@ -4203,11 +4217,22 @@ function M:showWelcomeCard(force)
         fs = G_reader_settings:readSetting("cre_font_size") or 20
     end
     local ui_font_size = math.max(15, math.min(fs, 19))
-    local title_font_size = math.max(13, math.min(fs - 2, 16))
+    local desc_font_size = math.max(12, ui_font_size - 2)
 
     local overlay
     local selected_action = "phone_pc"
-    local focused_index = 1
+    local is_touch = false
+    local ok_dev, Dev = pcall(require, "device")
+    if ok_dev and Dev then
+        if type(Dev.isTouchDevice) == "function" then
+            local ok2, res = pcall(Dev.isTouchDevice, Dev)
+            if ok2 and res ~= nil then is_touch = (res == true) end
+        elseif Dev.isTouchDevice ~= nil then
+            is_touch = (Dev.isTouchDevice == true)
+        end
+    end
+    local focus_visible = not is_touch
+    local focused_index = focus_visible and 1 or nil
     local total_items = 7
 
     local function span(h)
@@ -4228,23 +4253,19 @@ function M:showWelcomeCard(force)
         {
             value = "file_config",
             title = self.loc:t("welcome_opt_file_title") or "Import via Text File (xray_key.txt) or Config",
-            desc = self.loc:t("welcome_opt_file_desc") or "Auto-import keys from an xray_key.txt file, or view wiki setup instructions.",
+            desc = self.loc:t("welcome_opt_file_desc") or "Place key in koreader/settings/xray_key.txt or select existing configured provider.",
         },
         {
-            value = "all_providers",
-            title = self.loc:t("welcome_opt_all_title") or "Open All Provider Settings",
-            desc = self.loc:t("welcome_opt_all_desc") or "Configure custom endpoints, OpenAI, DeepSeek, Claude, or OpenRouter.",
+            value = "skip",
+            title = self.loc:t("welcome_opt_skip_title") or "Skip for Now (Offline Features Only)",
+            desc = self.loc:t("welcome_opt_skip_desc") or "Use local word counts, reading metrics, and cached series info without AI.",
         },
     }
 
-    local function buildWelcomeCard()
-        local title_label = TextWidget:new{
-            text = (self.loc:t("welcome_tag") or "WELCOME TO X-RAY"):upper(),
-            face = Font:getFace("cfont", title_font_size),
-            bold = true,
-            fgcolor = Blitbuffer.COLOR_BLACK,
-        }
+    local buildWelcomeCard
+    local refreshUI
 
+    buildWelcomeCard = function()
         local headline_label = TextWidget:new{
             text = self.loc:t("welcome_headline") or "Set Up AI Provider",
             face = Font:getFace("cfont", ui_font_size + 3),
@@ -4260,8 +4281,7 @@ function M:showWelcomeCard(force)
         }
 
         local content_vg = VerticalGroup:new{
-            align = "left",
-            title_label,
+            align = self:isRTL() and "right" or "left",
             span(sc(2)),
             headline_label,
             span(sc(4)),
@@ -4271,7 +4291,7 @@ function M:showWelcomeCard(force)
 
         for idx, choice in ipairs(choices) do
             local is_selected = (choice.value == selected_action)
-            local is_focused = (idx == focused_index)
+            local is_focused = focus_visible and (idx == focused_index)
             local dot_char = is_selected and "●" or "○"
 
             local text_widget = TextBoxWidget:new{
@@ -4284,44 +4304,50 @@ function M:showWelcomeCard(force)
             }
             local subtext_widget = TextBoxWidget:new{
                 text = choice.desc,
-                face = Font:getFace("cfont", math.max(12, ui_font_size - 2)),
-                fgcolor = Blitbuffer.COLOR_BLACK,
+                face = Font:getFace("cfont", desc_font_size),
+                fgcolor = Blitbuffer.Color8(75),
                 width = dialog_w - sc(60),
                 alignment = self:isRTL() and "right" or "left",
             }
-
-            local opt_vg = VerticalGroup:new{
-                align = "left",
+            local choice_text_vg = VerticalGroup:new{
+                align = self:isRTL() and "right" or "left",
                 text_widget,
-                VerticalSpan:new{ width = sc(2) },
+                span(sc(2)),
                 subtext_widget,
             }
 
-            local row_content = HorizontalGroup:new{ align = "center" }
+            local row_elements = HorizontalGroup:new{
+                align = "top",
+            }
             if self:isRTL() then
-                table.insert(row_content, opt_vg)
-                table.insert(row_content, WidgetContainer:new{ dimen = Geom:new{ w = sc(6), h = 1 } })
-                table.insert(row_content, TextWidget:new{
+                table.insert(row_elements, choice_text_vg)
+                table.insert(row_elements, WidgetContainer:new{ dimen = Geom:new{ w = sc(8), h = 1 } })
+                table.insert(row_elements, TextWidget:new{
                     text = dot_char,
                     face = Font:getFace("cfont", ui_font_size),
+                    bold = true,
+                    fgcolor = Blitbuffer.COLOR_BLACK,
                 })
             else
-                table.insert(row_content, TextWidget:new{
+                table.insert(row_elements, TextWidget:new{
                     text = dot_char,
                     face = Font:getFace("cfont", ui_font_size),
+                    bold = true,
+                    fgcolor = Blitbuffer.COLOR_BLACK,
                 })
-                table.insert(row_content, WidgetContainer:new{ dimen = Geom:new{ w = sc(6), h = 1 } })
-                table.insert(row_content, opt_vg)
+                table.insert(row_elements, WidgetContainer:new{ dimen = Geom:new{ w = sc(8), h = 1 } })
+                table.insert(row_elements, choice_text_vg)
             end
 
             local frame = FrameContainer:new{
-                bordersize = is_focused and (xray_theme.border_focus or sc(2)) or (is_selected and xray_theme.border_btn or sc(1)),
-                radius = xray_theme.radius_btn,
-                padding = sc(6),
-                color = is_focused and (xray_theme.color_focus_border or Blitbuffer.COLOR_BLACK) or (is_selected and xray_theme.color_border or xray_theme.color_section_rule),
-                background = is_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or xray_theme.color_bg,
+                padding = sc(8),
+                padding_h = sc(12),
+                bordersize = is_focused and (xray_theme.border_focus or sc(2)) or 0,
+                color = is_focused and (xray_theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+                background = is_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
+                radius = xray_theme.radius_card or sc(4),
                 width = dialog_w - sc(24),
-                row_content
+                row_elements,
             }
 
             local item = InputContainer:new{ frame }
@@ -4342,16 +4368,13 @@ function M:showWelcomeCard(force)
             }
             item.onTap = function()
                 selected_action = choice.value
-                focused_index = idx
-                if overlay then
-                    overlay[1] = MovableContainer:new{
-                        CenterContainer:new{
-                            dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
-                            buildWelcomeCard()
-                        }
-                    }
-                    UIManager:setDirty(overlay, "ui")
+                if is_touch then
+                    focus_visible = false
+                    focused_index = nil
+                else
+                    focused_index = idx
                 end
+                refreshUI()
                 return true
             end
 
@@ -4362,41 +4385,51 @@ function M:showWelcomeCard(force)
         table.insert(content_vg, span(sc(4)))
         table.insert(content_vg, LineWidget:new{
             dimen = Geom:new{ w = dialog_w - sc(24), h = sc(1) },
-            background = xray_theme.color_section_rule,
+            background = xray_theme.color_section_rule or Blitbuffer.Color8(200),
         })
         table.insert(content_vg, span(sc(5)))
 
         -- Action Buttons
-        local is_continue_focused = (focused_index == 5)
-        local is_ask_later_focused = (focused_index == 6)
-        local is_dont_ask_focused = (focused_index == 7)
+        local is_continue_focused = focus_visible and (focused_index == 5)
+        local is_ask_later_focused = focus_visible and (focused_index == 6)
+        local is_dont_ask_focused = focus_visible and (focused_index == 7)
 
         local continue_btn = Button:new{
             text = self.loc:t("welcome_action_continue") or "Continue",
             face = Font:getFace("cfont", ui_font_size),
-            bold = true,
             width = dialog_w - sc(24),
-            height = sc(38),
-            bordersize = is_continue_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            height = sc(44),
+            bordersize = is_continue_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn or sc(1),
             background = is_continue_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
-            radius = xray_theme.radius_btn,
+            radius = xray_theme.radius_btn or sc(4),
             callback = function()
                 if overlay then
                     UIManager:close(overlay, "ui")
                     overlay = nil
                 end
-                self:handleWelcomeAction(selected_action)
+                if selected_action == "phone_pc" then
+                    self:showWebSetupQrDialog()
+                elseif selected_action == "ereader" then
+                    self:promptApiKeyInput("gemini")
+                elseif selected_action == "file_config" then
+                    self:checkFileKeyImport()
+                elseif selected_action == "skip" then
+                    self:setSetting("welcome_dismissed", true)
+                end
             end
         }
+        table.insert(content_vg, continue_btn)
+        table.insert(content_vg, span(sc(5)))
 
+        local sec_btn_w = (dialog_w - sc(32)) / 2
         local ask_later_btn = Button:new{
-            text = self.loc:t("welcome_action_ask_later") or "Ask Later",
-            face = Font:getFace("cfont", math.max(12, ui_font_size - 1)),
-            width = (dialog_w - sc(30)) / 2,
-            height = sc(34),
-            bordersize = is_ask_later_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            text = self.loc:t("welcome_action_ask_later") or "Ask Me Later",
+            face = Font:getFace("cfont", desc_font_size),
+            width = sec_btn_w,
+            height = sc(38),
+            bordersize = is_ask_later_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn or sc(1),
             background = is_ask_later_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
-            radius = xray_theme.radius_btn,
+            radius = xray_theme.radius_btn or sc(4),
             callback = function()
                 if overlay then
                     UIManager:close(overlay, "ui")
@@ -4407,94 +4440,44 @@ function M:showWelcomeCard(force)
 
         local dont_ask_btn = Button:new{
             text = self.loc:t("welcome_action_dont_ask") or "Don't Ask Again",
-            face = Font:getFace("cfont", math.max(12, ui_font_size - 1)),
-            width = (dialog_w - sc(30)) / 2,
-            height = sc(34),
-            bordersize = is_dont_ask_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            face = Font:getFace("cfont", desc_font_size),
+            width = sec_btn_w,
+            height = sc(38),
+            bordersize = is_dont_ask_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn or sc(1),
             background = is_dont_ask_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
-            radius = xray_theme.radius_btn,
+            radius = xray_theme.radius_btn or sc(4),
             callback = function()
+                self:setSetting("welcome_dismissed", true)
                 if overlay then
                     UIManager:close(overlay, "ui")
                     overlay = nil
                 end
-                self.ai_helper:saveSettings({ welcome_wizard_dont_ask = true, welcome_wizard_dismissed = true })
             end
         }
 
-        table.insert(content_vg, continue_btn)
-        table.insert(content_vg, WidgetContainer:new{ dimen = Geom:new{ w = 1, h = sc(4) } })
-        table.insert(content_vg, HorizontalGroup:new{
+        local sec_buttons_row = HorizontalGroup:new{
             align = "center",
             ask_later_btn,
-            WidgetContainer:new{ dimen = Geom:new{ w = sc(6), h = 1 } },
+            WidgetContainer:new{ dimen = Geom:new{ w = sc(8), h = 1 } },
             dont_ask_btn,
-        })
+        }
+        table.insert(content_vg, sec_buttons_row)
+        table.insert(content_vg, span(sc(4)))
 
-        local inner_card = FrameContainer:new{
-            padding = sc(8),
-            radius = xray_theme.radius_window,
-            bordersize = sc(2),
+        local card_frame = FrameContainer:new{
+            padding = sc(12),
+            bordersize = xray_theme.border_dialog or sc(1),
             color = Blitbuffer.COLOR_BLACK,
-            background = xray_theme.color_bg,
-            width = dialog_w - sc(2),
-            content_vg
-        }
-
-        return FrameContainer:new{
-            bordersize = sc(1),
-            color = Blitbuffer.Color8(180),
-            padding = 0,
-            background = xray_theme.color_bg,
-            radius = xray_theme.radius_window,
+            background = Blitbuffer.COLOR_WHITE,
+            radius = xray_theme.radius_dialog or sc(8),
             width = dialog_w,
-            inner_card
+            content_vg,
         }
+        return card_frame
     end
 
-    local card = buildWelcomeCard()
-
-    local movable = MovableContainer:new{
-        CenterContainer:new{
-            dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
-            card
-        }
-    }
-
-    overlay = InputContainer:new{
-        dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
-        key_events = {
-            FocusUp = {
-                { "Up" },
-                { "PrevPage" },
-            },
-            FocusDown = {
-                { "Down" },
-                { "NextPage" },
-            },
-            FocusLeft = {
-                { "Left" },
-            },
-            FocusRight = {
-                { "Right" },
-            },
-            Select = {
-                { "Return" },
-                { "KP_Enter" },
-                { "Select" },
-                { "Space" },
-            },
-            Close = {
-                { "Escape" },
-                { "Back" },
-                { "q" },
-                { "Q" },
-            },
-        },
-        movable
-    }
-
-    local function refreshUI()
+    refreshUI = function()
+        if not overlay then return end
         overlay[1] = MovableContainer:new{
             CenterContainer:new{
                 dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
@@ -4504,8 +4487,29 @@ function M:showWelcomeCard(force)
         UIManager:setDirty(overlay, "ui")
     end
 
+    overlay = InputContainer:new{
+        dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
+        key_events = {
+            FocusUp = { { "Up" }, { "PrevPage" } },
+            FocusDown = { { "Down" }, { "NextPage" } },
+            FocusLeft = { { "Left" } },
+            FocusRight = { { "Right" } },
+            Select = { { "Return" }, { "KP_Enter" }, { "Select" }, { "Space" } },
+            Close = { { "Escape" }, { "Back" }, { "q" }, { "Q" } },
+        },
+        MovableContainer:new{
+            CenterContainer:new{
+                dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
+                buildWelcomeCard()
+            }
+        }
+    }
+
     overlay.onFocusUp = function()
-        if focused_index > 1 then
+        focus_visible = true
+        if not focused_index then
+            focused_index = total_items
+        elseif focused_index > 1 then
             focused_index = focused_index - 1
         else
             focused_index = total_items
@@ -6536,8 +6540,16 @@ function M:showImageActions(image_entry)
     end
 
     local overlay
+    local is_touch_dev = false
     local ok_dev_touch, DevTouch = pcall(require, "device")
-    local is_touch_dev = (ok_dev_touch and DevTouch and DevTouch.hasTouchScreen and DevTouch:hasTouchScreen()) or false
+    if ok_dev_touch and DevTouch then
+        if type(DevTouch.isTouchDevice) == "function" then
+            local ok2, res = pcall(DevTouch.isTouchDevice, DevTouch)
+            if ok2 and res ~= nil then is_touch_dev = (res == true) end
+        elseif DevTouch.isTouchDevice ~= nil then
+            is_touch_dev = (DevTouch.isTouchDevice == true)
+        end
+    end
     local focus_visible = not is_touch_dev
     local focused_action_idx = focus_visible and 1 or nil
     local action_items_list = {}

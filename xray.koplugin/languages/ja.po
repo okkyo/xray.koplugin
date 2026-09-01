@@ -1601,9 +1601,9 @@ msgstr "%s のAPIキーを受信して保存しました！"
 msgid "web_setup_title"
 msgstr "スマホ / PC から接続"
 
-# en-hash: ad608bec35300c1dbb0180723f2f6b9f
+# en-hash: 4111bd6fb88b1690bc80082903801ab8
 msgid "welcome_action_ask_later"
-msgstr "後で確認"
+msgstr "後で確認する"
 
 # en-hash: a0bfb8e59e6c13fc8d990781f77694fe
 msgid "welcome_action_continue"
@@ -1657,9 +1657,9 @@ msgstr "画面上のキーボードを使用してAPIキーを直接入力また
 msgid "welcome_opt_ereader_title"
 msgstr "リーダー画面でキーを入力"
 
-# en-hash: c3c978de8a982902e76b01a8bc5a996b
+# en-hash: 12273c89c62d45e28d60480dc913c65a
 msgid "welcome_opt_file_desc"
-msgstr "xray_key.txtからキーを自動インポート、またはWikiの手順を確認。"
+msgstr "koreader/settings/xray_key.txt にキーを配置するか、設定済みのプロバイダーを選択してください。"
 
 # en-hash: 5e2364ee83d001f6721276c20925e78e
 msgid "welcome_opt_file_title"
@@ -1672,6 +1672,14 @@ msgstr "QRコードをスキャンして、クラウドまたはローカルWi-F
 # en-hash: f5d12f602967b00beea3f12412fcb3a2
 msgid "welcome_opt_phone_title"
 msgstr "スマホ / PCから設定 (推奨)"
+
+# en-hash: 97d815bfab1c9a82c9e305a76b4b559f
+msgid "welcome_opt_skip_desc"
+msgstr "AIを使用せず、ローカルの単語数、読書指標、キャッシュされたシリーズ情報を使用します。"
+
+# en-hash: 93c52d3e72f67abf20b2ec1c235f5dc5
+msgid "welcome_opt_skip_title"
+msgstr "今はスキップ（オフライン機能のみ）"
 
 # en-hash: 741987eccc2e46095fdd70cf9377e31e
 msgid "welcome_select_provider"

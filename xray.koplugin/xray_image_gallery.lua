@@ -133,12 +133,16 @@ end
 
 local function makeTapItem(frame, callback)
     local item = InputContainer:new{ frame }
+    item.frame = frame
     function item:getSize()
         return (frame and frame.getSize and frame:getSize()) or { w = frame.width or 0, h = frame.height or 0 }
     end
     function item:paintTo(bb, x, y)
         local fsize = (frame and frame.getSize and frame:getSize()) or { w = frame.width or 0, h = frame.height or 0 }
         self.dimen = Geom:new{ x = x, y = y, w = fsize.w or 0, h = fsize.h or 0 }
+        if self.onBeforePaint then
+            self:onBeforePaint()
+        end
         frame:paintTo(bb, x, y)
     end
     item.ges_events = {
@@ -340,11 +344,11 @@ end
 local ImageGallery = InputContainer:extend{
     plugin = nil,
     current_page = 1,
-    focused_index = 1,
+    focused_index = nil,
     view_mode = "mosaic", -- "mosaic", "grid", "list"
     tab = "all",          -- "all", "favorites", "series", "hidden"
     filter_mode = "standard", -- "standard", "large_only", "all"
-    focus_zone = "cards", -- "header", "tabs", "cards", "footer"
+    focus_zone = nil,     -- "header", "tabs", "cards", "footer"
     header_focus_idx = 1, -- 1=view_mode, 2=filter, 3=close
     tab_focus_idx = 1,    -- 1=all, 2=favorites, 3=series, 4=hidden
     footer_focus_idx = 1, -- 1=prev, 2=next
@@ -353,8 +357,25 @@ local ImageGallery = InputContainer:extend{
 function ImageGallery:init()
     self.sw = Screen:getWidth()
     self.sh = Screen:getHeight()
-    self.focused_index = self.focused_index or 1
-    self.focus_zone = self.focus_zone or "cards"
+    local is_touch = false
+    local ok_dev, Dev = pcall(require, "device")
+    if ok_dev and Dev then
+        if type(Dev.isTouchDevice) == "function" then
+            local ok2, res = pcall(Dev.isTouchDevice, Dev)
+            if ok2 and res ~= nil then is_touch = (res == true) end
+        elseif Dev.isTouchDevice ~= nil then
+            is_touch = (Dev.isTouchDevice == true)
+        end
+    end
+    self.is_touch_device = is_touch
+
+    if not is_touch then
+        self.focus_zone = self.focus_zone or "cards"
+        self.focused_index = self.focused_index or 1
+    else
+        self.focus_zone = nil
+        self.focused_index = nil
+    end
     self.header_focus_idx = self.header_focus_idx or 1
     self.tab_focus_idx = self.tab_focus_idx or 1
     self.footer_focus_idx = self.footer_focus_idx or 1
@@ -450,43 +471,55 @@ function ImageGallery:init()
 end
 
 function ImageGallery:onFocusUp()
-    if self.focus_zone == "footer" then
+    local old_page = self.current_page
+    if not self.focus_zone then
+        self.focus_zone = "cards"
+        self.focused_index = 1
+    elseif self.focus_zone == "footer" then
         self.focus_zone = "cards"
         local count = self.current_page_items and #self.current_page_items or 0
         self.focused_index = math.max(1, count)
     elseif self.focus_zone == "cards" then
         local cols = (self.view_mode == "list") and 1 or 2
-        if self.focused_index > cols then
-            self.focused_index = self.focused_index - cols
+        local f_idx = self.focused_index or 1
+        if f_idx > cols then
+            self.focused_index = f_idx - cols
         else
             self.focus_zone = "tabs"
-            self.tab_focus_idx = math.min(4, math.max(1, self.focused_index))
+            self.tab_focus_idx = math.min(4, math.max(1, f_idx))
         end
     elseif self.focus_zone == "tabs" then
         self.focus_zone = "header"
-        self.header_focus_idx = math.min(3, math.max(1, self.tab_focus_idx))
+        self.header_focus_idx = math.min(3, math.max(1, self.tab_focus_idx or 1))
     elseif self.focus_zone == "header" then
         self.focus_zone = "footer"
         self.footer_focus_idx = 1
     end
-    self:buildUI()
+    if not self[1] or self.current_page ~= old_page then
+        self:buildUI()
+    end
     UIManager:setDirty(self, "ui")
     return true
 end
 
 function ImageGallery:onFocusDown()
-    if self.focus_zone == "header" then
+    local old_page = self.current_page
+    if not self.focus_zone then
+        self.focus_zone = "cards"
+        self.focused_index = 1
+    elseif self.focus_zone == "header" then
         self.focus_zone = "tabs"
-        self.tab_focus_idx = math.min(4, self.header_focus_idx)
+        self.tab_focus_idx = math.min(4, self.header_focus_idx or 1)
     elseif self.focus_zone == "tabs" then
         self.focus_zone = "cards"
         self.focused_index = 1
     elseif self.focus_zone == "cards" then
         local count = self.current_page_items and #self.current_page_items or 0
         local cols = (self.view_mode == "list") and 1 or 2
-        if self.focused_index + cols <= count then
-            self.focused_index = self.focused_index + cols
-        elseif self.focused_index < count then
+        local f_idx = self.focused_index or 1
+        if f_idx + cols <= count then
+            self.focused_index = f_idx + cols
+        elseif f_idx < count then
             self.focused_index = count
         else
             self.focus_zone = "footer"
@@ -496,21 +529,28 @@ function ImageGallery:onFocusDown()
         self.focus_zone = "header"
         self.header_focus_idx = 1
     end
-    self:buildUI()
+    if not self[1] or self.current_page ~= old_page then
+        self:buildUI()
+    end
     UIManager:setDirty(self, "ui")
     return true
 end
 
 function ImageGallery:onFocusLeft()
-    if self.focus_zone == "header" then
+    local old_page = self.current_page
+    if not self.focus_zone then
+        self.focus_zone = "cards"
+        self.focused_index = 1
+    elseif self.focus_zone == "header" then
         self.header_focus_idx = (self.header_focus_idx > 1) and (self.header_focus_idx - 1) or 3
     elseif self.focus_zone == "tabs" then
         self.tab_focus_idx = (self.tab_focus_idx > 1) and (self.tab_focus_idx - 1) or 4
     elseif self.focus_zone == "cards" then
         local count = self.current_page_items and #self.current_page_items or 0
         if count > 0 then
-            if self.focused_index > 1 then
-                self.focused_index = self.focused_index - 1
+            local f_idx = self.focused_index or 1
+            if f_idx > 1 then
+                self.focused_index = f_idx - 1
             elseif self.current_page > 1 then
                 self.current_page = self.current_page - 1
                 self.focused_index = 1
@@ -521,21 +561,28 @@ function ImageGallery:onFocusLeft()
     elseif self.focus_zone == "footer" then
         self.footer_focus_idx = (self.footer_focus_idx > 1) and (self.footer_focus_idx - 1) or 2
     end
-    self:buildUI()
+    if not self[1] or self.current_page ~= old_page then
+        self:buildUI()
+    end
     UIManager:setDirty(self, "ui")
     return true
 end
 
 function ImageGallery:onFocusRight()
-    if self.focus_zone == "header" then
+    local old_page = self.current_page
+    if not self.focus_zone then
+        self.focus_zone = "cards"
+        self.focused_index = 1
+    elseif self.focus_zone == "header" then
         self.header_focus_idx = (self.header_focus_idx < 3) and (self.header_focus_idx + 1) or 1
     elseif self.focus_zone == "tabs" then
         self.tab_focus_idx = (self.tab_focus_idx < 4) and (self.tab_focus_idx + 1) or 1
     elseif self.focus_zone == "cards" then
         local count = self.current_page_items and #self.current_page_items or 0
         if count > 0 then
-            if self.focused_index < count then
-                self.focused_index = self.focused_index + 1
+            local f_idx = self.focused_index or 1
+            if f_idx < count then
+                self.focused_index = f_idx + 1
             elseif self.current_page < (self.total_pages or 1) then
                 self.current_page = self.current_page + 1
                 self.focused_index = 1
@@ -546,7 +593,9 @@ function ImageGallery:onFocusRight()
     elseif self.focus_zone == "footer" then
         self.footer_focus_idx = (self.footer_focus_idx < 2) and (self.footer_focus_idx + 1) or 1
     end
-    self:buildUI()
+    if not self[1] or self.current_page ~= old_page then
+        self:buildUI()
+    end
     UIManager:setDirty(self, "ui")
     return true
 end
@@ -560,7 +609,19 @@ function ImageGallery:onPrevCard()
 end
 
 function ImageGallery:onOpenFocused()
-    if self.focus_zone == "header" then
+    if not self.focus_zone then
+        local img = self.current_page_items and self.current_page_items[1]
+        if img then
+            if self.openViewer then
+                self:openViewer(img)
+            elseif self.plugin and self.plugin.openImageViewer then
+                self.plugin:openImageViewer(img)
+            elseif self.plugin and self.plugin._launchImageViewer then
+                self.plugin:_launchImageViewer(img)
+            end
+        end
+        return true
+    elseif self.focus_zone == "header" then
         if self.header_focus_idx == 1 then
             return self:onCycleView()
         elseif self.header_focus_idx == 2 then
@@ -580,7 +641,8 @@ function ImageGallery:onOpenFocused()
         UIManager:setDirty(self, "ui")
         return true
     elseif self.focus_zone == "cards" then
-        local img = self.current_page_items and self.current_page_items[self.focused_index]
+        local f_idx = self.focused_index or 1
+        local img = self.current_page_items and self.current_page_items[f_idx]
         if img then
             if self.openViewer then
                 self:openViewer(img)
@@ -602,7 +664,8 @@ function ImageGallery:onOpenFocused()
 end
 
 function ImageGallery:onImageActions()
-    local img = self.current_page_items and self.current_page_items[self.focused_index]
+    local f_idx = self.focused_index or 1
+    local img = self.current_page_items and self.current_page_items[f_idx]
     if img and self.plugin then
         self.plugin:showImageActions(img)
     end
@@ -708,6 +771,10 @@ function ImageGallery:onClose()
 end
 
 function ImageGallery:onSwipe(arg, ges)
+    if self.is_touch_device and self.focus_zone then
+        self.focus_zone = nil
+        self.focused_index = nil
+    end
     if ges.direction == "west" or ges.direction == "left" then
         return self:onNextPage()
     elseif ges.direction == "east" or ges.direction == "right" then
@@ -798,6 +865,10 @@ function ImageGallery:buildUI()
         padding = 0,
         padding_h = 0,
         callback = function()
+            if self.is_touch_device then
+                self.focus_zone = nil
+                self.focused_index = nil
+            end
             if self.view_mode == "mosaic" then
                 self.view_mode = "grid"
             elseif self.view_mode == "grid" then
@@ -806,11 +877,20 @@ function ImageGallery:buildUI()
                 self.view_mode = "mosaic"
             end
             p.image_view_mode = self.view_mode
+            self.cached_pages = nil
             self.current_page = 1
             self:buildUI()
             UIManager:setDirty(self, "ui")
         end,
     }
+    view_mode_btn.onBeforePaint = function()
+        local focused = (self.focus_zone == "header" and self.header_focus_idx == 1)
+        if view_mode_btn.frame then
+            view_mode_btn.frame.bordersize = focused and (theme.border_focus or sc(3)) or 0
+            view_mode_btn.frame.color = focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil
+            view_mode_btn.frame.background = focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil
+        end
+    end
 
     local filter_btn = createIconButton{
         icon = "filter.svg",
@@ -823,17 +903,30 @@ function ImageGallery:buildUI()
         padding = 0,
         padding_h = 0,
         callback = function()
+            if self.is_touch_device then
+                self.focus_zone = nil
+                self.focused_index = nil
+            end
             if self.filter_mode == "maps_only" or self.filter_mode == "large_only" then
                 self.filter_mode = "all"
             else
                 self.filter_mode = "maps_only"
             end
             p.image_filter_mode = self.filter_mode
+            self.cached_pages = nil
             self.current_page = 1
             self:buildUI()
             UIManager:setDirty(self, "ui")
         end,
     }
+    filter_btn.onBeforePaint = function()
+        local focused = (self.focus_zone == "header" and self.header_focus_idx == 2)
+        if filter_btn.frame then
+            filter_btn.frame.bordersize = focused and (theme.border_focus or sc(3)) or 0
+            filter_btn.frame.color = focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil
+            filter_btn.frame.background = focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil
+        end
+    end
 
     local close_btn = createIconButton{
         icon = "x.svg",
@@ -849,6 +942,14 @@ function ImageGallery:buildUI()
             self:close()
         end,
     }
+    close_btn.onBeforePaint = function()
+        local focused = (self.focus_zone == "header" and self.header_focus_idx == 3)
+        if close_btn.frame then
+            close_btn.frame.bordersize = focused and (theme.border_focus or sc(3)) or 0
+            close_btn.frame.color = focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil
+            close_btn.frame.background = focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil
+        end
+    end
 
     local header_actions = HorizontalGroup:new{
         align = "center",
@@ -1016,14 +1117,27 @@ function ImageGallery:buildUI()
                 content_widget,
             }
         }
-        return makeTapItem(frame, function()
+        local tab_item = makeTapItem(frame, function()
+            if self.is_touch_device then
+                self.focus_zone = nil
+                self.focused_index = nil
+            end
             self.tab = tab_key
             self.tab_focus_idx = tab_idx or 1
             p.image_tab = tab_key
+            self.cached_pages = nil
             self.current_page = 1
             self:buildUI()
             UIManager:setDirty(self, "ui")
         end)
+        tab_item.onBeforePaint = function()
+            local focused = (self.focus_zone == "tabs" and self.tab_focus_idx == tab_idx)
+            local active = (self.tab == tab_key)
+            frame.bordersize = focused and (theme.border_focus or sc(3)) or sc(1)
+            frame.color = focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or (active and Blitbuffer.COLOR_BLACK or Blitbuffer.COLOR_DARK_GRAY)
+            frame.background = active and Blitbuffer.COLOR_BLACK or (focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or Blitbuffer.COLOR_WHITE)
+        end
+        return tab_item
     end
 
     local tab_bar = HorizontalGroup:new{
@@ -1076,86 +1190,90 @@ function ImageGallery:buildUI()
     local pages = {}
     local cur_page_items = {}
 
-    if self.view_mode == "list" then
-        local row_h = sc(82)
-        local row_gap = sc(6)
-        local items_per_page = math.max(1, math.floor((avail_content_h + row_gap) / (row_h + row_gap)))
-        for idx, img in ipairs(filtered) do
-            table.insert(cur_page_items, img)
-            if #cur_page_items == items_per_page or idx == #filtered then
-                table.insert(pages, cur_page_items)
-                cur_page_items = {}
-            end
-        end
-    elseif self.view_mode == "mosaic" then
-        -- ── Dynamic Height-Budget Mosaic Pagination ───────────────────────────
-        local col1_h = 0
-        local col2_h = 0
-        for idx, img in ipairs(filtered) do
-            local aspect_ratio = 0.75
-            if img.aspect_ratio and img.aspect_ratio > 0 then
-                aspect_ratio = img.aspect_ratio
-            else
-                local book_path = p.ui and p.ui.document and p.ui.document.file
-                local local_file = img.cached_file
-                if not local_file and book_path and not img.is_spoiler then
-                    local_file = p.image_manager:extractImageToFile(book_path, img)
+    if self.cached_tab == self.tab and self.cached_filter_mode == self.filter_mode and self.cached_view_mode == self.view_mode and self.cached_pages then
+        pages = self.cached_pages
+    else
+        if self.view_mode == "list" then
+            local row_h = sc(82)
+            local row_gap = sc(6)
+            local items_per_page = math.max(1, math.floor((avail_content_h + row_gap) / (row_h + row_gap)))
+            for idx, img in ipairs(filtered) do
+                table.insert(cur_page_items, img)
+                if #cur_page_items == items_per_page or idx == #filtered then
+                    table.insert(pages, cur_page_items)
+                    cur_page_items = {}
                 end
-                local nat_w, nat_h = getImageDimensions(local_file)
-                if nat_w and nat_h and nat_w > 0 and nat_h > 0 then
-                    aspect_ratio = nat_h / nat_w
-                    img.aspect_ratio = aspect_ratio
-                    img.width = nat_w
-                    img.height = nat_h
+            end
+        elseif self.view_mode == "mosaic" then
+            -- ── Dynamic Height-Budget Mosaic Pagination ───────────────────────────
+            local col1_h = 0
+            local col2_h = 0
+            for idx, img in ipairs(filtered) do
+                local aspect_ratio = 0.75
+                if img.aspect_ratio and img.aspect_ratio > 0 then
+                    aspect_ratio = img.aspect_ratio
                 elseif img.width and img.height and tonumber(img.width) and tonumber(img.height) and tonumber(img.width) > 0 then
                     aspect_ratio = tonumber(img.height) / tonumber(img.width)
                     img.aspect_ratio = aspect_ratio
+                elseif img.cached_file then
+                    local nat_w, nat_h = getImageDimensions(img.cached_file)
+                    if nat_w and nat_h and nat_w > 0 and nat_h > 0 then
+                        aspect_ratio = nat_h / nat_w
+                        img.aspect_ratio = aspect_ratio
+                        img.width = nat_w
+                        img.height = nat_h
+                    end
+                end
+                aspect_ratio = math.max(0.35, math.min(1.85, aspect_ratio))
+                local thumb_h = math.floor(cell_w * aspect_ratio)
+                local est_h = thumb_h + grid_gap_v
+
+                if col1_h <= col2_h then
+                    if (col1_h + est_h > avail_content_h) and (#cur_page_items > 0) then
+                        table.insert(pages, cur_page_items)
+                        cur_page_items = { img }
+                        col1_h = est_h
+                        col2_h = 0
+                    else
+                        table.insert(cur_page_items, img)
+                        col1_h = col1_h + est_h
+                    end
+                else
+                    if (col2_h + est_h > avail_content_h) and (#cur_page_items > 0) then
+                        table.insert(pages, cur_page_items)
+                        cur_page_items = { img }
+                        col1_h = est_h
+                        col2_h = 0
+                    else
+                        table.insert(cur_page_items, img)
+                        col2_h = col2_h + est_h
+                    end
+                end
+
+                if idx == #filtered and #cur_page_items > 0 then
+                    table.insert(pages, cur_page_items)
+                    cur_page_items = {}
                 end
             end
-            aspect_ratio = math.max(0.35, math.min(1.85, aspect_ratio))
-            local thumb_h = math.floor(cell_w * aspect_ratio)
-            local est_h = thumb_h + grid_gap_v
-
-            if col1_h <= col2_h then
-                if (col1_h + est_h > avail_content_h) and (#cur_page_items > 0) then
+        else
+            -- Uniform Grid with 1:1 Square Thumbnails
+            local inner_w = cell_w
+            local card_h = inner_w + sc(36)
+            local rows_can_fit = math.max(1, math.floor((avail_content_h + grid_gap_v) / (card_h + grid_gap_v)))
+            local items_per_page = rows_can_fit * COLS
+            for idx, img in ipairs(filtered) do
+                table.insert(cur_page_items, img)
+                if #cur_page_items == items_per_page or idx == #filtered then
                     table.insert(pages, cur_page_items)
-                    cur_page_items = { img }
-                    col1_h = est_h
-                    col2_h = 0
-                else
-                    table.insert(cur_page_items, img)
-                    col1_h = col1_h + est_h
+                    cur_page_items = {}
                 end
-            else
-                if (col2_h + est_h > avail_content_h) and (#cur_page_items > 0) then
-                    table.insert(pages, cur_page_items)
-                    cur_page_items = { img }
-                    col1_h = est_h
-                    col2_h = 0
-                else
-                    table.insert(cur_page_items, img)
-                    col2_h = col2_h + est_h
-                end
-            end
-
-            if idx == #filtered and #cur_page_items > 0 then
-                table.insert(pages, cur_page_items)
-                cur_page_items = {}
             end
         end
-    else
-        -- Uniform Grid with 1:1 Square Thumbnails
-        local inner_w = cell_w
-        local card_h = inner_w + sc(36)
-        local rows_can_fit = math.max(1, math.floor((avail_content_h + grid_gap_v) / (card_h + grid_gap_v)))
-        local items_per_page = rows_can_fit * COLS
-        for idx, img in ipairs(filtered) do
-            table.insert(cur_page_items, img)
-            if #cur_page_items == items_per_page or idx == #filtered then
-                table.insert(pages, cur_page_items)
-                cur_page_items = {}
-            end
-        end
+
+        self.cached_tab = self.tab
+        self.cached_filter_mode = self.filter_mode
+        self.cached_view_mode = self.view_mode
+        self.cached_pages = pages
     end
 
     self.total_pages = math.max(1, #pages)
@@ -1164,10 +1282,10 @@ function ImageGallery:buildUI()
 
     local page_items = pages[self.current_page] or {}
     self.current_page_items = page_items
-    if #page_items > 0 then
+    if self.focused_index and #page_items > 0 then
         if self.focused_index > #page_items then self.focused_index = #page_items end
         if self.focused_index < 1 then self.focused_index = 1 end
-    else
+    elseif not self.is_touch_device then
         self.focused_index = 1
     end
 
@@ -1200,8 +1318,9 @@ function ImageGallery:buildUI()
         })
     elseif self.view_mode == "list" then
         for idx, img in ipairs(page_items) do
-            local is_focused = (idx == self.focused_index)
-            local item_widget = self:renderListRow(img, content_w, is_focused)
+            local is_focused = (self.focus_zone == "cards" and idx == self.focused_index)
+            local item_widget = self:renderListRow(img, content_w, is_focused, idx)
+            item_widget.gallery = self
             table.insert(page_content_vg, item_widget)
             table.insert(page_content_vg, VerticalSpan:new{ width = sc(6) })
         end
@@ -1214,8 +1333,9 @@ function ImageGallery:buildUI()
 
         for idx, img in ipairs(page_items) do
             local card_w = cell_w
-            local is_focused = (idx == self.focused_index)
-            local card_widget, estimated_h = self:renderMosaicCard(img, card_w, is_focused)
+            local is_focused = (self.focus_zone == "cards" and idx == self.focused_index)
+            local card_widget, estimated_h = self:renderMosaicCard(img, card_w, is_focused, idx)
+            card_widget.gallery = self
             
             if col1_h <= col2_h then
                 table.insert(col1_items, card_widget)
@@ -1246,8 +1366,9 @@ function ImageGallery:buildUI()
         -- ── STOREFRONT SCREENSAVER STYLE GRID VIEW ───────────────────────────
         local current_row_widgets = {}
         for i, img in ipairs(page_items) do
-            local is_focused = (i == self.focused_index)
-            local card_widget = self:renderGridCard(img, cell_w, is_focused)
+            local is_focused = (self.focus_zone == "cards" and i == self.focused_index)
+            local card_widget = self:renderGridCard(img, cell_w, is_focused, i)
+            card_widget.gallery = self
             table.insert(current_row_widgets, card_widget)
 
             if #current_row_widgets == COLS or i == #page_items then
@@ -1280,6 +1401,10 @@ function ImageGallery:buildUI()
         color = is_prev_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK,
         background = is_prev_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
         callback = function()
+            if self.is_touch_device then
+                self.focus_zone = nil
+                self.focused_index = nil
+            end
             if self.current_page > 1 then
                 self.current_page = self.current_page - 1
                 self:buildUI()
@@ -1297,6 +1422,10 @@ function ImageGallery:buildUI()
         color = is_next_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK,
         background = is_next_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
         callback = function()
+            if self.is_touch_device then
+                self.focus_zone = nil
+                self.focused_index = nil
+            end
             if self.current_page < self.total_pages then
                 self.current_page = self.current_page + 1
                 self:buildUI()
@@ -1304,6 +1433,38 @@ function ImageGallery:buildUI()
             end
         end,
     }
+
+    local orig_prev_paint = prev_btn.paintTo
+    prev_btn.paintTo = function(this, bb, x, y)
+        local focused = (self.focus_zone == "footer" and self.footer_focus_idx == 1)
+        this.bordersize = focused and (theme.border_focus or sc(3)) or sc(1)
+        this.color = focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK
+        this.background = focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil
+        if this.frame then
+            this.frame.bordersize = this.bordersize
+            this.frame.color = this.color
+            this.frame.background = this.background
+        end
+        if orig_prev_paint then
+            orig_prev_paint(this, bb, x, y)
+        end
+    end
+
+    local orig_next_paint = next_btn.paintTo
+    next_btn.paintTo = function(this, bb, x, y)
+        local focused = (self.focus_zone == "footer" and self.footer_focus_idx == 2)
+        this.bordersize = focused and (theme.border_focus or sc(3)) or sc(1)
+        this.color = focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK
+        this.background = focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil
+        if this.frame then
+            this.frame.bordersize = this.bordersize
+            this.frame.color = this.color
+            this.frame.background = this.background
+        end
+        if orig_next_paint then
+            orig_next_paint(this, bb, x, y)
+        end
+    end
 
     local page_label = TextWidget:new{
         text = string.format("%d / %d", self.current_page, self.total_pages),
@@ -1370,7 +1531,8 @@ function ImageGallery:buildUI()
 end
 
 -- ── Mosaic Card (No Titles, Overlapped 3-Dot Menu, 100% Uncut Natural Aspect Ratio)
-function ImageGallery:renderMosaicCard(img, cell_w, is_focused)
+function ImageGallery:renderMosaicCard(img, cell_w, is_focused_or_idx, opt_idx)
+    local idx = opt_idx or (type(is_focused_or_idx) == "number" and is_focused_or_idx) or 1
     local p = self.plugin
     local book_path = p.ui and p.ui.document and p.ui.document.file
 
@@ -1487,40 +1649,7 @@ function ImageGallery:renderMosaicCard(img, cell_w, is_focused)
         }
     end
 
-    local focus_badge = nil
-    if is_card_focused then
-        focus_badge = FrameContainer:new{
-            padding = sc(2),
-            padding_h = sc(6),
-            bordersize = sc(1),
-            color = Blitbuffer.COLOR_WHITE,
-            background = Blitbuffer.COLOR_BLACK,
-            radius = sc(3),
-            TextWidget:new{
-                text = "↵ OPEN",
-                face = Font:getFace("cfont", 11),
-                bold = true,
-                fgcolor = Blitbuffer.COLOR_WHITE,
-            }
-        }
-    end
-
     local overlay_children = { image_frame }
-
-    -- Focus ring: a transparent-background frame drawn ON TOP of the image
-    -- so the border surrounds the card without squeezing image content
-    if is_card_focused then
-        table.insert(overlay_children, FrameContainer:new{
-            padding = 0,
-            bordersize = theme.border_focus or sc(3),
-            color = theme.color_focus_border or Blitbuffer.COLOR_BLACK,
-            background = nil,  -- transparent interior
-            radius = sc(4),
-            width = thumb_w,
-            height = thumb_h,
-            VerticalSpan:new{ width = 0 },  -- empty interior — border only
-        })
-    end
 
     if star_badge then
         table.insert(overlay_children, LeftContainer:new{
@@ -1529,16 +1658,6 @@ function ImageGallery:renderMosaicCard(img, cell_w, is_focused)
                 padding = sc(4),
                 bordersize = 0,
                 star_badge,
-            }
-        })
-    end
-    if focus_badge then
-        table.insert(overlay_children, LeftContainer:new{
-            dimen = Geom:new{ w = thumb_w, h = sc(28) },
-            FrameContainer:new{
-                padding = sc(4),
-                bordersize = 0,
-                focus_badge,
             }
         })
     end
@@ -1554,15 +1673,55 @@ function ImageGallery:renderMosaicCard(img, cell_w, is_focused)
         }
     })
 
+    local focus_ring = FrameContainer:new{
+        padding = 0,
+        bordersize = theme.border_focus or sc(3),
+        color = theme.color_focus_border or Blitbuffer.COLOR_BLACK,
+        background = nil,
+        radius = sc(4),
+        width = thumb_w,
+        height = thumb_h,
+        VerticalSpan:new{ width = 0 },
+    }
+
+    local focus_badge_widget = LeftContainer:new{
+        dimen = Geom:new{ w = thumb_w, h = sc(28) },
+        FrameContainer:new{
+            padding = sc(4),
+            bordersize = 0,
+            FrameContainer:new{
+                padding = sc(2),
+                padding_h = sc(6),
+                bordersize = sc(1),
+                color = Blitbuffer.COLOR_WHITE,
+                background = Blitbuffer.COLOR_BLACK,
+                radius = sc(3),
+                TextWidget:new{
+                    text = "↵ OPEN",
+                    face = Font:getFace("cfont", 11),
+                    bold = true,
+                    fgcolor = Blitbuffer.COLOR_WHITE,
+                }
+            }
+        }
+    }
+
+    local focus_overlay = OverlapGroup:new{ focus_ring, focus_badge_widget }
+
     local card_container = InputContainer:new{
         dimen = Geom:new{ w = thumb_w, h = thumb_h },
         OverlapGroup:new(overlay_children),
     }
+    card_container.gallery = self
 
     function card_container:paintTo(bb, x, y)
         self.dimen = Geom:new{ x = x, y = y, w = thumb_w, h = thumb_h }
         if self[1] then
             self[1]:paintTo(bb, x, y)
+        end
+        local g = self.gallery
+        if g and g.focus_zone == "cards" and g.focused_index == idx then
+            focus_overlay:paintTo(bb, x, y)
         end
     end
 
@@ -1578,6 +1737,12 @@ function ImageGallery:renderMosaicCard(img, cell_w, is_focused)
     }
 
     card_container.onTap = function(this, arg, ges)
+        local g = card_container.gallery or self
+        if g and g.is_touch_device and g.focus_zone then
+            g.focus_zone = nil
+            g.focused_index = nil
+            UIManager:setDirty(g, "ui")
+        end
         if ges and ges.pos and card_container.dimen then
             local right_edge = card_container.dimen.x + card_container.dimen.w
             local bottom_edge = card_container.dimen.y + card_container.dimen.h
@@ -1600,7 +1765,8 @@ function ImageGallery:renderMosaicCard(img, cell_w, is_focused)
 end
 
 -- ── Storefront Style Grid Card (No Outer Borders, Clean Rounded Thumbnail & Spaced Footer)
-function ImageGallery:renderGridCard(img, cell_w, is_focused)
+function ImageGallery:renderGridCard(img, cell_w, is_focused_or_idx, opt_idx)
+    local idx = opt_idx or (type(is_focused_or_idx) == "number" and is_focused_or_idx) or 1
     local p = self.plugin
     local book_path = p.ui and p.ui.document and p.ui.document.file
 
@@ -1713,35 +1879,29 @@ function ImageGallery:renderGridCard(img, cell_w, is_focused)
         },
     }
 
-    local focus_badge = nil
-    if is_card_focused then
-        focus_badge = FrameContainer:new{
-            padding = sc(2),
-            padding_h = sc(6),
-            bordersize = sc(1),
-            color = Blitbuffer.COLOR_WHITE,
-            background = Blitbuffer.COLOR_BLACK,
-            radius = sc(3),
-            TextWidget:new{
-                text = "↵ OPEN",
-                face = Font:getFace("cfont", 11),
-                bold = true,
-                fgcolor = Blitbuffer.COLOR_WHITE,
+    local focus_badge_widget = LeftContainer:new{
+        dimen = Geom:new{ w = inner_w, h = sc(28) },
+        FrameContainer:new{
+            padding = sc(4),
+            bordersize = 0,
+            FrameContainer:new{
+                padding = sc(2),
+                padding_h = sc(6),
+                bordersize = sc(1),
+                color = Blitbuffer.COLOR_WHITE,
+                background = Blitbuffer.COLOR_BLACK,
+                radius = sc(3),
+                TextWidget:new{
+                    text = "↵ OPEN",
+                    face = Font:getFace("cfont", 11),
+                    bold = true,
+                    fgcolor = Blitbuffer.COLOR_WHITE,
+                }
             }
         }
-    end
+    }
 
     local thumb_overlap_children = { thumb_frame }
-    if focus_badge then
-        table.insert(thumb_overlap_children, LeftContainer:new{
-            dimen = Geom:new{ w = inner_w, h = sc(28) },
-            FrameContainer:new{
-                padding = sc(4),
-                bordersize = 0,
-                focus_badge,
-            }
-        })
-    end
 
     local card_content = VerticalGroup:new{
         align = "left",
@@ -1751,10 +1911,10 @@ function ImageGallery:renderGridCard(img, cell_w, is_focused)
     }
 
     local card_frame = FrameContainer:new{
-        bordersize = is_card_focused and (theme.border_focus or sc(3)) or 0,
-        color = is_card_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_WHITE,
-        padding = is_card_focused and sc(2) or 0,
-        background = is_card_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or Blitbuffer.COLOR_WHITE,
+        bordersize = 0,
+        color = Blitbuffer.COLOR_WHITE,
+        padding = 0,
+        background = Blitbuffer.COLOR_WHITE,
         radius = sc(4),
         width = cell_w,
         height = card_h,
@@ -1765,11 +1925,21 @@ function ImageGallery:renderGridCard(img, cell_w, is_focused)
         dimen = Geom:new{ w = cell_w, h = card_h },
         card_frame,
     }
+    card_item.gallery = self
 
     function card_item:paintTo(bb, x, y)
         self.dimen = Geom:new{ x = x, y = y, w = cell_w, h = card_h }
+        local g = self.gallery
+        local is_focused = (g and g.focus_zone == "cards" and g.focused_index == idx)
+        card_frame.bordersize = is_focused and (theme.border_focus or sc(3)) or 0
+        card_frame.color = is_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_WHITE
+        card_frame.padding = is_focused and sc(2) or 0
+        card_frame.background = is_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or Blitbuffer.COLOR_WHITE
         if self[1] then
             self[1]:paintTo(bb, x, y)
+        end
+        if is_focused then
+            focus_badge_widget:paintTo(bb, x, y)
         end
     end
 
@@ -1785,6 +1955,12 @@ function ImageGallery:renderGridCard(img, cell_w, is_focused)
     }
 
     card_item.onTap = function(this, arg, ges)
+        local g = card_item.gallery or self
+        if g and g.is_touch_device and g.focus_zone then
+            g.focus_zone = nil
+            g.focused_index = nil
+            UIManager:setDirty(g, "ui")
+        end
         if ges and ges.pos and card_item.dimen then
             local right_edge = card_item.dimen.x + card_item.dimen.w
             local bottom_edge = card_item.dimen.y + card_item.dimen.h
@@ -1807,7 +1983,8 @@ function ImageGallery:renderGridCard(img, cell_w, is_focused)
 end
 
 -- ── Storefront Style List Row ────────────────────────────────────────────────
-function ImageGallery:renderListRow(img, content_w, is_focused)
+function ImageGallery:renderListRow(img, content_w, is_focused_or_idx, opt_idx)
+    local idx = opt_idx or (type(is_focused_or_idx) == "number" and is_focused_or_idx) or 1
     local p = self.plugin
     local book_path = p.ui and p.ui.document and p.ui.document.file
 
@@ -1927,9 +2104,9 @@ function ImageGallery:renderListRow(img, content_w, is_focused)
     local row_frame = FrameContainer:new{
         padding = sc(6),
         padding_h = pad_h,
-        bordersize = is_card_focused and (theme.border_focus or sc(3)) or sc(1),
-        color = is_card_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.Color8(180),
-        background = is_card_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or Blitbuffer.COLOR_WHITE,
+        bordersize = sc(1),
+        color = Blitbuffer.Color8(180),
+        background = Blitbuffer.COLOR_WHITE,
         radius = sc(6),
         width = content_w,
         row_overlap,
@@ -1939,9 +2116,15 @@ function ImageGallery:renderListRow(img, content_w, is_focused)
         dimen = Geom:new{ w = content_w, h = row_h },
         row_frame,
     }
+    row_item.gallery = self
 
     function row_item:paintTo(bb, x, y)
         self.dimen = Geom:new{ x = x, y = y, w = content_w, h = row_h }
+        local g = self.gallery
+        local is_card_focused = (g and g.focus_zone == "cards" and g.focused_index == idx)
+        row_frame.bordersize = is_card_focused and (theme.border_focus or sc(3)) or sc(1)
+        row_frame.color = is_card_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.Color8(180)
+        row_frame.background = is_card_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or Blitbuffer.COLOR_WHITE
         if self[1] then
             self[1]:paintTo(bb, x, y)
         end
@@ -1959,6 +2142,12 @@ function ImageGallery:renderListRow(img, content_w, is_focused)
     }
 
     row_item.onTap = function(this, arg, ges)
+        local g = row_item.gallery or self
+        if g and g.is_touch_device and g.focus_zone then
+            g.focus_zone = nil
+            g.focused_index = nil
+            UIManager:setDirty(g, "ui")
+        end
         if ges and ges.pos and row_item.dimen then
             local right_edge = row_item.dimen.x + row_item.dimen.w
             local btn_hit_w = sc(54)

@@ -11,6 +11,7 @@ package.loaded["device"] = {
     isPocketBook = function() return false end,
     isKobo = function() return false end,
     isKoboV2 = function() return false end,
+    isTouchDevice = function() return true end,
     screen = {
         getWidth = function() return 600 end,
         getHeight = function() return 800 end,

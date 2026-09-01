@@ -9,9 +9,13 @@ local UnitScanner = require("xray_unitscanner")
 local UIManager = require("ui/uimanager")
 
 describe("X-Ray Non-Touch & Keyboard Support", function()
-    local mock_plugin
+    local Device = require("device")
+    local orig_isTouch
 
     before_each(function()
+        orig_isTouch = Device.isTouchDevice
+        Device.isTouchDevice = function() return false end
+
         mock_plugin = {
             loc = { t = function(self, k, ...) return k end },
             ai_helper = {
@@ -29,6 +33,10 @@ describe("X-Ray Non-Touch & Keyboard Support", function()
             image_manager = require("xray_imagemanager"):new(),
             book_data = {},
         }
+    end)
+
+    after_each(function()
+        Device.isTouchDevice = orig_isTouch or (function() return true end)
     end)
 
     describe("Theme Tokens", function()
@@ -180,6 +188,69 @@ describe("X-Ray Non-Touch & Keyboard Support", function()
             assert.is_true(handled)
             assert.are_not.equal(nil, opened_entry)
             assert.are.equal("img3", opened_entry.id)
+        end)
+
+        it("avoids calling buildUI when moving focus within the same page", function()
+            mock_plugin.images = sample_images
+            local gallery = ImageGallery:new{
+                plugin = mock_plugin,
+                images = sample_images,
+                view_mode = "mosaic",
+                tab = "all",
+            }
+            local build_count = 0
+            local orig_buildUI = gallery.buildUI
+            gallery.buildUI = function(this)
+                build_count = build_count + 1
+                return orig_buildUI(this)
+            end
+
+            -- Moving right from item 1 to item 2 on the same page
+            gallery:onFocusRight()
+            assert.are.equal(0, build_count)
+            assert.are.equal(2, gallery.focused_index)
+
+            -- Moving down on the same page
+            gallery:onFocusDown()
+            assert.are.equal(0, build_count)
+
+            -- Moving up to tabs
+            gallery:onFocusUp()
+            gallery:onFocusUp()
+            assert.are.equal("tabs", gallery.focus_zone)
+            assert.are.equal(0, build_count)
+
+            -- Moving left within tabs
+            gallery:onFocusLeft()
+            assert.are.equal(0, build_count)
+        end)
+
+        it("calls buildUI when moving focus across page boundaries", function()
+            local many_images = {}
+            for i = 1, 30 do
+                table.insert(many_images, { id = "img" .. i, title = "Image " .. i, page = i })
+            end
+            mock_plugin.images = many_images
+            local gallery = ImageGallery:new{
+                plugin = mock_plugin,
+                images = many_images,
+                view_mode = "mosaic",
+                tab = "all",
+            }
+            gallery.focus_zone = "cards"
+            gallery.focused_index = #(gallery.current_page_items or {})
+
+            local build_count = 0
+            local orig_buildUI = gallery.buildUI
+            gallery.buildUI = function(this)
+                build_count = build_count + 1
+                return orig_buildUI(this)
+            end
+
+            -- Focus right on last card of page 1 advances to page 2 -> triggers buildUI
+            gallery:onFocusRight()
+            assert.are.equal(2, gallery.current_page)
+            assert.are.equal(1, build_count)
         end)
     end)
 
@@ -349,6 +420,10 @@ describe("X-Ray Non-Touch & Keyboard Support", function()
     describe("ButtonDialog Non-Touch Support", function()
         it("patches ButtonDialog with Enter/Escape key events, traps propagation, and focuses default button", function()
             local ButtonDialog = require("ui/widget/buttondialog")
+            local Device = require("device")
+            local orig_isTouch = Device.isTouchDevice
+            Device.isTouchDevice = function() return false end -- Non-touch mode
+
             local cancel_called = false
             local dlg = {
                 buttons = {{{
@@ -370,7 +445,7 @@ describe("X-Ray Non-Touch & Keyboard Support", function()
                 },
                 key_events = {},
             }
-            -- Simulate ButtonDialog:init after patching
+            -- Simulate ButtonDialog:init after patching on non-touch device
             if ButtonDialog.init then
                 ButtonDialog.init(dlg)
                 assert.are_not.equal(nil, dlg.key_events.Press)
@@ -388,6 +463,90 @@ describe("X-Ray Non-Touch & Keyboard Support", function()
                     assert.is_true(cancel_called)
                 end
             end
+
+            -- Now test touch-capable mode: focus indicator does NOT immediately show
+            Device.isTouchDevice = function() return true end
+            local touch_dlg = {
+                buttons = {{{ text = "OK", is_enter_default = true }}},
+                layout = {{{
+                    is_enter_default = true,
+                    handleEvent = function(self, ev)
+                        if ev.type == "Focus" then self._focused = true end
+                    end
+                }}},
+                key_events = {},
+            }
+            if ButtonDialog.init then
+                ButtonDialog.init(touch_dlg)
+                assert.are.equal(1, touch_dlg.selected.x)
+                assert.are.equal(1, touch_dlg.selected.y)
+                assert.are.equal(nil, touch_dlg.layout[1][1]._focused)
+            end
+
+            Device.isTouchDevice = orig_isTouch
+        end)
+    end)
+
+    describe("Dual Touch / Keyboard Focus Suppression", function()
+        local sample_images = {
+            { id = "img1", title = "Map 1", page = 1 },
+            { id = "img2", title = "Map 2", page = 10 },
+        }
+
+        it("suppresses focus in ImageGallery on touch devices until D-pad activation, and clears on swipe", function()
+            Device.isTouchDevice = function() return true end
+            mock_plugin.images = sample_images
+            local gallery = ImageGallery:new{
+                plugin = mock_plugin,
+                images = sample_images,
+                view_mode = "mosaic",
+                tab = "all",
+            }
+            assert.is_nil(gallery.focus_zone)
+            assert.is_nil(gallery.focused_index)
+
+            -- D-pad right activates focus on cards
+            gallery:onFocusRight()
+            assert.are.equal("cards", gallery.focus_zone)
+            assert.are.equal(1, gallery.focused_index)
+
+            -- Subsequent D-pad movement moves index
+            gallery:onFocusRight()
+            assert.are.equal(2, gallery.focused_index)
+
+            -- Swipe turns page and resets focus visibility back to touch-first mode
+            gallery:onSwipe(nil, { direction = "west" })
+            assert.is_nil(gallery.focus_zone)
+            assert.is_nil(gallery.focused_index)
+        end)
+
+        it("suppresses toolbar focus in ImageViewer on touch devices until D-pad activation, and clears on tap", function()
+            Device.isTouchDevice = function() return true end
+            local viewer = ImageViewer:new{
+                plugin = mock_plugin,
+                image_entry = sample_images[1],
+            }
+            assert.is_nil(viewer.focus_zone)
+            assert.is_nil(viewer.focused_btn_idx)
+
+            -- D-pad left activates toolbar focus on close button (idx 7)
+            viewer:onFocusLeft()
+            assert.are.equal("toolbar", viewer.focus_zone)
+            assert.are.equal(7, viewer.focused_btn_idx)
+
+            -- Tap clears toolbar focus
+            viewer:onTap()
+            assert.is_nil(viewer.focus_zone)
+            assert.is_nil(viewer.focused_btn_idx)
+        end)
+
+        it("correctly identifies touch vs non-touch device via XRayUtils", function()
+            local XRayUtils = require("xray_utils")
+            Device.isTouchDevice = function() return true end
+            assert.is_true(XRayUtils:isTouchDevice())
+
+            Device.isTouchDevice = function() return false end
+            assert.is_false(XRayUtils:isTouchDevice())
         end)
     end)
 end)

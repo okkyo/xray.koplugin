@@ -1601,7 +1601,7 @@ msgstr "%s için API anahtarı alındı ve kaydedildi!"
 msgid "web_setup_title"
 msgstr "Telefon / PC ile Bağlan"
 
-# en-hash: ad608bec35300c1dbb0180723f2f6b9f
+# en-hash: 4111bd6fb88b1690bc80082903801ab8
 msgid "welcome_action_ask_later"
 msgstr "Daha Sonra Sor"
 
@@ -1657,9 +1657,9 @@ msgstr "Ekran klavyesini kullanarak API anahtarınızı yazın veya yapıştır�
 msgid "welcome_opt_ereader_title"
 msgstr "Anahtarı E-Okuyucuda Girin"
 
-# en-hash: c3c978de8a982902e76b01a8bc5a996b
+# en-hash: 12273c89c62d45e28d60480dc913c65a
 msgid "welcome_opt_file_desc"
-msgstr "xray_key.txt dosyasından otomatik içe aktarın veya wiki rehberini görüntüleyin."
+msgstr "Anahtarı koreader/settings/xray_key.txt konumuna yerleştirin veya yapılandırılmış bir sağlayıcı seçin."
 
 # en-hash: 5e2364ee83d001f6721276c20925e78e
 msgid "welcome_opt_file_title"
@@ -1672,6 +1672,14 @@ msgstr "Cloud Relay veya yerel Wi-Fi ile anahtarınızı girmek için bir QR kod
 # en-hash: f5d12f602967b00beea3f12412fcb3a2
 msgid "welcome_opt_phone_title"
 msgstr "Telefondan / PC'den Ayarla (Önerilen)"
+
+# en-hash: 97d815bfab1c9a82c9e305a76b4b559f
+msgid "welcome_opt_skip_desc"
+msgstr "Yapay zeka olmadan yerel kelime sayılarını, okuma ölçümlerini ve önbelleğe alınmış seri bilgilerini kullanın."
+
+# en-hash: 93c52d3e72f67abf20b2ec1c235f5dc5
+msgid "welcome_opt_skip_title"
+msgstr "Şimdilik Atla (Yalnızca Çevrimdışı Özellikler)"
 
 # en-hash: 741987eccc2e46095fdd70cf9377e31e
 msgid "welcome_select_provider"

@@ -46,6 +46,24 @@ function M:isLowPowerForScan()
     return false
 end
 
+function M:isTouchDevice()
+    local ok, Dev = pcall(require, "device")
+    if ok and Dev then
+        if type(Dev.isTouchDevice) == "function" then
+            local ok2, res = pcall(Dev.isTouchDevice, Dev)
+            if ok2 and res ~= nil then return res == true end
+        end
+        if Dev.isTouchDevice ~= nil then
+            return Dev.isTouchDevice == true
+        end
+        if type(Dev.hasTouchScreen) == "function" then
+            local ok2, res = pcall(Dev.hasTouchScreen, Dev)
+            if ok2 and res ~= nil then return res == true end
+        end
+    end
+    return true
+end
+
 function M:getFriendlyError(error_code, error_msg, loc)
     local title_key = "error_unknown_title"
     local desc_key = "error_unknown_desc"

@@ -245,8 +245,25 @@ function ImageViewer:init()
 
     local full_range = Geom:new{ x = 0, y = 0, w = self.sw, h = self.sh }
 
-    self.focus_zone = self.focus_zone or "toolbar"
-    self.focused_btn_idx = self.focused_btn_idx or 2 -- default to Zoom In
+    local is_touch = false
+    local ok_dev, Dev = pcall(require, "device")
+    if ok_dev and Dev then
+        if type(Dev.isTouchDevice) == "function" then
+            local ok2, res = pcall(Dev.isTouchDevice, Dev)
+            if ok2 and res ~= nil then is_touch = (res == true) end
+        elseif Dev.isTouchDevice ~= nil then
+            is_touch = (Dev.isTouchDevice == true)
+        end
+    end
+    self.is_touch_device = is_touch
+
+    if not is_touch then
+        self.focus_zone = self.focus_zone or "toolbar"
+        self.focused_btn_idx = self.focused_btn_idx or 2 -- default to Zoom In
+    else
+        self.focus_zone = nil
+        self.focused_btn_idx = nil
+    end
 
     self.ges_events = {
         Tap = { GestureRange:new{ ges = "tap", range = full_range } },
@@ -405,7 +422,12 @@ end
 
 function ImageViewer:onTap(arg, ges)
     self._last_pan_pos = nil
-    -- Tapping the image surface does nothing (does NOT rotate)
+    if self.is_touch_device and self.focus_zone then
+        self.focus_zone = nil
+        self.focused_btn_idx = nil
+        self:buildUI()
+        UIManager:setDirty(self, "ui")
+    end
     return true
 end
 
@@ -621,12 +643,13 @@ function ImageViewer:onNextImage()
 end
 
 function ImageViewer:onFocusUp()
-    if self.focus_zone == "image" then
+    if not self.focus_zone or self.focus_zone == "image" then
         local fit_zoom = self:getFitZoom()
-        if self.zoom_level > (fit_zoom + 0.05) then
+        if self.focus_zone == "image" and self.zoom_level > (fit_zoom + 0.05) then
             return self:onPanUp()
         else
             self.focus_zone = "toolbar"
+            self.focused_btn_idx = self.focused_btn_idx or 2
             self:buildUI()
             UIManager:setDirty(self, "ui")
         end
@@ -635,7 +658,7 @@ function ImageViewer:onFocusUp()
 end
 
 function ImageViewer:onFocusDown()
-    if self.focus_zone == "toolbar" then
+    if not self.focus_zone or self.focus_zone == "toolbar" then
         self.focus_zone = "image"
         self:buildUI()
         UIManager:setDirty(self, "ui")
@@ -651,8 +674,13 @@ function ImageViewer:onFocusDown()
 end
 
 function ImageViewer:onFocusLeft()
-    if self.focus_zone == "toolbar" then
-        self.focused_btn_idx = (self.focused_btn_idx > 1) and (self.focused_btn_idx - 1) or 7
+    if not self.focus_zone or self.focus_zone == "toolbar" then
+        self.focus_zone = "toolbar"
+        if not self.focused_btn_idx then
+            self.focused_btn_idx = 7
+        else
+            self.focused_btn_idx = (self.focused_btn_idx > 1) and (self.focused_btn_idx - 1) or 7
+        end
         self:buildUI()
         UIManager:setDirty(self, "ui")
     elseif self.focus_zone == "image" then
@@ -667,8 +695,13 @@ function ImageViewer:onFocusLeft()
 end
 
 function ImageViewer:onFocusRight()
-    if self.focus_zone == "toolbar" then
-        self.focused_btn_idx = (self.focused_btn_idx < 7) and (self.focused_btn_idx + 1) or 1
+    if not self.focus_zone or self.focus_zone == "toolbar" then
+        self.focus_zone = "toolbar"
+        if not self.focused_btn_idx then
+            self.focused_btn_idx = 1
+        else
+            self.focused_btn_idx = (self.focused_btn_idx < 7) and (self.focused_btn_idx + 1) or 1
+        end
         self:buildUI()
         UIManager:setDirty(self, "ui")
     elseif self.focus_zone == "image" then

@@ -1601,9 +1601,9 @@ msgstr "¡Clave API para %s recibida y guardada!"
 msgid "web_setup_title"
 msgstr "Conectar mediante móvil / PC"
 
-# en-hash: ad608bec35300c1dbb0180723f2f6b9f
+# en-hash: 4111bd6fb88b1690bc80082903801ab8
 msgid "welcome_action_ask_later"
-msgstr "Preguntar más tarde"
+msgstr "Preguntarme más tarde"
 
 # en-hash: a0bfb8e59e6c13fc8d990781f77694fe
 msgid "welcome_action_continue"
@@ -1657,9 +1657,9 @@ msgstr "Escriba o pegue su clave de API usando el teclado en pantalla."
 msgid "welcome_opt_ereader_title"
 msgstr "Ingresar clave en el lector electrónico"
 
-# en-hash: c3c978de8a982902e76b01a8bc5a996b
+# en-hash: 12273c89c62d45e28d60480dc913c65a
 msgid "welcome_opt_file_desc"
-msgstr "Importa claves automáticamente desde xray_key.txt o mira la guía wiki."
+msgstr "Coloque la clave en koreader/settings/xray_key.txt o seleccione un proveedor configurado existente."
 
 # en-hash: 5e2364ee83d001f6721276c20925e78e
 msgid "welcome_opt_file_title"
@@ -1672,6 +1672,14 @@ msgstr "Escanee un código QR para ingresar su clave vía Cloud Relay o Wi-Fi lo
 # en-hash: f5d12f602967b00beea3f12412fcb3a2
 msgid "welcome_opt_phone_title"
 msgstr "Configurar desde el móvil / PC (Recomendado)"
+
+# en-hash: 97d815bfab1c9a82c9e305a76b4b559f
+msgid "welcome_opt_skip_desc"
+msgstr "Use el recuento de palabras local, métricas de lectura e información de series en caché sin IA."
+
+# en-hash: 93c52d3e72f67abf20b2ec1c235f5dc5
+msgid "welcome_opt_skip_title"
+msgstr "Omitir por ahora (solo funciones sin conexión)"
 
 # en-hash: 741987eccc2e46095fdd70cf9377e31e
 msgid "welcome_select_provider"

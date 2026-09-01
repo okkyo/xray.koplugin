@@ -1601,7 +1601,7 @@ msgstr "Ключ API для %s отримано та збережено!"
 msgid "web_setup_title"
 msgstr "Підключення через телефон / ПК"
 
-# en-hash: ad608bec35300c1dbb0180723f2f6b9f
+# en-hash: 4111bd6fb88b1690bc80082903801ab8
 msgid "welcome_action_ask_later"
 msgstr "Запитати пізніше"
 
@@ -1657,9 +1657,9 @@ msgstr "Введіть або вставте ключ API за допомого�
 msgid "welcome_opt_ereader_title"
 msgstr "Ввести ключ на рідері"
 
-# en-hash: c3c978de8a982902e76b01a8bc5a996b
+# en-hash: 12273c89c62d45e28d60480dc913c65a
 msgid "welcome_opt_file_desc"
-msgstr "Автоматичний імпорт з xray_key.txt або перегляд посібника у вікі."
+msgstr "Помістіть ключ у koreader/settings/xray_key.txt або виберіть налаштованого провайдера."
 
 # en-hash: 5e2364ee83d001f6721276c20925e78e
 msgid "welcome_opt_file_title"
@@ -1672,6 +1672,14 @@ msgstr "Відскануйте QR-код для введення ключа че
 # en-hash: f5d12f602967b00beea3f12412fcb3a2
 msgid "welcome_opt_phone_title"
 msgstr "Налаштувати з телефона / ПК (Рекомендовано)"
+
+# en-hash: 97d815bfab1c9a82c9e305a76b4b559f
+msgid "welcome_opt_skip_desc"
+msgstr "Використовуйте локальний підрахунок слів, статистику читання та кешовані дані про серії без ШІ."
+
+# en-hash: 93c52d3e72f67abf20b2ec1c235f5dc5
+msgid "welcome_opt_skip_title"
+msgstr "Пропустити (лише офлайн-функції)"
 
 # en-hash: 741987eccc2e46095fdd70cf9377e31e
 msgid "welcome_select_provider"

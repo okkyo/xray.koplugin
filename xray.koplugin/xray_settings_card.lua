@@ -40,7 +40,18 @@ function M.show(ui_instance, args)
     local title_font_size = math.max(10, math.min(fs - 5, 15))
 
     local overlay
-    local focused_index = 1
+    local is_touch = false
+    local ok_dev, Dev = pcall(require, "device")
+    if ok_dev and Dev then
+        if type(Dev.isTouchDevice) == "function" then
+            local ok2, res = pcall(Dev.isTouchDevice, Dev)
+            if ok2 and res ~= nil then is_touch = (res == true) end
+        elseif Dev.isTouchDevice ~= nil then
+            is_touch = (Dev.isTouchDevice == true)
+        end
+    end
+    local focus_visible = not is_touch
+    local focused_index = focus_visible and 1 or nil
     local refresh
 
     refresh = function()
@@ -49,8 +60,10 @@ function M.show(ui_instance, args)
         local total_options = #options_list
         local total_items = total_options + (args.about_text and 2 or 1)
 
-        if focused_index > total_items then focused_index = total_items end
-        if focused_index < 1 then focused_index = 1 end
+        if focus_visible and focused_index then
+            if focused_index > total_items then focused_index = total_items end
+            if focused_index < 1 then focused_index = 1 end
+        end
 
         local function span()
             return VerticalSpan:new{ width = xray_theme.gap }
@@ -81,7 +94,7 @@ function M.show(ui_instance, args)
 
         for idx, opt in ipairs(options_list) do
             local is_selected = (opt.value == current_val)
-            local is_focused = (idx == focused_index)
+            local is_focused = focus_visible and (idx == focused_index)
             local dot_char = is_selected and "●" or "○"
             
             local row_content = HorizontalGroup:new{
@@ -143,7 +156,12 @@ function M.show(ui_instance, args)
                 }
             }
             item.onTap = function()
-                focused_index = idx
+                if is_touch then
+                    focus_visible = false
+                    focused_index = nil
+                else
+                    focused_index = idx
+                end
                 local handled = args.save_func(opt.value, refresh)
                 if not handled then
                     refresh()
@@ -176,8 +194,8 @@ function M.show(ui_instance, args)
         local about_index = args.about_text and (total_options + 1) or nil
         local close_index = args.about_text and (total_options + 2) or (total_options + 1)
 
-        local is_about_focused = (focused_index == about_index)
-        local is_close_focused = (focused_index == close_index)
+        local is_about_focused = focus_visible and (focused_index == about_index)
+        local is_close_focused = focus_visible and (focused_index == close_index)
 
         if args.about_text then
             local about_btn = Button:new{
@@ -298,7 +316,10 @@ function M.show(ui_instance, args)
             }
 
             overlay.onFocusUp = function()
-                if focused_index > 1 then
+                focus_visible = true
+                if not focused_index then
+                    focused_index = total_items
+                elseif focused_index > 1 then
                     focused_index = focused_index - 1
                 else
                     focused_index = total_items
@@ -308,7 +329,10 @@ function M.show(ui_instance, args)
             end
 
             overlay.onFocusDown = function()
-                if focused_index < total_items then
+                focus_visible = true
+                if not focused_index then
+                    focused_index = 1
+                elseif focused_index < total_items then
                     focused_index = focused_index + 1
                 else
                     focused_index = 1
@@ -318,6 +342,8 @@ function M.show(ui_instance, args)
             end
 
             overlay.onFocusLeft = function()
+                focus_visible = true
+                if not focused_index then focused_index = 1 end
                 if args.about_text and focused_index == close_index then
                     focused_index = about_index
                     refresh()
@@ -326,6 +352,8 @@ function M.show(ui_instance, args)
             end
 
             overlay.onFocusRight = function()
+                focus_visible = true
+                if not focused_index then focused_index = 1 end
                 if args.about_text and focused_index == about_index then
                     focused_index = close_index
                     refresh()
