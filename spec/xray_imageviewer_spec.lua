@@ -70,5 +70,9 @@ describe("xray_imageviewer", function()
         assert.are.equal(270, viewer.rotation_angle) -- 270 in KOReader equals 90° Clockwise
         viewer:onRotate()
         assert.are.equal(180, viewer.rotation_angle)
+
+        -- Test minimize without crash
+        viewer:onMinimize()
+        assert.is_not_nil(mock_plugin.last_minimized_state)
     end)
 end)

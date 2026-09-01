@@ -105,7 +105,7 @@ msgstr "Clairsemé : vérifie max toutes les 30 min"
 msgid "auto_update_ultra"
 msgstr "Ultra : vérifie toutes les %d pages"
 
-# en-hash: 0557fa923dcee4d0f86b1409f5c2167f
+# en-hash: a9d418644a14acc5d9622ca060895802
 msgid "back_to_reading"
 msgstr "Retour à la lecture"
 
@@ -477,13 +477,13 @@ msgstr "Mode Livre Complet"
 msgid "gemini_key_hint"
 msgstr "Entrez votre clé gratuite Gemini depuis Google AI Studio (commence par AQ. ou AIzaSy...) :"
 
+# en-hash: 33dca68e340b8d6c21472341130cf45a
+msgid "illustration"
+msgstr "Illustration"
+
 # en-hash: fe63191987f62b9e4806e376671ed335
 msgid "img_extract_failed"
 msgstr "Impossible d'extraire le fichier image."
-
-# en-hash: 0e05d094e359443c73ada4c2e852ccae
-msgid "img_minimized_hint"
-msgstr "Indice d'image minimisée"
 
 # en-hash: 30936c8b483b8b104a4ad7821ce2262b
 msgid "img_no_favorites"
@@ -501,9 +501,9 @@ msgstr "Aucune image trouvée pour cet onglet/filtre.\n\nExtraction ou analyse d
 msgid "img_no_series"
 msgstr "Aucune référence de série enregistrée.\n\nUtilisez le menu ⋮ sur n'importe quelle carte pour l'enregistrer dans vos références de série."
 
-# en-hash: 2bea7b6d66811b50767c7b22f81fb2c2
+# en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
-msgstr "Renommer l'étiquette de l'image"
+msgstr "Renommer l'étiquette"
 
 # en-hash: 393c3f5ea8ad35c02691d507bdbb31b0
 msgid "img_reveal"

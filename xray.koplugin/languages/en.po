@@ -81,7 +81,7 @@ msgid "auto_update_ultra"
 msgstr "Ultra: checks every %d pages"
 
 msgid "back_to_reading"
-msgstr "Back"
+msgstr "Back to Reading"
 
 msgid "beta_channel_desc"
 msgstr "The beta channel allows you to receive pre-release versions of the X-Ray plugin. These versions include the latest features and bug fixes but may be [B]less stable[/B] than the regular release."
@@ -359,11 +359,11 @@ msgstr "Full Book Mode"
 msgid "gemini_key_hint"
 msgstr "Enter your free Gemini key from Google AI Studio (starts with AQ. or AIzaSy...):"
 
+msgid "illustration"
+msgstr "Illustration"
+
 msgid "img_extract_failed"
 msgstr "Could not extract image file."
-
-msgid "img_minimized_hint"
-msgstr "img_minimized_hint"
 
 msgid "img_no_favorites"
 msgstr "No favorites yet.\n\nUse the ⋮ menu on any image to add it to your favorites."
@@ -378,7 +378,7 @@ msgid "img_no_series"
 msgstr "No series references saved.\n\nUse the ⋮ menu on any map to save it to your series references."
 
 msgid "img_rename_title"
-msgstr "Rename Image Label"
+msgstr "Rename Label"
 
 msgid "img_reveal"
 msgstr "Reveal"

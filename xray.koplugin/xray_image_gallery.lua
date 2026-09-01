@@ -340,14 +340,24 @@ end
 local ImageGallery = InputContainer:extend{
     plugin = nil,
     current_page = 1,
+    focused_index = 1,
     view_mode = "mosaic", -- "mosaic", "grid", "list"
-    tab = "all",          -- "all", "favorites", "series"
+    tab = "all",          -- "all", "favorites", "series", "hidden"
     filter_mode = "standard", -- "standard", "large_only", "all"
+    focus_zone = "cards", -- "header", "tabs", "cards", "footer"
+    header_focus_idx = 1, -- 1=view_mode, 2=filter, 3=close
+    tab_focus_idx = 1,    -- 1=all, 2=favorites, 3=series, 4=hidden
+    footer_focus_idx = 1, -- 1=prev, 2=next
 }
 
 function ImageGallery:init()
     self.sw = Screen:getWidth()
     self.sh = Screen:getHeight()
+    self.focused_index = self.focused_index or 1
+    self.focus_zone = self.focus_zone or "cards"
+    self.header_focus_idx = self.header_focus_idx or 1
+    self.tab_focus_idx = self.tab_focus_idx or 1
+    self.footer_focus_idx = self.footer_focus_idx or 1
 
     self.ges_events = {
         Swipe = {
@@ -359,32 +369,323 @@ function ImageGallery:init()
     }
 
     self.key_events = {
+        NextCard = {
+            { "Right" },
+        },
+        PrevCard = {
+            { "Left" },
+        },
+        FocusUp = {
+            { "Up" },
+        },
+        FocusDown = {
+            { "Down" },
+        },
         NextPage = {
             { "NextPage" },
-            { "Right" },
-            { "Down" },
             { "PageDown" },
-            { "Space" },
+            { "n" },
+            { "N" },
+            { "]" },
         },
         PrevPage = {
             { "PrevPage" },
-            { "Left" },
-            { "Up" },
             { "PageUp" },
+            { "p" },
+            { "P" },
+            { "[" },
         },
+        OpenFocused = {
+            { "Return" },
+            { "KP_Enter" },
+            { "Enter" },
+            { "Press" },
+            { "Select" },
+            { "Space" },
+        },
+        ImageActions = {
+            { "Menu" },
+            { "a" },
+            { "A" },
+            { "." },
+            { "3" },
+        },
+        CycleTab = {
+            { "t" },
+            { "T" },
+            { "Tab" },
+        },
+        CycleView = {
+            { "v" },
+            { "V" },
+        },
+        ToggleFilter = {
+            { "f" },
+            { "F" },
+        },
+        Select1 = { { "1" } },
+        Select2 = { { "2" } },
+        Select3 = { { "3" } },
+        Select4 = { { "4" } },
+        Select5 = { { "5" } },
+        Select6 = { { "6" } },
+        Select7 = { { "7" } },
+        Select8 = { { "8" } },
+        Select9 = { { "9" } },
         Close = {
             { "Escape" },
             { "Back" },
             { "q" },
+            { "Q" },
         },
     }
+
+    if Device and Device.input and Device.input.group then
+        if Device.input.group.Enter then table.insert(self.key_events.OpenFocused, { Device.input.group.Enter }) end
+        if Device.input.group.Select then table.insert(self.key_events.OpenFocused, { Device.input.group.Select }) end
+        if Device.input.group.Back then table.insert(self.key_events.Close, { Device.input.group.Back }) end
+    end
 
     self:buildUI()
 end
 
+function ImageGallery:onFocusUp()
+    if self.focus_zone == "footer" then
+        self.focus_zone = "cards"
+        local count = self.current_page_items and #self.current_page_items or 0
+        self.focused_index = math.max(1, count)
+    elseif self.focus_zone == "cards" then
+        local cols = (self.view_mode == "list") and 1 or 2
+        if self.focused_index > cols then
+            self.focused_index = self.focused_index - cols
+        else
+            self.focus_zone = "tabs"
+            self.tab_focus_idx = math.min(4, math.max(1, self.focused_index))
+        end
+    elseif self.focus_zone == "tabs" then
+        self.focus_zone = "header"
+        self.header_focus_idx = math.min(3, math.max(1, self.tab_focus_idx))
+    elseif self.focus_zone == "header" then
+        self.focus_zone = "footer"
+        self.footer_focus_idx = 1
+    end
+    self:buildUI()
+    UIManager:setDirty(self, "ui")
+    return true
+end
+
+function ImageGallery:onFocusDown()
+    if self.focus_zone == "header" then
+        self.focus_zone = "tabs"
+        self.tab_focus_idx = math.min(4, self.header_focus_idx)
+    elseif self.focus_zone == "tabs" then
+        self.focus_zone = "cards"
+        self.focused_index = 1
+    elseif self.focus_zone == "cards" then
+        local count = self.current_page_items and #self.current_page_items or 0
+        local cols = (self.view_mode == "list") and 1 or 2
+        if self.focused_index + cols <= count then
+            self.focused_index = self.focused_index + cols
+        elseif self.focused_index < count then
+            self.focused_index = count
+        else
+            self.focus_zone = "footer"
+            self.footer_focus_idx = 2
+        end
+    elseif self.focus_zone == "footer" then
+        self.focus_zone = "header"
+        self.header_focus_idx = 1
+    end
+    self:buildUI()
+    UIManager:setDirty(self, "ui")
+    return true
+end
+
+function ImageGallery:onFocusLeft()
+    if self.focus_zone == "header" then
+        self.header_focus_idx = (self.header_focus_idx > 1) and (self.header_focus_idx - 1) or 3
+    elseif self.focus_zone == "tabs" then
+        self.tab_focus_idx = (self.tab_focus_idx > 1) and (self.tab_focus_idx - 1) or 4
+    elseif self.focus_zone == "cards" then
+        local count = self.current_page_items and #self.current_page_items or 0
+        if count > 0 then
+            if self.focused_index > 1 then
+                self.focused_index = self.focused_index - 1
+            elseif self.current_page > 1 then
+                self.current_page = self.current_page - 1
+                self.focused_index = 1
+            else
+                self.focused_index = count
+            end
+        end
+    elseif self.focus_zone == "footer" then
+        self.footer_focus_idx = (self.footer_focus_idx > 1) and (self.footer_focus_idx - 1) or 2
+    end
+    self:buildUI()
+    UIManager:setDirty(self, "ui")
+    return true
+end
+
+function ImageGallery:onFocusRight()
+    if self.focus_zone == "header" then
+        self.header_focus_idx = (self.header_focus_idx < 3) and (self.header_focus_idx + 1) or 1
+    elseif self.focus_zone == "tabs" then
+        self.tab_focus_idx = (self.tab_focus_idx < 4) and (self.tab_focus_idx + 1) or 1
+    elseif self.focus_zone == "cards" then
+        local count = self.current_page_items and #self.current_page_items or 0
+        if count > 0 then
+            if self.focused_index < count then
+                self.focused_index = self.focused_index + 1
+            elseif self.current_page < (self.total_pages or 1) then
+                self.current_page = self.current_page + 1
+                self.focused_index = 1
+            else
+                self.focused_index = 1
+            end
+        end
+    elseif self.focus_zone == "footer" then
+        self.footer_focus_idx = (self.footer_focus_idx < 2) and (self.footer_focus_idx + 1) or 1
+    end
+    self:buildUI()
+    UIManager:setDirty(self, "ui")
+    return true
+end
+
+function ImageGallery:onNextCard()
+    return self:onFocusRight()
+end
+
+function ImageGallery:onPrevCard()
+    return self:onFocusLeft()
+end
+
+function ImageGallery:onOpenFocused()
+    if self.focus_zone == "header" then
+        if self.header_focus_idx == 1 then
+            return self:onCycleView()
+        elseif self.header_focus_idx == 2 then
+            return self:onToggleFilter()
+        elseif self.header_focus_idx == 3 then
+            return self:onClose()
+        end
+    elseif self.focus_zone == "tabs" then
+        local tabs = { "all", "favorites", "series", "hidden" }
+        local target_tab = tabs[self.tab_focus_idx] or "all"
+        self.tab = target_tab
+        if self.plugin then self.plugin.image_tab = target_tab end
+        self.current_page = 1
+        self.focused_index = 1
+        self.focus_zone = "cards"
+        self:buildUI()
+        UIManager:setDirty(self, "ui")
+        return true
+    elseif self.focus_zone == "cards" then
+        local img = self.current_page_items and self.current_page_items[self.focused_index]
+        if img then
+            if self.openViewer then
+                self:openViewer(img)
+            elseif self.plugin and self.plugin.openImageViewer then
+                self.plugin:openImageViewer(img)
+            elseif self.plugin and self.plugin._launchImageViewer then
+                self.plugin:_launchImageViewer(img)
+            end
+        end
+        return true
+    elseif self.focus_zone == "footer" then
+        if self.footer_focus_idx == 1 then
+            return self:onPrevPage()
+        else
+            return self:onNextPage()
+        end
+    end
+    return true
+end
+
+function ImageGallery:onImageActions()
+    local img = self.current_page_items and self.current_page_items[self.focused_index]
+    if img and self.plugin then
+        self.plugin:showImageActions(img)
+    end
+    return true
+end
+
+function ImageGallery:onCycleTab()
+    local tabs = { "all", "favorites", "series", "hidden" }
+    local cur_idx = 1
+    for i, t in ipairs(tabs) do
+        if t == self.tab then cur_idx = i; break end
+    end
+    local next_tab = tabs[(cur_idx % #tabs) + 1]
+    self.tab = next_tab
+    self.tab_focus_idx = (cur_idx % #tabs) + 1
+    if self.plugin then self.plugin.image_tab = next_tab end
+    self.current_page = 1
+    self.focused_index = 1
+    self:buildUI()
+    UIManager:setDirty(self, "ui")
+    return true
+end
+
+function ImageGallery:onCycleView()
+    if self.view_mode == "mosaic" then
+        self.view_mode = "grid"
+    elseif self.view_mode == "grid" then
+        self.view_mode = "list"
+    else
+        self.view_mode = "mosaic"
+    end
+    if self.plugin then self.plugin.image_view_mode = self.view_mode end
+    self.current_page = 1
+    self.focused_index = 1
+    self:buildUI()
+    UIManager:setDirty(self, "ui")
+    return true
+end
+
+function ImageGallery:onToggleFilter()
+    if self.filter_mode == "maps_only" or self.filter_mode == "large_only" then
+        self.filter_mode = "all"
+    else
+        self.filter_mode = "maps_only"
+    end
+    if self.plugin then self.plugin.image_filter_mode = self.filter_mode end
+    self.current_page = 1
+    self.focused_index = 1
+    self:buildUI()
+    UIManager:setDirty(self, "ui")
+    return true
+end
+
+local function _openDirect(self, idx)
+    local img = self.current_page_items and self.current_page_items[idx]
+    if img then
+        self.focus_zone = "cards"
+        self.focused_index = idx
+        if self.openViewer then
+            self:openViewer(img)
+        elseif self.plugin and self.plugin.openImageViewer then
+            self.plugin:openImageViewer(img)
+        elseif self.plugin and self.plugin._launchImageViewer then
+            self.plugin:_launchImageViewer(img)
+        end
+    end
+    return true
+end
+
+function ImageGallery:onSelect1() return _openDirect(self, 1) end
+function ImageGallery:onSelect2() return _openDirect(self, 2) end
+function ImageGallery:onSelect3() return _openDirect(self, 3) end
+function ImageGallery:onSelect4() return _openDirect(self, 4) end
+function ImageGallery:onSelect5() return _openDirect(self, 5) end
+function ImageGallery:onSelect6() return _openDirect(self, 6) end
+function ImageGallery:onSelect7() return _openDirect(self, 7) end
+function ImageGallery:onSelect8() return _openDirect(self, 8) end
+function ImageGallery:onSelect9() return _openDirect(self, 9) end
+
 function ImageGallery:onNextPage()
     if self.current_page < self.total_pages then
         self.current_page = self.current_page + 1
+        self.focused_index = 1
         self:buildUI()
         UIManager:setDirty(self, "ui")
     end
@@ -394,6 +695,7 @@ end
 function ImageGallery:onPrevPage()
     if self.current_page > 1 then
         self.current_page = self.current_page - 1
+        self.focused_index = 1
         self:buildUI()
         UIManager:setDirty(self, "ui")
     end
@@ -411,6 +713,47 @@ function ImageGallery:onSwipe(arg, ges)
     elseif ges.direction == "east" or ges.direction == "right" then
         return self:onPrevPage()
     end
+end
+
+function ImageGallery:handleEvent(ev)
+    if ev.type == "Key" or ev.type == "KeyPress" or ev.type == "KeyDown" then
+        local key = ev.key or ev.name or ev.sym
+        if key == "Return" or key == "KP_Enter" or key == "Enter" or key == "Select" or key == "Space" or key == "Press" then
+            return self:onOpenFocused()
+        elseif key == "Up" then
+            return self:onFocusUp()
+        elseif key == "Down" then
+            return self:onFocusDown()
+        elseif key == "Left" then
+            return self:onFocusLeft()
+        elseif key == "Right" then
+            return self:onFocusRight()
+        elseif key == "a" or key == "A" or key == "Menu" or key == "." or key == "3" then
+            return self:onImageActions()
+        elseif key == "v" or key == "V" then
+            return self:onCycleView()
+        elseif key == "t" or key == "T" or key == "Tab" then
+            return self:onCycleTab()
+        elseif key == "f" or key == "F" then
+            return self:onToggleFilter()
+        elseif key == "p" or key == "P" or key == "PageUp" or key == "PrevPage" or key == "[" then
+            return self:onPrevPage()
+        elseif key == "n" or key == "N" or key == "PageDown" or key == "NextPage" or key == "]" then
+            return self:onNextPage()
+        elseif key == "Escape" or key == "Back" or key == "q" or key == "Q" then
+            return self:onClose()
+        elseif key == "1" then return self:onSelect1()
+        elseif key == "2" then return self:onSelect2()
+        elseif key == "3" then return self:onSelect3()
+        elseif key == "4" then return self:onSelect4()
+        elseif key == "5" then return self:onSelect5()
+        elseif key == "6" then return self:onSelect6()
+        elseif key == "7" then return self:onSelect7()
+        elseif key == "8" then return self:onSelect8()
+        elseif key == "9" then return self:onSelect9()
+        end
+    end
+    return InputContainer.handleEvent(self, ev)
 end
 
 function ImageGallery:buildUI()
@@ -439,14 +782,19 @@ function ImageGallery:buildUI()
     local num_header_btns = 3
     local actions_total_w = (btn_w * num_header_btns) + (btn_gap * (num_header_btns - 1))
 
+    local is_view_focused = (self.focus_zone == "header" and self.header_focus_idx == 1)
+    local is_filter_focused = (self.focus_zone == "header" and self.header_focus_idx == 2)
+    local is_close_focused = (self.focus_zone == "header" and self.header_focus_idx == 3)
+
     local mode_icon = (self.view_mode == "mosaic" and "trello.svg") or (self.view_mode == "grid" and "grid.svg" or "list.svg")
     local view_mode_btn = createIconButton{
         icon = mode_icon,
         size = btn_size,
         width = btn_w,
         height = btn_w,
-        bordersize = 0,
-        background = nil,
+        bordersize = is_view_focused and (theme.border_focus or sc(3)) or 0,
+        color = is_view_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+        background = is_view_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
         padding = 0,
         padding_h = 0,
         callback = function()
@@ -469,8 +817,9 @@ function ImageGallery:buildUI()
         size = btn_size,
         width = btn_w,
         height = btn_w,
-        bordersize = 0,
-        background = nil,
+        bordersize = is_filter_focused and (theme.border_focus or sc(3)) or 0,
+        color = is_filter_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+        background = is_filter_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
         padding = 0,
         padding_h = 0,
         callback = function()
@@ -491,8 +840,9 @@ function ImageGallery:buildUI()
         size = btn_size,
         width = btn_w,
         height = btn_w,
-        bordersize = 0,
-        background = nil,
+        bordersize = is_close_focused and (theme.border_focus or sc(3)) or 0,
+        color = is_close_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+        background = is_close_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
         padding = 0,
         padding_h = 0,
         callback = function()
@@ -591,8 +941,9 @@ function ImageGallery:buildUI()
     local total_gaps = tab_gap * 3
     local main_tab_w = math.floor((sw - sc(32) - total_gaps - hidden_tab_w) / 3)
 
-    local function createTabBtn(label, tab_key, count, icon_file, custom_w)
+    local function createTabBtn(label, tab_key, count, icon_file, custom_w, tab_idx)
         local is_active = (self.tab == tab_key)
+        local is_focused_tab = (self.focus_zone == "tabs" and self.tab_focus_idx == tab_idx)
         local btn_w = custom_w or main_tab_w
         local content_widget
 
@@ -615,7 +966,7 @@ function ImageGallery:buildUI()
                 local count_txt = TextWidget:new{
                     text = tostring(count),
                     face = Font:getFace("cfont", 13),
-                    bold = is_active,
+                    bold = is_active or is_focused_tab,
                     fgcolor = is_active and Blitbuffer.COLOR_WHITE or Blitbuffer.COLOR_BLACK,
                 }
                 content_widget = HorizontalGroup:new{
@@ -632,7 +983,7 @@ function ImageGallery:buildUI()
             local txt = TextWidget:new{
                 text = display_label,
                 face = Font:getFace("cfont", 14),
-                bold = is_active,
+                bold = is_active or is_focused_tab,
                 fgcolor = is_active and Blitbuffer.COLOR_WHITE or Blitbuffer.COLOR_BLACK,
             }
             content_widget = txt
@@ -656,9 +1007,9 @@ function ImageGallery:buildUI()
 
         local frame = FrameContainer:new{
             padding = sc(3),
-            bordersize = sc(1),
-            color = Blitbuffer.COLOR_BLACK,
-            background = is_active and Blitbuffer.COLOR_BLACK or Blitbuffer.COLOR_WHITE,
+            bordersize = is_focused_tab and (theme.border_focus or sc(3)) or sc(1),
+            color = is_focused_tab and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or (is_active and Blitbuffer.COLOR_BLACK or Blitbuffer.COLOR_DARK_GRAY),
+            background = is_active and Blitbuffer.COLOR_BLACK or (is_focused_tab and (theme.color_focus_bg or Blitbuffer.Color8(215)) or Blitbuffer.COLOR_WHITE),
             radius = sc(4),
             CenterContainer:new{
                 dimen = Geom:new{ w = btn_w - sc(8), h = tab_h - sc(8) },
@@ -667,6 +1018,7 @@ function ImageGallery:buildUI()
         }
         return makeTapItem(frame, function()
             self.tab = tab_key
+            self.tab_focus_idx = tab_idx or 1
             p.image_tab = tab_key
             self.current_page = 1
             self:buildUI()
@@ -676,13 +1028,13 @@ function ImageGallery:buildUI()
 
     local tab_bar = HorizontalGroup:new{
         align = "center",
-        createTabBtn(p.loc:t("img_tab_all") or "All", "all", all_filtered_count),
+        createTabBtn(p.loc:t("img_tab_all") or "All", "all", all_filtered_count, nil, nil, 1),
         HorizontalSpan:new{ width = tab_gap },
-        createTabBtn(p.loc:t("img_tab_favorites") or "Favorites", "favorites", fav_count, "star.svg"),
+        createTabBtn(p.loc:t("img_tab_favorites") or "Favorites", "favorites", fav_count, "star.svg", nil, 2),
         HorizontalSpan:new{ width = tab_gap },
-        createTabBtn(p.loc:t("img_tab_series") or "Series", "series", #series_images, "book-open.svg"),
+        createTabBtn(p.loc:t("img_tab_series") or "Series", "series", #series_images, "book-open.svg", nil, 3),
         HorizontalSpan:new{ width = tab_gap },
-        createTabBtn(nil, "hidden", hidden_count, "eye-off.svg", hidden_tab_w),
+        createTabBtn(nil, "hidden", hidden_count, "eye-off.svg", hidden_tab_w, 4),
     }
 
     local header_vg = VerticalGroup:new{
@@ -811,6 +1163,13 @@ function ImageGallery:buildUI()
     if self.current_page < 1 then self.current_page = 1 end
 
     local page_items = pages[self.current_page] or {}
+    self.current_page_items = page_items
+    if #page_items > 0 then
+        if self.focused_index > #page_items then self.focused_index = #page_items end
+        if self.focused_index < 1 then self.focused_index = 1 end
+    else
+        self.focused_index = 1
+    end
 
     local page_content_vg = VerticalGroup:new{ align = "left" }
 
@@ -840,8 +1199,9 @@ function ImageGallery:buildUI()
             }
         })
     elseif self.view_mode == "list" then
-        for _, img in ipairs(page_items) do
-            local item_widget = self:renderListRow(img, content_w)
+        for idx, img in ipairs(page_items) do
+            local is_focused = (idx == self.focused_index)
+            local item_widget = self:renderListRow(img, content_w, is_focused)
             table.insert(page_content_vg, item_widget)
             table.insert(page_content_vg, VerticalSpan:new{ width = sc(6) })
         end
@@ -852,9 +1212,10 @@ function ImageGallery:buildUI()
         local col1_h = 0
         local col2_h = 0
 
-        for _, img in ipairs(page_items) do
+        for idx, img in ipairs(page_items) do
             local card_w = cell_w
-            local card_widget, estimated_h = self:renderMosaicCard(img, card_w)
+            local is_focused = (idx == self.focused_index)
+            local card_widget, estimated_h = self:renderMosaicCard(img, card_w, is_focused)
             
             if col1_h <= col2_h then
                 table.insert(col1_items, card_widget)
@@ -885,7 +1246,8 @@ function ImageGallery:buildUI()
         -- ── STOREFRONT SCREENSAVER STYLE GRID VIEW ───────────────────────────
         local current_row_widgets = {}
         for i, img in ipairs(page_items) do
-            local card_widget = self:renderGridCard(img, cell_w)
+            local is_focused = (i == self.focused_index)
+            local card_widget = self:renderGridCard(img, cell_w, is_focused)
             table.insert(current_row_widgets, card_widget)
 
             if #current_row_widgets == COLS or i == #page_items then
@@ -907,10 +1269,16 @@ function ImageGallery:buildUI()
     end
 
     -- ── 4. Fixed Bottom Pagination Bar (Always Anchored at Bottom) ─────────────
+    local is_prev_focused = (self.focus_zone == "footer" and self.footer_focus_idx == 1)
+    local is_next_focused = (self.focus_zone == "footer" and self.footer_focus_idx == 2)
     local prev_btn = createButton{
         text = "‹ " .. (p.loc:t("prev") or "Prev"),
         width = sc(85),
         height = sc(34),
+        bold = is_prev_focused,
+        bordersize = is_prev_focused and (theme.border_focus or sc(3)) or sc(1),
+        color = is_prev_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK,
+        background = is_prev_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
         callback = function()
             if self.current_page > 1 then
                 self.current_page = self.current_page - 1
@@ -924,6 +1292,10 @@ function ImageGallery:buildUI()
         text = (p.loc:t("next") or "Next") .. " ›",
         width = sc(85),
         height = sc(34),
+        bold = is_next_focused,
+        bordersize = is_next_focused and (theme.border_focus or sc(3)) or sc(1),
+        color = is_next_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK,
+        background = is_next_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
         callback = function()
             if self.current_page < self.total_pages then
                 self.current_page = self.current_page + 1
@@ -998,7 +1370,7 @@ function ImageGallery:buildUI()
 end
 
 -- ── Mosaic Card (No Titles, Overlapped 3-Dot Menu, 100% Uncut Natural Aspect Ratio)
-function ImageGallery:renderMosaicCard(img, cell_w)
+function ImageGallery:renderMosaicCard(img, cell_w, is_focused)
     local p = self.plugin
     local book_path = p.ui and p.ui.document and p.ui.document.file
 
@@ -1079,10 +1451,12 @@ function ImageGallery:renderMosaicCard(img, cell_w)
         end
     end
 
+    local is_card_focused = is_focused and (self.focus_zone == "cards")
+    -- The image_frame always fills the full thumbnail area with no border/padding
+    -- so the focus indicator doesn't squeeze or overlap the image content.
     local image_frame = FrameContainer:new{
         padding = 0,
         bordersize = 0,
-        background = Blitbuffer.COLOR_WHITE,
         radius = sc(4),
         width = thumb_w,
         height = thumb_h,
@@ -1113,7 +1487,41 @@ function ImageGallery:renderMosaicCard(img, cell_w)
         }
     end
 
+    local focus_badge = nil
+    if is_card_focused then
+        focus_badge = FrameContainer:new{
+            padding = sc(2),
+            padding_h = sc(6),
+            bordersize = sc(1),
+            color = Blitbuffer.COLOR_WHITE,
+            background = Blitbuffer.COLOR_BLACK,
+            radius = sc(3),
+            TextWidget:new{
+                text = "↵ OPEN",
+                face = Font:getFace("cfont", 11),
+                bold = true,
+                fgcolor = Blitbuffer.COLOR_WHITE,
+            }
+        }
+    end
+
     local overlay_children = { image_frame }
+
+    -- Focus ring: a transparent-background frame drawn ON TOP of the image
+    -- so the border surrounds the card without squeezing image content
+    if is_card_focused then
+        table.insert(overlay_children, FrameContainer:new{
+            padding = 0,
+            bordersize = theme.border_focus or sc(3),
+            color = theme.color_focus_border or Blitbuffer.COLOR_BLACK,
+            background = nil,  -- transparent interior
+            radius = sc(4),
+            width = thumb_w,
+            height = thumb_h,
+            VerticalSpan:new{ width = 0 },  -- empty interior — border only
+        })
+    end
+
     if star_badge then
         table.insert(overlay_children, LeftContainer:new{
             dimen = Geom:new{ w = thumb_w, h = sc(28) },
@@ -1121,6 +1529,16 @@ function ImageGallery:renderMosaicCard(img, cell_w)
                 padding = sc(4),
                 bordersize = 0,
                 star_badge,
+            }
+        })
+    end
+    if focus_badge then
+        table.insert(overlay_children, LeftContainer:new{
+            dimen = Geom:new{ w = thumb_w, h = sc(28) },
+            FrameContainer:new{
+                padding = sc(4),
+                bordersize = 0,
+                focus_badge,
             }
         })
     end
@@ -1170,7 +1588,11 @@ function ImageGallery:renderMosaicCard(img, cell_w)
                 return true
             end
         end
-        p:openImageViewer(img)
+        if p and p.openImageViewer then
+            p:openImageViewer(img)
+        elseif p and p._launchImageViewer then
+            p:_launchImageViewer(img)
+        end
         return true
     end
 
@@ -1178,7 +1600,7 @@ function ImageGallery:renderMosaicCard(img, cell_w)
 end
 
 -- ── Storefront Style Grid Card (No Outer Borders, Clean Rounded Thumbnail & Spaced Footer)
-function ImageGallery:renderGridCard(img, cell_w)
+function ImageGallery:renderGridCard(img, cell_w, is_focused)
     local p = self.plugin
     local book_path = p.ui and p.ui.document and p.ui.document.file
 
@@ -1232,11 +1654,13 @@ function ImageGallery:renderGridCard(img, cell_w)
         }
     end
 
+    local is_card_focused = is_focused and (self.focus_zone == "cards")
+
     local thumb_frame = FrameContainer:new{
-        padding = 0,
-        bordersize = sc(1),
-        color = Blitbuffer.COLOR_DARK_GRAY,
-        background = Blitbuffer.COLOR_WHITE,
+        padding = is_card_focused and sc(2) or 0,
+        bordersize = is_card_focused and (theme.border_focus or sc(3)) or sc(1),
+        color = is_card_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_DARK_GRAY,
+        background = is_card_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or Blitbuffer.COLOR_WHITE,
         radius = sc(4),
         width = inner_w,
         height = img_h,
@@ -1289,17 +1713,49 @@ function ImageGallery:renderGridCard(img, cell_w)
         },
     }
 
+    local focus_badge = nil
+    if is_card_focused then
+        focus_badge = FrameContainer:new{
+            padding = sc(2),
+            padding_h = sc(6),
+            bordersize = sc(1),
+            color = Blitbuffer.COLOR_WHITE,
+            background = Blitbuffer.COLOR_BLACK,
+            radius = sc(3),
+            TextWidget:new{
+                text = "↵ OPEN",
+                face = Font:getFace("cfont", 11),
+                bold = true,
+                fgcolor = Blitbuffer.COLOR_WHITE,
+            }
+        }
+    end
+
+    local thumb_overlap_children = { thumb_frame }
+    if focus_badge then
+        table.insert(thumb_overlap_children, LeftContainer:new{
+            dimen = Geom:new{ w = inner_w, h = sc(28) },
+            FrameContainer:new{
+                padding = sc(4),
+                bordersize = 0,
+                focus_badge,
+            }
+        })
+    end
+
     local card_content = VerticalGroup:new{
         align = "left",
-        thumb_frame,
+        OverlapGroup:new(thumb_overlap_children),
         VerticalSpan:new{ width = sc(4) },
         footer_row,
     }
 
     local card_frame = FrameContainer:new{
-        bordersize = 0,
-        padding = 0,
-        background = Blitbuffer.COLOR_WHITE,
+        bordersize = is_card_focused and (theme.border_focus or sc(3)) or 0,
+        color = is_card_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_WHITE,
+        padding = is_card_focused and sc(2) or 0,
+        background = is_card_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or Blitbuffer.COLOR_WHITE,
+        radius = sc(4),
         width = cell_w,
         height = card_h,
         card_content,
@@ -1339,7 +1795,11 @@ function ImageGallery:renderGridCard(img, cell_w)
                 return true
             end
         end
-        p:openImageViewer(img)
+        if p and p.openImageViewer then
+            p:openImageViewer(img)
+        elseif p and p._launchImageViewer then
+            p:_launchImageViewer(img)
+        end
         return true
     end
 
@@ -1347,7 +1807,7 @@ function ImageGallery:renderGridCard(img, cell_w)
 end
 
 -- ── Storefront Style List Row ────────────────────────────────────────────────
-function ImageGallery:renderListRow(img, content_w)
+function ImageGallery:renderListRow(img, content_w, is_focused)
     local p = self.plugin
     local book_path = p.ui and p.ui.document and p.ui.document.file
 
@@ -1392,6 +1852,8 @@ function ImageGallery:renderListRow(img, content_w)
         }
     end
 
+    local is_card_focused = is_focused and (self.focus_zone == "cards")
+
     local thumb_frame = FrameContainer:new{
         padding = 0,
         bordersize = sc(1),
@@ -1430,11 +1892,11 @@ function ImageGallery:renderListRow(img, content_w)
     if sub_str and sub_str ~= "" then
         local sub_w = TextWidget:new{
             text = sub_str,
-            face = Font:getFace("cfont", 13),
-            fgcolor = Blitbuffer.COLOR_BLACK,
+            face = Font:getFace("cfont", 12),
+            fgcolor = Blitbuffer.Color8(75),
             max_width = text_avail_w,
         }
-        table.insert(info_items, VerticalSpan:new{ width = sc(4) })
+        table.insert(info_items, VerticalSpan:new{ width = sc(3) })
         table.insert(info_items, sub_w)
     end
 
@@ -1448,7 +1910,7 @@ function ImageGallery:renderListRow(img, content_w)
         info_vg,
     }
 
-    local dot_badge = createDotMenuBadge(sc(36), true)
+    local dot_badge = createDotMenuBadge(sc(34), true)
 
     local row_overlap = OverlapGroup:new{
         dimen = Geom:new{ w = inner_w, h = thumb_h },
@@ -1465,9 +1927,9 @@ function ImageGallery:renderListRow(img, content_w)
     local row_frame = FrameContainer:new{
         padding = sc(6),
         padding_h = pad_h,
-        bordersize = sc(1),
-        color = Blitbuffer.Color8(180),
-        background = Blitbuffer.COLOR_WHITE,
+        bordersize = is_card_focused and (theme.border_focus or sc(3)) or sc(1),
+        color = is_card_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.Color8(180),
+        background = is_card_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or Blitbuffer.COLOR_WHITE,
         radius = sc(6),
         width = content_w,
         row_overlap,
@@ -1505,7 +1967,11 @@ function ImageGallery:renderListRow(img, content_w)
                 return true
             end
         end
-        p:openImageViewer(img)
+        if p and p.openImageViewer then
+            p:openImageViewer(img)
+        elseif p and p._launchImageViewer then
+            p:_launchImageViewer(img)
+        end
         return true
     end
 

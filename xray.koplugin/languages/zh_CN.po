@@ -105,9 +105,9 @@ msgstr "稀疏：最多每 30 分钟"
 msgid "auto_update_ultra"
 msgstr "极速：每%d页检查一次"
 
-# en-hash: 0557fa923dcee4d0f86b1409f5c2167f
+# en-hash: a9d418644a14acc5d9622ca060895802
 msgid "back_to_reading"
-msgstr "回到阅读"
+msgstr "返回阅读"
 
 # en-hash: 5fcd6ed2b6f2c21bc5c936cf44c36b37
 msgid "beta_channel_desc"
@@ -477,13 +477,13 @@ msgstr "整本书模式"
 msgid "gemini_key_hint"
 msgstr "输入 Google AI Studio 免费获取的 Gemini 密钥（以 AQ. 或 AIzaSy... 开头）："
 
+# en-hash: 33dca68e340b8d6c21472341130cf45a
+msgid "illustration"
+msgstr "插图"
+
 # en-hash: fe63191987f62b9e4806e376671ed335
 msgid "img_extract_failed"
 msgstr "无法提取图片文件。"
-
-# en-hash: 0e05d094e359443c73ada4c2e852ccae
-msgid "img_minimized_hint"
-msgstr "最小化图片提示"
 
 # en-hash: 30936c8b483b8b104a4ad7821ce2262b
 msgid "img_no_favorites"
@@ -501,9 +501,9 @@ msgstr "未找到此标签/过滤器的图片。\n\n正在从书籍中提取或�
 msgid "img_no_series"
 msgstr "未保存系列参考资料。\n\n在任何地图上使用 ⋮ 菜单即可将其保存到系列参考资料中。"
 
-# en-hash: 2bea7b6d66811b50767c7b22f81fb2c2
+# en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
-msgstr "重命名图片标签"
+msgstr "重命名标签"
 
 # en-hash: 393c3f5ea8ad35c02691d507bdbb31b0
 msgid "img_reveal"

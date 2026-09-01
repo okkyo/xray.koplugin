@@ -245,6 +245,9 @@ function ImageViewer:init()
 
     local full_range = Geom:new{ x = 0, y = 0, w = self.sw, h = self.sh }
 
+    self.focus_zone = self.focus_zone or "toolbar"
+    self.focused_btn_idx = self.focused_btn_idx or 2 -- default to Zoom In
+
     self.ges_events = {
         Tap = { GestureRange:new{ ges = "tap", range = full_range } },
         DoubleTap = { GestureRange:new{ ges = "double_tap", range = full_range } },
@@ -257,15 +260,30 @@ function ImageViewer:init()
     }
 
     self.key_events = {
-        ZoomIn = { { "+" }, { "=" }, { "KP_Add" } },
-        ZoomOut = { { "-" }, { "_" }, { "KP_Subtract" } },
-        PanLeft = { { "Left" } },
-        PanRight = { { "Right" } },
-        PanUp = { { "Up" } },
-        PanDown = { { "Down" } },
+        ZoomIn = { { "+" }, { "=" }, { "KP_Add" }, { "k" }, { "K" } },
+        ZoomOut = { { "-" }, { "_" }, { "KP_Subtract" }, { "j" }, { "J" } },
+        -- Arrow keys: navigate toolbar buttons (when focus_zone=="toolbar") or pan/switch images
+        FocusLeft = { { "Left" } },
+        FocusRight = { { "Right" } },
+        FocusUp = { { "Up" } },
+        FocusDown = { { "Down" } },
         Rotate = { { "r" }, { "R" } },
-        Close = { { "Escape" }, { "Back" }, { "q" } },
+        Invert = { { "i" }, { "I" }, { "n" }, { "N" } },
+        Minimize = { { "m" }, { "M" } },
+        Actions = { { "Menu" }, { "a" }, { "A" }, { "." }, { "3" } },
+        -- Enter: context-aware — activates focused toolbar button OR toggles zoom in image zone
+        OpenFocused = { { "Return" }, { "KP_Enter" }, { "Enter" }, { "Select" }, { "Space" }, { "Press" } },
+        PrevImage = { { "PageUp" }, { "PrevPage" }, { "p" }, { "P" }, { "[" } },
+        NextImage = { { "PageDown" }, { "NextPage" }, { "]" } },
+        -- Escape: context-aware — resets zoom / returns to toolbar; Back/Q always closes
+        EscapeBack = { { "Escape" }, { "Back" }, { "q" }, { "Q" } },
     }
+
+    if Device and Device.input and Device.input.group then
+        if Device.input.group.Enter then table.insert(self.key_events.OpenFocused, { Device.input.group.Enter }) end
+        if Device.input.group.Select then table.insert(self.key_events.OpenFocused, { Device.input.group.Select }) end
+        if Device.input.group.Back then table.insert(self.key_events.EscapeBack, { Device.input.group.Back }) end
+    end
 
     -- Ensure zoom starts at saved zoom or fit-to-viewport for the current rotation
     if self.image_entry and self.image_entry.zoom_level ~= nil then
@@ -534,6 +552,220 @@ function ImageViewer:onRotate()
     return true
 end
 
+function ImageViewer:onInvert()
+    self.inverted = not self.inverted
+    self:buildUI()
+    UIManager:setDirty(self, "ui")
+    return true
+end
+
+function ImageViewer:onMinimize()
+    self:minimize()
+    return true
+end
+
+function ImageViewer:onActions()
+    local p = self.plugin
+    if p and p.showImageActions and self.image_entry then
+        p:showImageActions(self.image_entry)
+    end
+    return true
+end
+
+function ImageViewer:onToggleZoom()
+    return self:onDoubleTap()
+end
+
+function ImageViewer:onPrevImage()
+    local p = self.plugin
+    if not p or not p.images or #p.images <= 1 then return true end
+    local cur_idx = 1
+    local cur_id = self.image_entry and (self.image_entry.id or self.image_entry.src or self.image_entry.href or self.image_entry.title)
+    for i, img in ipairs(p.images) do
+        local id = img.id or img.src or img.href or img.title
+        if id == cur_id then cur_idx = i; break end
+    end
+    local prev_idx = (cur_idx > 1) and (cur_idx - 1) or #p.images
+    local next_img = p.images[prev_idx]
+    if next_img then
+        self:close()
+        if p.openImageViewer then
+            p:openImageViewer(next_img)
+        elseif p._launchImageViewer then
+            p:_launchImageViewer(next_img)
+        end
+    end
+    return true
+end
+
+function ImageViewer:onNextImage()
+    local p = self.plugin
+    if not p or not p.images or #p.images <= 1 then return true end
+    local cur_idx = 1
+    local cur_id = self.image_entry and (self.image_entry.id or self.image_entry.src or self.image_entry.href or self.image_entry.title)
+    for i, img in ipairs(p.images) do
+        local id = img.id or img.src or img.href or img.title
+        if id == cur_id then cur_idx = i; break end
+    end
+    local next_idx = (cur_idx < #p.images) and (cur_idx + 1) or 1
+    local next_img = p.images[next_idx]
+    if next_img then
+        self:close()
+        if p.openImageViewer then
+            p:openImageViewer(next_img)
+        elseif p._launchImageViewer then
+            p:_launchImageViewer(next_img)
+        end
+    end
+    return true
+end
+
+function ImageViewer:onFocusUp()
+    if self.focus_zone == "image" then
+        local fit_zoom = self:getFitZoom()
+        if self.zoom_level > (fit_zoom + 0.05) then
+            return self:onPanUp()
+        else
+            self.focus_zone = "toolbar"
+            self:buildUI()
+            UIManager:setDirty(self, "ui")
+        end
+    end
+    return true
+end
+
+function ImageViewer:onFocusDown()
+    if self.focus_zone == "toolbar" then
+        self.focus_zone = "image"
+        self:buildUI()
+        UIManager:setDirty(self, "ui")
+    elseif self.focus_zone == "image" then
+        local fit_zoom = self:getFitZoom()
+        if self.zoom_level > (fit_zoom + 0.05) then
+            return self:onPanDown()
+        else
+            return self:onToggleZoom()
+        end
+    end
+    return true
+end
+
+function ImageViewer:onFocusLeft()
+    if self.focus_zone == "toolbar" then
+        self.focused_btn_idx = (self.focused_btn_idx > 1) and (self.focused_btn_idx - 1) or 7
+        self:buildUI()
+        UIManager:setDirty(self, "ui")
+    elseif self.focus_zone == "image" then
+        local fit_zoom = self:getFitZoom()
+        if self.zoom_level > (fit_zoom + 0.05) then
+            return self:onPanLeft()
+        else
+            return self:onPrevImage()
+        end
+    end
+    return true
+end
+
+function ImageViewer:onFocusRight()
+    if self.focus_zone == "toolbar" then
+        self.focused_btn_idx = (self.focused_btn_idx < 7) and (self.focused_btn_idx + 1) or 1
+        self:buildUI()
+        UIManager:setDirty(self, "ui")
+    elseif self.focus_zone == "image" then
+        local fit_zoom = self:getFitZoom()
+        if self.zoom_level > (fit_zoom + 0.05) then
+            return self:onPanRight()
+        else
+            return self:onNextImage()
+        end
+    end
+    return true
+end
+
+function ImageViewer:onOpenFocused()
+    if self.focus_zone == "toolbar" then
+        if self.focused_btn_idx == 1 then
+            return self:onRotate()
+        elseif self.focused_btn_idx == 2 then
+            return self:onZoomIn()
+        elseif self.focused_btn_idx == 3 then
+            return self:onZoomOut()
+        elseif self.focused_btn_idx == 4 then
+            return self:onInvert()
+        elseif self.focused_btn_idx == 5 then
+            return self:onActions()
+        elseif self.focused_btn_idx == 6 then
+            return self:onMinimize()
+        elseif self.focused_btn_idx == 7 then
+            return self:onEscapeBack()
+        end
+    else
+        return self:onToggleZoom()
+    end
+    return true
+end
+
+function ImageViewer:onEscapeBack()
+    -- If we are zoomed in (pan mode), first reset zoom and return focus to toolbar
+    if self.focus_zone == "image" then
+        local fit_zoom = self:getFitZoom()
+        if self.zoom_level > (fit_zoom + 0.05) then
+            -- Reset zoom to fit view and move focus to toolbar
+            self.zoom_level = fit_zoom
+            self.pan_x = 0
+            self.pan_y = 0
+            self.focus_zone = "toolbar"
+            self:buildUI()
+            UIManager:setDirty(self, "ui")
+            return true
+        end
+    end
+    -- Not zoomed or already in toolbar: close the viewer
+    self:close()
+    return true
+end
+
+function ImageViewer:onClose()
+    self:close()
+    return true
+end
+
+function ImageViewer:handleEvent(ev)
+    if ev.type == "Key" or ev.type == "KeyPress" or ev.type == "KeyDown" then
+        local key = ev.key or ev.name or ev.sym
+        if key == "Return" or key == "KP_Enter" or key == "Enter" or key == "Select" or key == "Space" or key == "Press" then
+            return self:onOpenFocused()
+        elseif key == "Up" then
+            return self:onFocusUp()
+        elseif key == "Down" then
+            return self:onFocusDown()
+        elseif key == "Left" then
+            return self:onFocusLeft()
+        elseif key == "Right" then
+            return self:onFocusRight()
+        elseif key == "+" or key == "=" or key == "KP_Add" or key == "k" or key == "K" then
+            return self:onZoomIn()
+        elseif key == "-" or key == "_" or key == "KP_Subtract" or key == "j" or key == "J" then
+            return self:onZoomOut()
+        elseif key == "r" or key == "R" then
+            return self:onRotate()
+        elseif key == "i" or key == "I" or key == "n" or key == "N" then
+            return self:onInvert()
+        elseif key == "m" or key == "M" then
+            return self:onMinimize()
+        elseif key == "a" or key == "A" or key == "Menu" or key == "." or key == "3" then
+            return self:onActions()
+        elseif key == "p" or key == "P" or key == "PageUp" or key == "PrevPage" or key == "[" then
+            return self:onPrevImage()
+        elseif key == "PageDown" or key == "NextPage" or key == "]" then
+            return self:onNextImage()
+        elseif key == "Escape" or key == "Back" or key == "q" or key == "Q" then
+            return self:onClose()
+        end
+    end
+    return InputContainer.handleEvent(self, ev)
+end
+
 function ImageViewer:onHold(arg, ges)
     if ges and ges.pos then
         self._last_pan_pos = { x = ges.pos.x, y = ges.pos.y }
@@ -612,19 +844,31 @@ function ImageViewer:buildUI()
     local img = self.image_entry or {}
 
     -- ── 1. Top Controls Toolbar (Right-Aligned, Fixed Height) ─────────────────
-    local toolbar_h = sc(54)
-    local bar_content_h = sc(40)
-    local btn_size = sc(22)
+    local toolbar_h = sc(48)
+    local bar_content_h = sc(32)
+    local btn_size = sc(20)
     local btn_frame_w = sc(32)
-    local btn_gap = sc(10)
+    local btn_gap = sc(6)
     local num_btns = 7
     local actions_total_w = (btn_frame_w * num_btns) + (btn_gap * (num_btns - 1))
+
+    local is_rotate_focused = (self.focus_zone == "toolbar" and self.focused_btn_idx == 1)
+    local is_zoomin_focused = (self.focus_zone == "toolbar" and self.focused_btn_idx == 2)
+    local is_zoomout_focused = (self.focus_zone == "toolbar" and self.focused_btn_idx == 3)
+    local is_night_focused = (self.focus_zone == "toolbar" and self.focused_btn_idx == 4)
+    local is_menu_focused = (self.focus_zone == "toolbar" and self.focused_btn_idx == 5)
+    local is_min_focused = (self.focus_zone == "toolbar" and self.focused_btn_idx == 6)
+    local is_close_focused = (self.focus_zone == "toolbar" and self.focused_btn_idx == 7)
 
     local rotate_btn = createIconButton{
         icon = "rotate-cw.svg",
         size = btn_size,
         width = btn_frame_w,
         height = bar_content_h,
+        bordersize = is_rotate_focused and sc(2) or 0,
+        color = is_rotate_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+        background = is_rotate_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
+        radius = sc(4),
         callback = function()
             self:onRotate()
         end,
@@ -635,6 +879,10 @@ function ImageViewer:buildUI()
         size = btn_size,
         width = btn_frame_w,
         height = bar_content_h,
+        bordersize = is_zoomin_focused and sc(2) or 0,
+        color = is_zoomin_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+        background = is_zoomin_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
+        radius = sc(4),
         callback = function()
             self:onZoomIn()
         end,
@@ -645,6 +893,10 @@ function ImageViewer:buildUI()
         size = btn_size,
         width = btn_frame_w,
         height = bar_content_h,
+        bordersize = is_zoomout_focused and sc(2) or 0,
+        color = is_zoomout_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+        background = is_zoomout_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
+        radius = sc(4),
         callback = function()
             self:onZoomOut()
         end,
@@ -655,20 +907,14 @@ function ImageViewer:buildUI()
         size = btn_size,
         width = btn_frame_w,
         height = bar_content_h,
+        bordersize = is_night_focused and sc(2) or 0,
+        color = is_night_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+        background = is_night_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
+        radius = sc(4),
         callback = function()
             self.inverted = not self.inverted
             self:buildUI()
             UIManager:setDirty(self, "ui")
-        end,
-    }
-
-    local minimize_btn = createIconButton{
-        icon = "minus.svg",
-        size = btn_size,
-        width = btn_frame_w,
-        height = bar_content_h,
-        callback = function()
-            self:minimize()
         end,
     }
 
@@ -677,10 +923,28 @@ function ImageViewer:buildUI()
         size = btn_size,
         width = btn_frame_w,
         height = bar_content_h,
+        bordersize = is_menu_focused and sc(2) or 0,
+        color = is_menu_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+        background = is_menu_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
+        radius = sc(4),
         callback = function()
             if p and p.showImageActions then
                 p:showImageActions(img)
             end
+        end,
+    }
+
+    local minimize_btn = createIconButton{
+        icon = "minus.svg",
+        size = btn_size,
+        width = btn_frame_w,
+        height = bar_content_h,
+        bordersize = is_min_focused and sc(2) or 0,
+        color = is_min_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+        background = is_min_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
+        radius = sc(4),
+        callback = function()
+            self:minimize()
         end,
     }
 
@@ -689,6 +953,10 @@ function ImageViewer:buildUI()
         size = btn_size,
         width = btn_frame_w,
         height = bar_content_h,
+        bordersize = is_close_focused and sc(2) or 0,
+        color = is_close_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or nil,
+        background = is_close_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
+        radius = sc(4),
         callback = function()
             self:close()
         end,
@@ -856,11 +1124,6 @@ function ImageViewer:minimize()
     if p and p.closeAllMenus then
         p:closeAllMenus()
     end
-    local title = (self.image_entry and self.image_entry.title) or "Image"
-    UIManager:show(InfoMessage:new{
-        text = string.format((p and p.loc and p.loc:t("img_minimized_hint")) or "Minimized '%s'. Reopen 'Images & Maps' to resume.", title),
-        timeout = 2,
-    })
 end
 
 function ImageViewer:close(is_minimizing)

@@ -101,6 +101,39 @@ local XRayBottomPopup = InputContainer:extend{
 }
 
 function XRayBottomPopup:init()
+    local Device = require("device")
+    self.focused_btn_index = self.focused_btn_index or 1
+
+    self.key_events = {
+        PrevButton = {
+            { "Left" },
+            { "Up" },
+        },
+        NextButton = {
+            { "Right" },
+            { "Down" },
+        },
+        Select = {
+            { "Return" },
+            { "KP_Enter" },
+            { "Select" },
+            { "Space" },
+        },
+        Close = {
+            { "Escape" },
+            { "Back" },
+            { "q" },
+            { "Q" },
+        },
+    }
+    if Device.hasKeys and Device:hasKeys() and Device.input and Device.input.group and Device.input.group.Back then
+        table.insert(self.key_events.Close, { Device.input.group.Back })
+    end
+
+    self:_rebuild()
+end
+
+function XRayBottomPopup:_rebuild()
     local sw = Screen:getWidth()
     local sh = Screen:getHeight()
     local fs  = self.font_size
@@ -137,8 +170,6 @@ function XRayBottomPopup:init()
     -- If doc_family is CJK or the text contains CJK, apply a smaller scaling factor
     local is_cjk = _isCJKFontFamily(doc_family) or text_has_cjk
     if is_cjk then
-        -- Scale by 0.55 instead of the default, and apply a maximum cap of 20pt.
-        -- Since the caller passed fs = _getPopupFontSize(plugin), we scale it down.
         fs = math.max(12, math.min(math.floor(fs * (0.55 / 0.75)), 20))
     else
         fs = math.max(12, math.min(fs, 20))
@@ -149,7 +180,6 @@ function XRayBottomPopup:init()
             return Font:getFace("cfont", size)
         end
         if preferred_family and preferred_family ~= "" then
-            -- Resolve the CRE face name to an actual font file path
             local ok, credoc = pcall(require, "document/credocument")
             if ok and credoc and credoc.engineInit then
                 local ok2, cre = pcall(credoc.engineInit, credoc)
@@ -165,7 +195,6 @@ function XRayBottomPopup:init()
                 end
             end
         end
-        -- Fallback to the standard UI content font
         return Font:getFace("cfont", size)
     end
 
@@ -176,7 +205,6 @@ function XRayBottomPopup:init()
     local fs_small    = math.max(12, fs - 4)
     local face_small_normal = getFontSafe(doc_family, fs_small)
 
-    -- TextBoxWidget — wrap multilínea, justificado con guionado
     local function make_text(text, face, align, is_bold)
         return TextBoxWidget:new{
             text       = text,
@@ -193,7 +221,7 @@ function XRayBottomPopup:init()
     local btn_padding_h   = (Size.padding and Size.padding.large) or 12
     local btn_padding_v   = (Size.padding and Size.padding.small) or 4
 
-    local function make_btn(label, cb)
+    local function make_btn(label, cb, is_focused)
         return Button:new{
             text       = label,
             face       = face_btn,
@@ -201,7 +229,8 @@ function XRayBottomPopup:init()
             padding_v  = btn_padding_v,
             margin     = math.max(16, gap * 4),
             radius     = 4,
-            bordersize = 2,
+            bordersize = is_focused and 3 or 2,
+            background = is_focused and Blitbuffer.Color8(230) or nil,
             callback   = cb,
         }
     end
@@ -293,56 +322,77 @@ function XRayBottomPopup:init()
     end
     local mentions_enabled = plugin and plugin.ai_helper and plugin.ai_helper.settings and plugin.ai_helper.settings.mentions_enabled ~= false
 
-    local active_btns = {}
+    local raw_button_defs = {}
 
     -- A. Read More button (if truncated)
     if is_truncated then
-        local read_more_btn = make_btn(get_loc_t("read_more", "Read More"), function()
-            UIManager:close(self)
-            local TextViewer = require("ui/widget/textviewer")
-            local full_text_for_viewer = tostring(e.name or "?") .. "\n"
-            if #attrs > 0 then
-                full_text_for_viewer = full_text_for_viewer .. table.concat(attrs, " | ") .. "\n"
-            end
-            if aliases_str then
-                full_text_for_viewer = full_text_for_viewer .. get_loc_t("label_aliases", "Aliases") .. ": " .. aliases_str .. "\n"
-            end
-            full_text_for_viewer = full_text_for_viewer .. "\n" .. desc_str
-            if e.ai_reasoning and e.ai_reasoning ~= "" then
-                full_text_for_viewer = full_text_for_viewer .. "\n\n[" .. get_loc_t("label_reasoning", "AI Reasoning") .. "]\n" .. e.ai_reasoning
-            end
-            local viewer = TextViewer:new{
-                title = e.name,
-                text = full_text_for_viewer,
-            }
-            UIManager:show(viewer)
-        end)
-        table.insert(active_btns, read_more_btn)
+        table.insert(raw_button_defs, {
+            label = get_loc_t("read_more", "Read More"),
+            cb = function()
+                UIManager:close(self)
+                local TextViewer = require("ui/widget/textviewer")
+                local full_text_for_viewer = tostring(e.name or "?") .. "\n"
+                if #attrs > 0 then
+                    full_text_for_viewer = full_text_for_viewer .. table.concat(attrs, " | ") .. "\n"
+                end
+                if aliases_str then
+                    full_text_for_viewer = full_text_for_viewer .. get_loc_t("label_aliases", "Aliases") .. ": " .. aliases_str .. "\n"
+                end
+                full_text_for_viewer = full_text_for_viewer .. "\n" .. desc_str
+                if e.ai_reasoning and e.ai_reasoning ~= "" then
+                    full_text_for_viewer = full_text_for_viewer .. "\n\n[" .. get_loc_t("label_reasoning", "AI Reasoning") .. "]\n" .. e.ai_reasoning
+                end
+                local viewer = TextViewer:new{
+                    title = e.name,
+                    text = full_text_for_viewer,
+                }
+                UIManager:show(viewer)
+            end,
+        })
     end
 
     -- B. Linked Entries button
     if #related > 0 and not e.is_conversion then
-        local left_btn = make_btn(get_loc_t("linked_entries", "Linked Entries"), function()
-            UIManager:close(self)
-            if plugin and plugin.showRelatedEntities then
-                plugin:showRelatedEntities(related)
-            end
-        end)
-        table.insert(active_btns, left_btn)
+        table.insert(raw_button_defs, {
+            label = get_loc_t("linked_entries", "Linked Entries"),
+            cb = function()
+                UIManager:close(self)
+                if plugin and plugin.showRelatedEntities then
+                    plugin:showRelatedEntities(related)
+                end
+            end,
+        })
     end
 
     -- C. Find Mentions button
     if mentions_enabled and not e.is_timeline and not e.is_conversion then
-        local right_btn = make_btn(get_loc_t("find_mentions", "Find Mentions"), function()
-            UIManager:close(self)
-            if plugin then
-                if     plugin.showMentionsForEntity then plugin:showMentionsForEntity(e)
-                elseif plugin.findMentions          then plugin:findMentions(e)
-                elseif plugin.showMentions          then plugin:showMentions(e)
+        table.insert(raw_button_defs, {
+            label = get_loc_t("find_mentions", "Find Mentions"),
+            cb = function()
+                UIManager:close(self)
+                if plugin then
+                    if     plugin.showMentionsForEntity then plugin:showMentionsForEntity(e)
+                    elseif plugin.findMentions          then plugin:findMentions(e)
+                    elseif plugin.showMentions          then plugin:showMentions(e)
+                    end
                 end
-            end
-        end)
-        table.insert(active_btns, right_btn)
+            end,
+        })
+    end
+
+    if #raw_button_defs > 0 then
+        if self.focused_btn_index > #raw_button_defs then self.focused_btn_index = #raw_button_defs end
+        if self.focused_btn_index < 1 then self.focused_btn_index = 1 end
+    else
+        self.focused_btn_index = 1
+    end
+
+    self.active_button_defs = raw_button_defs
+    local active_btns = {}
+    for idx, bdef in ipairs(raw_button_defs) do
+        local is_focused = (idx == self.focused_btn_index)
+        local btn = make_btn(bdef.label, bdef.cb, is_focused)
+        table.insert(active_btns, btn)
     end
 
     -- Layout buttons row
@@ -379,7 +429,6 @@ function XRayBottomPopup:init()
     local pad_top_px    = math.floor(fs * 0.55)
     local pad_bottom_px = math.floor(fs * 0.85)
     if Device:isAndroid() then
-        -- Add a safe area inset at the bottom for rounded screens and gesture bar
         local safe_bottom = 20
         if Screen.scaleBySize then
             safe_bottom = Screen:scaleBySize(20)
@@ -427,17 +476,48 @@ function XRayBottomPopup:init()
         },
     }
 
-    if Device.hasKeys and Device:hasKeys() then
-        self.key_events = {
-            Close = { { Device.input.group.Back } },
-        }
-    end
-
     local BottomContainer = require("ui/widget/container/bottomcontainer")
     self[1] = BottomContainer:new{
         dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
         self.popup_frame,
     }
+end
+
+function XRayBottomPopup:onPrevButton()
+    local count = self.active_button_defs and #self.active_button_defs or 0
+    if count == 0 then return true end
+    if self.focused_btn_index > 1 then
+        self.focused_btn_index = self.focused_btn_index - 1
+    else
+        self.focused_btn_index = count
+    end
+    self:_rebuild()
+    UIManager:setDirty(self, "ui")
+    return true
+end
+
+function XRayBottomPopup:onNextButton()
+    local count = self.active_button_defs and #self.active_button_defs or 0
+    if count == 0 then return true end
+    if self.focused_btn_index < count then
+        self.focused_btn_index = self.focused_btn_index + 1
+    else
+        self.focused_btn_index = 1
+    end
+    self:_rebuild()
+    UIManager:setDirty(self, "ui")
+    return true
+end
+
+function XRayBottomPopup:onSelect()
+    if self.active_button_defs and #self.active_button_defs > 0 then
+        local def = self.active_button_defs[self.focused_btn_index or 1]
+        if def and def.cb then
+            def.cb()
+            return true
+        end
+    end
+    return true
 end
 
 function XRayBottomPopup:onTapOutside()
@@ -671,6 +751,212 @@ function M:isXRayUIActive()
         or self.hf_menu or self.terms_menu or self.ldlg or self.active_related_menu or self.length_presets_menu
 end
 
+local xray_theme = require(plugin_path .. "xray_theme")
+
+-- MenuItem is defined privately inside ui/widget/menu, not as a separate module.
+-- We patch it lazily the first time an X-Ray menu is created, by extracting its
+-- class from the first item in the menu's item_group via the Lua metatable.
+local function _patchMenuItemClass(item_group)
+    if not item_group or #item_group == 0 then return end
+    local first_item = item_group[1]
+    if not first_item then return end
+
+    -- In KOReader's OOP, the class is at getmetatable(instance).__index
+    local mt = getmetatable(first_item)
+    local ItemClass = mt and mt.__index
+    if not ItemClass or ItemClass._xray_focus_patched then return end
+
+    ItemClass._xray_focus_patched = true
+
+    local orig_paintTo = ItemClass.paintTo
+    local orig_onFocus = ItemClass.onFocus
+    local orig_onUnfocus = ItemClass.onUnfocus
+
+    function ItemClass:onFocus()
+        self._xray_focused = self.menu and self.menu._xray_highlight or false
+        if orig_onFocus then orig_onFocus(self) end
+        return true
+    end
+
+    function ItemClass:onUnfocus()
+        self._xray_focused = false
+        if orig_onUnfocus then orig_onUnfocus(self) end
+        return true
+    end
+
+    function ItemClass:paintTo(bb, x, y)
+        -- Draw full-width focus background before rendering item content
+        if self._xray_focused and self.dimen then
+            local bg = xray_theme.color_focus_bg or Blitbuffer.Color8(215)
+            bb:paintRect(x, y, self.dimen.w, self.dimen.h, bg)
+        end
+        if orig_paintTo then
+            orig_paintTo(self, bb, x, y)
+        end
+    end
+end
+
+local function _patchButtonDialog()
+    local ok_btndlg, ButtonDialog = pcall(require, "ui/widget/buttondialog")
+    if ok_btndlg and ButtonDialog and not ButtonDialog._xray_nontouch_patched then
+        ButtonDialog._xray_nontouch_patched = true
+
+        local orig_btndlg_init = ButtonDialog.init
+        function ButtonDialog:init()
+            if orig_btndlg_init then
+                orig_btndlg_init(self)
+            end
+
+            -- Ensure layout is always populated, even on non-DPad devices (where ButtonTable doesn't set self.layout)
+            if (not self.layout or #self.layout == 0) and self.buttontable and self.buttontable.buttons_layout then
+                self.layout = self.buttontable.buttons_layout
+            end
+
+            self.key_events = self.key_events or {}
+
+            -- 1. Map Return, Enter, KP_Enter, Select, Space to Press so Enter activates focused button
+            self.key_events.Press = self.key_events.Press or {}
+            local enter_keys = { "Return", "KP_Enter", "Enter", "Select", "Space" }
+            for _, k in ipairs(enter_keys) do
+                table.insert(self.key_events.Press, { k })
+            end
+
+            -- 2. Map Escape, Back, q, Q to Close
+            self.key_events.Close = self.key_events.Close or {}
+            local close_keys = { "Escape", "Back", "q", "Q" }
+            for _, k in ipairs(close_keys) do
+                table.insert(self.key_events.Close, { k })
+            end
+
+            -- 3. Ensure arrow keys are always registered for navigation
+            self.key_events.FocusUp = { { "Up" }, event = "FocusMove", args = {0, -1} }
+            self.key_events.FocusDown = { { "Down" }, event = "FocusMove", args = {0, 1} }
+            self.key_events.FocusLeft = { { "Left" }, event = "FocusMove", args = {-1, 0} }
+            self.key_events.FocusRight = { { "Right" }, event = "FocusMove", args = {1, 0} }
+
+            -- 4. Ingest device-specific groups if available
+            local ok_dev, Device = pcall(require, "device")
+            if ok_dev and Device and Device.input and Device.input.group then
+                if Device.input.group.Enter then
+                    table.insert(self.key_events.Press, { Device.input.group.Enter })
+                end
+                if Device.input.group.Select then
+                    table.insert(self.key_events.Press, { Device.input.group.Select })
+                end
+                if Device.input.group.Back then
+                    table.insert(self.key_events.Close, { Device.input.group.Back })
+                end
+            end
+
+            -- 5. Trap events within the dialog so unhandled keys do not leak to background menus
+            self.stop_events_propagation = true
+
+            -- 6. Immediately highlight & focus the initial/default button
+            if self.layout and #self.layout > 0 and #self.layout[1] > 0 then
+                local def_x, def_y = 1, 1
+                for y, row in ipairs(self.layout) do
+                    for x, btn in ipairs(row) do
+                        if btn and btn.is_enter_default then
+                            def_x, def_y = x, y
+                            break
+                        end
+                    end
+                end
+                self.selected = { x = def_x, y = def_y }
+                local target_btn = self.layout[def_y] and self.layout[def_y][def_x]
+                if target_btn and target_btn.handleEvent then
+                    local ok_ev, Event = pcall(require, "ui/event")
+                    if ok_ev and Event then
+                        target_btn:handleEvent(Event:new("Focus"))
+                    end
+                end
+            end
+        end
+
+        local orig_btndlg_onPress = ButtonDialog.onPress
+        function ButtonDialog:onPress()
+            local item = (self.getFocusItem and self:getFocusItem()) or (self.layout and self.layout[1] and self.layout[1][1])
+            if item then
+                if item.onTapSelectButton then
+                    return item:onTapSelectButton()
+                elseif item.callback then
+                    item.callback()
+                    return true
+                end
+            end
+            if orig_btndlg_onPress then
+                return orig_btndlg_onPress(self)
+            end
+            return true
+        end
+    end
+end
+_patchButtonDialog()
+
+local function _attachMenuPaginationToLayout(menu)
+    if not menu or not menu.layout then return end
+    local orig_updateItems = menu.updateItems
+    function menu:updateItems(select_number, no_paint)
+        if orig_updateItems then
+            orig_updateItems(self, select_number, no_paint)
+        end
+        if self.page_num and self.page_num > 1 and self.layout then
+            local page_row = {}
+            if self.page_info_first_chev and not self.page_info_first_chev.hidden then
+                table.insert(page_row, self.page_info_first_chev)
+            end
+            if self.page_info_left_chev and not self.page_info_left_chev.hidden then
+                table.insert(page_row, self.page_info_left_chev)
+            end
+            if self.page_info_text and not self.page_info_text.hidden then
+                table.insert(page_row, self.page_info_text)
+            end
+            if self.page_info_right_chev and not self.page_info_right_chev.hidden then
+                table.insert(page_row, self.page_info_right_chev)
+            end
+            if self.page_info_last_chev and not self.page_info_last_chev.hidden then
+                table.insert(page_row, self.page_info_last_chev)
+            end
+            if #page_row > 0 then
+                table.insert(self.layout, page_row)
+            end
+        end
+    end
+
+    -- Also append to initial layout if already populated
+    if menu.page_num and menu.page_num > 1 and menu.layout then
+        local page_row = {}
+        if menu.page_info_first_chev and not menu.page_info_first_chev.hidden then
+            table.insert(page_row, menu.page_info_first_chev)
+        end
+        if menu.page_info_left_chev and not menu.page_info_left_chev.hidden then
+            table.insert(page_row, menu.page_info_left_chev)
+        end
+        if menu.page_info_text and not menu.page_info_text.hidden then
+            table.insert(page_row, menu.page_info_text)
+        end
+        if menu.page_info_right_chev and not menu.page_info_right_chev.hidden then
+            table.insert(page_row, menu.page_info_right_chev)
+        end
+        if menu.page_info_last_chev and not menu.page_info_last_chev.hidden then
+            table.insert(page_row, menu.page_info_last_chev)
+        end
+        if #page_row > 0 then
+            table.insert(menu.layout, page_row)
+        end
+    end
+
+    -- Add key mappings for Page navigation
+    menu.key_events = menu.key_events or {}
+    menu.key_events.NextPage = menu.key_events.NextPage or {}
+    table.insert(menu.key_events.NextPage, { "PageDown" })
+    table.insert(menu.key_events.NextPage, { "]" })
+
+    menu.key_events.PrevPage = menu.key_events.PrevPage or {}
+    table.insert(menu.key_events.PrevPage, { "PageUp" })
+    table.insert(menu.key_events.PrevPage, { "[" })
+end
+
 function M:newMenu(var_name, args)
     self._menu_creating = true
     plugin_instance = self
@@ -685,7 +971,13 @@ function M:newMenu(var_name, args)
         end
     end
     
+    args._xray_highlight = true
     local menu = Menu:new(args)
+    menu._xray_highlight = true
+    -- Lazily patch the private MenuItem class via the live item_group
+    _patchMenuItemClass(menu.item_group)
+    -- Attach pagination buttons to FocusManager layout
+    _attachMenuPaginationToLayout(menu)
     self._menu_creating = nil
     return menu
 end
@@ -899,22 +1191,30 @@ function M:showCharacters()
             local merge_dialog
             merge_dialog = ButtonDialog:new{
                 title = self.loc:t("merge_duplicates") or "Merge Duplicates",
-                buttons = {{
+                buttons = {
                     {
-                        text = "✦ " .. (self.loc:t("ai_scan") or "AI Scan"),
-                        callback = function()
-                            UIManager:close(merge_dialog)
-                            self:showAIFindDuplicatesFlow(self.characters, "characters", self.loc:t("entity_label_characters") or "characters")
-                        end
+                        {
+                            text = "✦ " .. (self.loc:t("ai_scan") or "AI Scan"),
+                            callback = function()
+                                UIManager:close(merge_dialog)
+                                self:showAIFindDuplicatesFlow(self.characters, "characters", self.loc:t("entity_label_characters") or "characters")
+                            end
+                        },
+                        {
+                            text = self.loc:t("manual_pick") or "Manual Pick",
+                            callback = function()
+                                UIManager:close(merge_dialog)
+                                self:showMergeFlow(self.characters, "characters")
+                            end
+                        }
                     },
                     {
-                        text = self.loc:t("manual_pick") or "Manual Pick",
-                        callback = function()
-                            UIManager:close(merge_dialog)
-                            self:showMergeFlow(self.characters, "characters")
-                        end
+                        {
+                            text = self.loc:t("cancel") or "Cancel",
+                            callback = function() UIManager:close(merge_dialog) end
+                        }
                     }
-                }}
+                }
             }
             UIManager:show(merge_dialog)
         end })
@@ -2717,22 +3017,30 @@ function M:showLocations()
             local merge_dialog
             merge_dialog = ButtonDialog:new{
                 title = self.loc:t("merge_duplicates") or "Merge Duplicates",
-                buttons = {{
+                buttons = {
                     {
-                        text = "✦ " .. (self.loc:t("ai_scan") or "AI Scan"),
-                        callback = function()
-                            UIManager:close(merge_dialog)
-                            self:showAIFindDuplicatesFlow(self.locations, "locations", self.loc:t("entity_label_locations") or "locations")
-                        end
+                        {
+                            text = "✦ " .. (self.loc:t("ai_scan") or "AI Scan"),
+                            callback = function()
+                                UIManager:close(merge_dialog)
+                                self:showAIFindDuplicatesFlow(self.locations, "locations", self.loc:t("entity_label_locations") or "locations")
+                            end
+                        },
+                        {
+                            text = self.loc:t("manual_pick") or "Manual Pick",
+                            callback = function()
+                                UIManager:close(merge_dialog)
+                                self:showMergeFlow(self.locations, "locations")
+                            end
+                        }
                     },
                     {
-                        text = self.loc:t("manual_pick") or "Manual Pick",
-                        callback = function()
-                            UIManager:close(merge_dialog)
-                            self:showMergeFlow(self.locations, "locations")
-                        end
+                        {
+                            text = self.loc:t("cancel") or "Cancel",
+                            callback = function() UIManager:close(merge_dialog) end
+                        }
                     }
-                }}
+                }
             }
             UIManager:show(merge_dialog)
         end, separator = true },
@@ -2925,18 +3233,68 @@ function XRayLogViewer:init()
     local sh = Screen:getHeight()
     local Device = require("device")
 
-    local pad = (Size.padding and Size.padding.large) or 12
-    local gap = math.max(4, math.floor(sh * 0.01))
-
     self.dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh }
 
-    if Device.hasKeys and Device:hasKeys() then
-        self.key_events = {
-            Close = { { Device.input.group.Back } },
-        }
+    self.key_events = {
+        PrevPage = {
+            { "Left" },
+            { "Up" },
+            { "PageUp" },
+            { "p" },
+            { "P" },
+        },
+        NextPage = {
+            { "Right" },
+            { "Down" },
+            { "PageDown" },
+            { "Space" },
+            { "n" },
+            { "N" },
+        },
+        Reload = {
+            { "r" },
+            { "R" },
+            { "F5" },
+        },
+        Close = {
+            { "Escape" },
+            { "Back" },
+            { "q" },
+            { "Q" },
+        },
+    }
+    if Device.hasKeys and Device:hasKeys() and Device.input and Device.input.group and Device.input.group.Back then
+        table.insert(self.key_events.Close, { Device.input.group.Back })
     end
 
     self:_rebuild()
+end
+
+function XRayLogViewer:onPrevPage()
+    if self.current_page and self.current_page > 1 then
+        self.current_page = self.current_page - 1
+        self:_rebuild()
+    end
+    return true
+end
+
+function XRayLogViewer:onNextPage()
+    local total = (self.pages and #self.pages) or 1
+    if self.current_page and self.current_page < total then
+        self.current_page = self.current_page + 1
+        self:_rebuild()
+    end
+    return true
+end
+
+function XRayLogViewer:onReload()
+    self:_reloadFromDisk()
+    return true
+end
+
+function XRayLogViewer:onClose()
+    UIManager:close(self)
+    return true
 end
 
 function XRayLogViewer:_rebuild()
@@ -3849,16 +4207,37 @@ function M:showWelcomeCard(force)
 
     local overlay
     local selected_action = "phone_pc"
+    local focused_index = 1
+    local total_items = 7
 
     local function span(h)
         return VerticalSpan:new{ width = h or sc(4) }
     end
 
-    local function renderCard()
-        if overlay then
-            UIManager:close(overlay, "ui")
-        end
+    local choices = {
+        {
+            value = "phone_pc",
+            title = self.loc:t("welcome_opt_phone_title") or "Set from Phone/PC (Recommended)",
+            desc = self.loc:t("welcome_opt_phone_desc") or "Scan a QR code to enter your key online via Cloud Relay or local Wi-Fi.",
+        },
+        {
+            value = "ereader",
+            title = self.loc:t("welcome_opt_ereader_title") or "Enter Key on E-Reader",
+            desc = self.loc:t("welcome_opt_ereader_desc") or "Type or paste your API key directly using the on-screen keyboard.",
+        },
+        {
+            value = "file_config",
+            title = self.loc:t("welcome_opt_file_title") or "Import via Text File (xray_key.txt) or Config",
+            desc = self.loc:t("welcome_opt_file_desc") or "Auto-import keys from an xray_key.txt file, or view wiki setup instructions.",
+        },
+        {
+            value = "all_providers",
+            title = self.loc:t("welcome_opt_all_title") or "Open All Provider Settings",
+            desc = self.loc:t("welcome_opt_all_desc") or "Configure custom endpoints, OpenAI, DeepSeek, Claude, or OpenRouter.",
+        },
+    }
 
+    local function buildWelcomeCard()
         local title_label = TextWidget:new{
             text = (self.loc:t("welcome_tag") or "WELCOME TO X-RAY"):upper(),
             face = Font:getFace("cfont", title_font_size),
@@ -3890,31 +4269,9 @@ function M:showWelcomeCard(force)
             span(sc(6)),
         }
 
-        local choices = {
-            {
-                value = "phone_pc",
-                title = self.loc:t("welcome_opt_phone_title") or "Set from Phone/PC (Recommended)",
-                desc = self.loc:t("welcome_opt_phone_desc") or "Scan a QR code to enter your key online via Cloud Relay or local Wi-Fi.",
-            },
-            {
-                value = "ereader",
-                title = self.loc:t("welcome_opt_ereader_title") or "Enter Key on E-Reader",
-                desc = self.loc:t("welcome_opt_ereader_desc") or "Type or paste your API key directly using the on-screen keyboard.",
-            },
-            {
-                value = "file_config",
-                title = self.loc:t("welcome_opt_file_title") or "Import via Text File (xray_key.txt) or Config",
-                desc = self.loc:t("welcome_opt_file_desc") or "Auto-import keys from an xray_key.txt file, or view wiki setup instructions.",
-            },
-            {
-                value = "all_providers",
-                title = self.loc:t("welcome_opt_all_title") or "Open All Provider Settings",
-                desc = self.loc:t("welcome_opt_all_desc") or "Configure custom endpoints, OpenAI, DeepSeek, Claude, or OpenRouter.",
-            },
-        }
-
-        for _, choice in ipairs(choices) do
+        for idx, choice in ipairs(choices) do
             local is_selected = (choice.value == selected_action)
+            local is_focused = (idx == focused_index)
             local dot_char = is_selected and "●" or "○"
 
             local text_widget = TextBoxWidget:new{
@@ -3958,11 +4315,11 @@ function M:showWelcomeCard(force)
             end
 
             local frame = FrameContainer:new{
-                bordersize = is_selected and xray_theme.border_btn or sc(1),
+                bordersize = is_focused and (xray_theme.border_focus or sc(2)) or (is_selected and xray_theme.border_btn or sc(1)),
                 radius = xray_theme.radius_btn,
                 padding = sc(6),
-                color = is_selected and xray_theme.color_border or xray_theme.color_section_rule,
-                background = xray_theme.color_bg,
+                color = is_focused and (xray_theme.color_focus_border or Blitbuffer.COLOR_BLACK) or (is_selected and xray_theme.color_border or xray_theme.color_section_rule),
+                background = is_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or xray_theme.color_bg,
                 width = dialog_w - sc(24),
                 row_content
             }
@@ -3985,7 +4342,16 @@ function M:showWelcomeCard(force)
             }
             item.onTap = function()
                 selected_action = choice.value
-                renderCard()
+                focused_index = idx
+                if overlay then
+                    overlay[1] = MovableContainer:new{
+                        CenterContainer:new{
+                            dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
+                            buildWelcomeCard()
+                        }
+                    }
+                    UIManager:setDirty(overlay, "ui")
+                end
                 return true
             end
 
@@ -4000,20 +4366,25 @@ function M:showWelcomeCard(force)
         })
         table.insert(content_vg, span(sc(5)))
 
-        -- Action Buttons:
-        -- Row 1: Continue (primary action, full width)
-        -- Row 2: Ask Later & Don't Ask Again (side-by-side)
+        -- Action Buttons
+        local is_continue_focused = (focused_index == 5)
+        local is_ask_later_focused = (focused_index == 6)
+        local is_dont_ask_focused = (focused_index == 7)
+
         local continue_btn = Button:new{
             text = self.loc:t("welcome_action_continue") or "Continue",
             face = Font:getFace("cfont", ui_font_size),
             bold = true,
             width = dialog_w - sc(24),
             height = sc(38),
-            bordersize = xray_theme.border_btn,
+            bordersize = is_continue_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            background = is_continue_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
             radius = xray_theme.radius_btn,
             callback = function()
-                UIManager:close(overlay, "ui")
-                overlay = nil
+                if overlay then
+                    UIManager:close(overlay, "ui")
+                    overlay = nil
+                end
                 self:handleWelcomeAction(selected_action)
             end
         }
@@ -4023,11 +4394,14 @@ function M:showWelcomeCard(force)
             face = Font:getFace("cfont", math.max(12, ui_font_size - 1)),
             width = (dialog_w - sc(30)) / 2,
             height = sc(34),
-            bordersize = xray_theme.border_btn,
+            bordersize = is_ask_later_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            background = is_ask_later_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
             radius = xray_theme.radius_btn,
             callback = function()
-                UIManager:close(overlay, "ui")
-                overlay = nil
+                if overlay then
+                    UIManager:close(overlay, "ui")
+                    overlay = nil
+                end
             end
         }
 
@@ -4036,11 +4410,14 @@ function M:showWelcomeCard(force)
             face = Font:getFace("cfont", math.max(12, ui_font_size - 1)),
             width = (dialog_w - sc(30)) / 2,
             height = sc(34),
-            bordersize = xray_theme.border_btn,
+            bordersize = is_dont_ask_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            background = is_dont_ask_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
             radius = xray_theme.radius_btn,
             callback = function()
-                UIManager:close(overlay, "ui")
-                overlay = nil
+                if overlay then
+                    UIManager:close(overlay, "ui")
+                    overlay = nil
+                end
                 self.ai_helper:saveSettings({ welcome_wizard_dont_ask = true, welcome_wizard_dismissed = true })
             end
         }
@@ -4064,7 +4441,7 @@ function M:showWelcomeCard(force)
             content_vg
         }
 
-        local outer_card = FrameContainer:new{
+        return FrameContainer:new{
             bordersize = sc(1),
             color = Blitbuffer.Color8(180),
             padding = 0,
@@ -4073,23 +4450,136 @@ function M:showWelcomeCard(force)
             width = dialog_w,
             inner_card
         }
-
-        local movable = MovableContainer:new{
-            CenterContainer:new{
-                dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
-                outer_card
-            }
-        }
-
-        overlay = InputContainer:new{
-            dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
-            movable
-        }
-
-        UIManager:show(overlay, "ui")
     end
 
-    renderCard()
+    local card = buildWelcomeCard()
+
+    local movable = MovableContainer:new{
+        CenterContainer:new{
+            dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
+            card
+        }
+    }
+
+    overlay = InputContainer:new{
+        dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
+        key_events = {
+            FocusUp = {
+                { "Up" },
+                { "PrevPage" },
+            },
+            FocusDown = {
+                { "Down" },
+                { "NextPage" },
+            },
+            FocusLeft = {
+                { "Left" },
+            },
+            FocusRight = {
+                { "Right" },
+            },
+            Select = {
+                { "Return" },
+                { "KP_Enter" },
+                { "Select" },
+                { "Space" },
+            },
+            Close = {
+                { "Escape" },
+                { "Back" },
+                { "q" },
+                { "Q" },
+            },
+        },
+        movable
+    }
+
+    local function refreshUI()
+        overlay[1] = MovableContainer:new{
+            CenterContainer:new{
+                dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
+                buildWelcomeCard()
+            }
+        }
+        UIManager:setDirty(overlay, "ui")
+    end
+
+    overlay.onFocusUp = function()
+        if focused_index > 1 then
+            focused_index = focused_index - 1
+        else
+            focused_index = total_items
+        end
+        refreshUI()
+        return true
+    end
+
+    overlay.onFocusDown = function()
+        if focused_index < total_items then
+            focused_index = focused_index + 1
+        else
+            focused_index = 1
+        end
+        refreshUI()
+        return true
+    end
+
+    overlay.onFocusLeft = function()
+        if focused_index == 7 then
+            focused_index = 6
+            refreshUI()
+        elseif focused_index > 1 and focused_index <= 4 then
+            focused_index = focused_index - 1
+            refreshUI()
+        end
+        return true
+    end
+
+    overlay.onFocusRight = function()
+        if focused_index == 6 then
+            focused_index = 7
+            refreshUI()
+        elseif focused_index < 4 then
+            focused_index = focused_index + 1
+            refreshUI()
+        end
+        return true
+    end
+
+    overlay.onSelect = function()
+        if focused_index >= 1 and focused_index <= 4 then
+            selected_action = choices[focused_index].value
+            refreshUI()
+        elseif focused_index == 5 then
+            if overlay then
+                UIManager:close(overlay, "ui")
+                overlay = nil
+            end
+            self:handleWelcomeAction(selected_action)
+        elseif focused_index == 6 then
+            if overlay then
+                UIManager:close(overlay, "ui")
+                overlay = nil
+            end
+        elseif focused_index == 7 then
+            if overlay then
+                UIManager:close(overlay, "ui")
+                overlay = nil
+            end
+            self.ai_helper:saveSettings({ welcome_wizard_dont_ask = true, welcome_wizard_dismissed = true })
+        end
+        return true
+    end
+
+    overlay.onClose = function()
+        if overlay then
+            UIManager:close(overlay, "ui")
+            overlay = nil
+        end
+        return true
+    end
+
+    UIManager:show(overlay, "ui")
 end
 
 function M:refreshAPIKeysMenu()
@@ -4342,94 +4832,231 @@ function M:showConfigFileGuide()
     local title_font_size = math.max(10, math.min(fs - 5, 14))
 
     local overlay
+    local focused_btn = 1 -- 1: Import Now, 2: Close
 
     local function span()
         return VerticalSpan:new{ width = xray_theme.gap }
     end
 
-    local title_label = TextWidget:new{
-        text = (self.loc:t("welcome_tag") or "WELCOME TO X-RAY"):upper(),
-        face = Font:getFace("cfont", title_font_size),
-        bold = true,
-        fgcolor = Blitbuffer.COLOR_BLACK,
-    }
-
-    local headline_label = TextWidget:new{
-        text = self.loc:t("welcome_file_guide_title") or "Config & Text File Setup",
-        face = Font:getFace("cfont", ui_font_size + 2),
-        bold = true,
-        fgcolor = Blitbuffer.COLOR_BLACK,
-    }
-
-    local instructions_text = self.loc:t("welcome_file_guide_desc") or "How to configure API keys via text file:\n\n1. Create a file named 'xray_key.txt' on your device or computer.\n2. Place it in your KOReader folder (e.g. koreader/ or koreader/settings/).\n3. Add your key inside on a single line:\n   • Gemini: gemini = YOUR_KEY (or simply paste raw key)\n   • OpenAI: openai = sk-...\n   • DeepSeek / Claude: deepseek = ..., claude = ...\n4. Tap 'Import Now' below to load your keys.\n\nManual Config: You can also edit koreader/plugins/xray.koplugin/xray_config.lua."
-
-    local description_box = TextBoxWidget:new{
-        text = instructions_text,
-        face = Font:getFace("cfont", ui_font_size),
-        width = dialog_w - sc(32),
-        alignment = self:isRTL() and "right" or "left",
-    }
-
-    local content_vg = VerticalGroup:new{
-        align = "left",
-        title_label,
-        span(),
-        headline_label,
-        span(),
-        description_box,
-        span(),
-    }
-
-    local wiki_url = "https://github.com/ultimatejimmy/xray.koplugin/wiki/2.-API-Key-Setup-Options"
-    local qr_size = math.max(100, math.min(math.floor((dialog_w - sc(32)) * 0.35), 140))
-    local ok_qr, QRWidget = pcall(require, "ui/widget/qrwidget")
-    if ok_qr and QRWidget then
-        local qr_widget = QRWidget:new{
-            text = wiki_url,
-            width = qr_size,
-            height = qr_size,
-        }
-        local qr_frame = FrameContainer:new{
-            background = Blitbuffer.COLOR_WHITE,
-            padding = sc(4),
-            bordersize = 1,
-            margin = 0,
-            qr_widget,
-        }
-        table.insert(content_vg, CenterContainer:new{
-            dimen = Geom:new{ w = dialog_w - sc(32), h = qr_size + sc(12) },
-            qr_frame,
-        })
-        table.insert(content_vg, WidgetContainer:new{ dimen = Geom:new{ w = 1, h = sc(4) } })
-        table.insert(content_vg, TextBoxWidget:new{
-            text = self.loc:t("welcome_file_guide_scan") or "Scan QR to view API Key Setup wiki guide",
-            face = Font:getFace("cfont", math.max(11, ui_font_size - 3)),
+    local function buildGuideCard()
+        local title_label = TextWidget:new{
+            text = (self.loc:t("welcome_tag") or "WELCOME TO X-RAY"):upper(),
+            face = Font:getFace("cfont", title_font_size),
+            bold = true,
             fgcolor = Blitbuffer.COLOR_BLACK,
+        }
+
+        local headline_label = TextWidget:new{
+            text = self.loc:t("welcome_file_guide_title") or "Config & Text File Setup",
+            face = Font:getFace("cfont", ui_font_size + 2),
+            bold = true,
+            fgcolor = Blitbuffer.COLOR_BLACK,
+        }
+
+        local instructions_text = self.loc:t("welcome_file_guide_desc") or "How to configure API keys via text file:\n\n1. Create a file named 'xray_key.txt' on your device or computer.\n2. Place it in your KOReader folder (e.g. koreader/ or koreader/settings/).\n3. Add your key inside on a single line:\n   • Gemini: gemini = YOUR_KEY (or simply paste raw key)\n   • OpenAI: openai = sk-...\n   • DeepSeek / Claude: deepseek = ..., claude = ...\n4. Tap 'Import Now' below to load your keys.\n\nManual Config: You can also edit koreader/plugins/xray.koplugin/xray_config.lua."
+
+        local description_box = TextBoxWidget:new{
+            text = instructions_text,
+            face = Font:getFace("cfont", ui_font_size),
             width = dialog_w - sc(32),
-            alignment = "center",
+            alignment = self:isRTL() and "right" or "left",
+        }
+
+        local content_vg = VerticalGroup:new{
+            align = "left",
+            title_label,
+            span(),
+            headline_label,
+            span(),
+            description_box,
+            span(),
+        }
+
+        local wiki_url = "https://github.com/ultimatejimmy/xray.koplugin/wiki/2.-API-Key-Setup-Options"
+        local qr_size = math.max(100, math.min(math.floor((dialog_w - sc(32)) * 0.35), 140))
+        local ok_qr, QRWidget = pcall(require, "ui/widget/qrwidget")
+        if ok_qr and QRWidget then
+            local qr_widget = QRWidget:new{
+                text = wiki_url,
+                width = qr_size,
+                height = qr_size,
+            }
+            local qr_frame = FrameContainer:new{
+                background = Blitbuffer.COLOR_WHITE,
+                padding = sc(4),
+                bordersize = 1,
+                margin = 0,
+                qr_widget,
+            }
+            table.insert(content_vg, CenterContainer:new{
+                dimen = Geom:new{ w = dialog_w - sc(32), h = qr_size + sc(12) },
+                qr_frame,
+            })
+            table.insert(content_vg, WidgetContainer:new{ dimen = Geom:new{ w = 1, h = sc(4) } })
+            table.insert(content_vg, TextBoxWidget:new{
+                text = self.loc:t("welcome_file_guide_scan") or "Scan QR to view API Key Setup wiki guide",
+                face = Font:getFace("cfont", math.max(11, ui_font_size - 3)),
+                fgcolor = Blitbuffer.COLOR_BLACK,
+                width = dialog_w - sc(32),
+                alignment = "center",
+            })
+            table.insert(content_vg, span())
+        end
+
+        table.insert(content_vg, LineWidget:new{
+            dimen = Geom:new{ w = dialog_w - sc(32), h = sc(1) },
+            background = xray_theme.color_section_rule,
         })
         table.insert(content_vg, span())
+
+        local is_import_focused = (focused_btn == 1)
+        local is_close_focused = (focused_btn == 2)
+
+        local import_btn = Button:new{
+            text = self.loc:t("welcome_btn_import_now") or "Import Now",
+            face = Font:getFace("cfont", ui_font_size),
+            bold = true,
+            width = (dialog_w - sc(40)) / 2,
+            height = sc(42),
+            bordersize = is_import_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            background = is_import_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
+            radius = xray_theme.radius_btn,
+            callback = function()
+                local ok, count, path = self.ai_helper:importFromTextFile(true)
+                if ok and count > 0 then
+                    self.ai_helper:init(self.path)
+                    if overlay then
+                        UIManager:close(overlay, "ui")
+                        overlay = nil
+                    end
+                    UIManager:show(InfoMessage:new{
+                        text = string.format("Imported %d API key(s) from %s", count, tostring(path)),
+                        timeout = 4
+                    })
+                    UIManager:setDirty(nil, "ui")
+                else
+                    UIManager:show(InfoMessage:new{
+                        text = self.loc:t("welcome_no_file_found") or "No xray_key.txt found in KOReader directory.",
+                        timeout = 4
+                    })
+                end
+            end
+        }
+
+        local close_btn = Button:new{
+            text = self.loc:t("close") or "Close",
+            face = Font:getFace("cfont", ui_font_size),
+            width = (dialog_w - sc(40)) / 2,
+            height = sc(42),
+            bordersize = is_close_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            background = is_close_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
+            radius = xray_theme.radius_btn,
+            callback = function()
+                if overlay then
+                    UIManager:close(overlay, "ui")
+                    overlay = nil
+                end
+            end
+        }
+
+        local btn_row = HorizontalGroup:new{
+            align = "center",
+            import_btn,
+            WidgetContainer:new{ dimen = Geom:new{ w = sc(8), h = 1 } },
+            close_btn,
+        }
+        table.insert(content_vg, btn_row)
+
+        local inner_card = FrameContainer:new{
+            padding = sc(12),
+            radius = xray_theme.radius_window,
+            bordersize = sc(2),
+            color = Blitbuffer.COLOR_BLACK,
+            background = xray_theme.color_bg,
+            width = dialog_w - sc(2),
+            content_vg
+        }
+
+        return FrameContainer:new{
+            bordersize = sc(1),
+            color = Blitbuffer.Color8(180),
+            padding = 0,
+            background = xray_theme.color_bg,
+            radius = xray_theme.radius_window,
+            width = dialog_w,
+            inner_card
+        }
     end
 
-    table.insert(content_vg, LineWidget:new{
-        dimen = Geom:new{ w = dialog_w - sc(32), h = sc(1) },
-        background = xray_theme.color_section_rule,
-    })
-    table.insert(content_vg, span())
+    local card = buildGuideCard()
 
-    local import_btn = Button:new{
-        text = self.loc:t("welcome_btn_import_now") or "Import Now",
-        face = Font:getFace("cfont", ui_font_size),
-        bold = true,
-        width = (dialog_w - sc(40)) / 2,
-        height = sc(42),
-        bordersize = xray_theme.border_btn,
-        radius = xray_theme.radius_btn,
-        callback = function()
+    local movable = MovableContainer:new{
+        CenterContainer:new{
+            dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
+            card
+        }
+    }
+
+    overlay = InputContainer:new{
+        dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
+        key_events = {
+            PrevButton = {
+                { "Left" },
+                { "Up" },
+                { "PrevPage" },
+            },
+            NextButton = {
+                { "Right" },
+                { "Down" },
+                { "NextPage" },
+            },
+            Select = {
+                { "Return" },
+                { "KP_Enter" },
+                { "Select" },
+                { "Space" },
+            },
+            Close = {
+                { "Escape" },
+                { "Back" },
+                { "q" },
+                { "Q" },
+            },
+        },
+        movable
+    }
+
+    local function refreshUI()
+        overlay[1] = MovableContainer:new{
+            CenterContainer:new{
+                dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
+                buildGuideCard()
+            }
+        }
+        UIManager:setDirty(overlay, "ui")
+    end
+
+    overlay.onPrevButton = function()
+        focused_btn = (focused_btn == 1) and 2 or 1
+        refreshUI()
+        return true
+    end
+
+    overlay.onNextButton = function()
+        focused_btn = (focused_btn == 1) and 2 or 1
+        refreshUI()
+        return true
+    end
+
+    overlay.onSelect = function()
+        if focused_btn == 1 then
             local ok, count, path = self.ai_helper:importFromTextFile(true)
             if ok and count > 0 then
                 self.ai_helper:init(self.path)
-                UIManager:close(overlay, "ui")
+                if overlay then
+                    UIManager:close(overlay, "ui")
+                    overlay = nil
+                end
                 UIManager:show(InfoMessage:new{
                     text = string.format("Imported %d API key(s) from %s", count, tostring(path)),
                     timeout = 4
@@ -4441,60 +5068,22 @@ function M:showConfigFileGuide()
                     timeout = 4
                 })
             end
+        else
+            if overlay then
+                UIManager:close(overlay, "ui")
+                overlay = nil
+            end
         end
-    }
+        return true
+    end
 
-    local close_btn = Button:new{
-        text = self.loc:t("close") or "Close",
-        face = Font:getFace("cfont", ui_font_size),
-        width = (dialog_w - sc(40)) / 2,
-        height = sc(42),
-        bordersize = xray_theme.border_btn,
-        radius = xray_theme.radius_btn,
-        callback = function()
+    overlay.onClose = function()
+        if overlay then
             UIManager:close(overlay, "ui")
+            overlay = nil
         end
-    }
-
-    local btn_row = HorizontalGroup:new{
-        align = "center",
-        import_btn,
-        WidgetContainer:new{ dimen = Geom:new{ w = sc(8), h = 1 } },
-        close_btn,
-    }
-    table.insert(content_vg, btn_row)
-
-    local inner_card = FrameContainer:new{
-        padding = sc(12),
-        radius = xray_theme.radius_window,
-        bordersize = sc(2),
-        color = Blitbuffer.COLOR_BLACK,
-        background = xray_theme.color_bg,
-        width = dialog_w - sc(2),
-        content_vg
-    }
-
-    local outer_card = FrameContainer:new{
-        bordersize = sc(1),
-        color = Blitbuffer.Color8(180),
-        padding = 0,
-        background = xray_theme.color_bg,
-        radius = xray_theme.radius_window,
-        width = dialog_w,
-        inner_card
-    }
-
-    local movable = MovableContainer:new{
-        CenterContainer:new{
-            dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
-            outer_card
-        }
-    }
-
-    overlay = InputContainer:new{
-        dimen = Geom:new{ x = 0, y = 0, w = sw, h = sh },
-        movable
-    }
+        return true
+    end
 
     UIManager:show(overlay, "ui")
 end
@@ -5854,6 +6443,46 @@ function M:showImages(opts)
     UIManager:show(gallery, "ui")
 end
 
+function M:renameImageDialog(image_entry, on_success)
+    if not image_entry then return end
+    local InputDialog = require("ui/widget/inputdialog")
+    local rename_dialog
+    rename_dialog = InputDialog:new{
+        title = self.loc:t("img_rename_title") or "Rename Image Label",
+        input = image_entry.title or "",
+        buttons = {
+            {
+                {
+                    text = self.loc:t("cancel") or "Cancel",
+                    callback = function()
+                        UIManager:close(rename_dialog)
+                    end,
+                },
+                {
+                    text = self.loc:t("save") or "Save",
+                    is_enter_default = true,
+                    callback = function()
+                        local new_val = rename_dialog:getInputText()
+                        UIManager:close(rename_dialog)
+                        if new_val and #new_val > 0 and self.image_manager and self.book_data then
+                            image_entry.title = new_val
+                            image_entry.custom_title = true
+                            local cur_id = image_entry.id or image_entry.href or image_entry.src
+                            self.image_manager:renameImage(self.book_data, cur_id, new_val)
+                            if self.cache_manager and self.ui and self.ui.document and self.ui.document.file then
+                                self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
+                            end
+                            if on_success then on_success() end
+                        end
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(rename_dialog)
+    rename_dialog:onShowKeyboard()
+end
+
 function M:showImageActions(image_entry)
     if not image_entry then return end
     local InputContainer = require("ui/widget/container/inputcontainer")
@@ -5877,7 +6506,7 @@ function M:showImageActions(image_entry)
     local Blitbuffer = require("ffi/blitbuffer")
     local Device = require("device")
     local Screen = Device.screen
-    local InputDialog = require("ui/widget/inputdialog")
+    local xray_theme = require(plugin_path .. "xray_theme")
 
     local function sc(val)
         return (Screen and Screen.scaleBySize and Screen:scaleBySize(val)) or val
@@ -5907,7 +6536,21 @@ function M:showImageActions(image_entry)
     end
 
     local overlay
-    local function closeDialog(callback)
+    local ok_dev_touch, DevTouch = pcall(require, "device")
+    local is_touch_dev = (ok_dev_touch and DevTouch and DevTouch.hasTouchScreen and DevTouch:hasTouchScreen()) or false
+    local focus_visible = not is_touch_dev
+    local focused_action_idx = focus_visible and 1 or nil
+    local action_items_list = {}
+    local total_nav_items = 1
+
+    local closeDialog
+    local refreshActiveContext
+    local buildActionItemsList
+    local buildDialogWidget
+    local rebuildOverlay
+    local runAction
+
+    closeDialog = function(callback)
         if overlay then
             local ov = overlay
             overlay = nil
@@ -5917,335 +6560,432 @@ function M:showImageActions(image_entry)
         if callback then callback() end
     end
 
-    local content_items = {}
-
-    -- ── 1. Card Header ──────────────────────────────────────────────────────────
-    local display_title = image_entry.title or (self.loc:t("img_untitled") or "Image")
-    local title_label = TextBoxWidget:new{
-        text = (image_entry.is_favorite and "★ " or "") .. display_title,
-        face = Font:getFace("NotoSerif-Regular.ttf", 20),
-        bold = true,
-        fgcolor = Blitbuffer.COLOR_BLACK,
-        width = inner_w,
-        alignment = "left",
-    }
-    table.insert(content_items, title_label)
-
-    local sub_info = (image_entry.page and ("Page " .. tostring(image_entry.page)) or "Reference Image")
-    if image_entry.category then
-        sub_info = sub_info .. "  ·  [" .. image_entry.category:upper() .. "]"
-    end
-    if image_entry.is_series then
-        sub_info = sub_info .. "  ·  Series Reference"
-    end
-
-    local sub_label = TextWidget:new{
-        text = sub_info,
-        face = Font:getFace("cfont", 13),
-        fgcolor = Blitbuffer.Color8(70),
-    }
-    table.insert(content_items, sub_label)
-    table.insert(content_items, VerticalSpan:new{ width = sc(6) })
-    table.insert(content_items, LineWidget:new{
-        dimen = Geom:new{ w = inner_w, h = sc(1) },
-        background = Blitbuffer.COLOR_DARK_GRAY,
-    })
-    table.insert(content_items, VerticalSpan:new{ width = sc(6) })
-
-    local function refreshActiveContext()
-        if self.active_image_viewer then
+    refreshActiveContext = function()
+        if self.active_image_viewer and self.active_image_viewer.buildUI then
             self.active_image_viewer.image_entry = image_entry
             self.active_image_viewer:buildUI()
             UIManager:setDirty(self.active_image_viewer, "ui")
         end
-        if self.image_gallery_overlay then
+        if self.image_gallery_overlay and self.image_gallery_overlay.buildUI then
             self.image_gallery_overlay:buildUI()
             UIManager:setDirty(self.image_gallery_overlay, "ui")
         end
     end
 
-    -- ── 2. Action Row Helper with Visual Separation ────────────────────────────
-    local function addDivider()
-        table.insert(content_items, VerticalSpan:new{ width = sc(5) })
-        table.insert(content_items, LineWidget:new{
-            dimen = Geom:new{ w = inner_w, h = sc(1) },
-            background = Blitbuffer.Color8(175),
+    buildActionItemsList = function()
+        action_items_list = {}
+
+        -- 1. Favorite Toggle
+        local is_fav = (image_entry.is_favorite == true)
+        local fav_title = is_fav and "Remove from Favorites" or "Add to Favorites"
+        local fav_desc = is_fav and "Unpin from the favorites tab" or "Pin this image to the favorites tab"
+        table.insert(action_items_list, {
+            icon = is_fav and "star-off.svg" or "star.svg",
+            title = fav_title,
+            desc = fav_desc,
+            cb = function()
+                if self.image_manager and self.book_data then
+                    local cur_id = image_entry.id or image_entry.href or image_entry.src
+                    local new_fav = self.image_manager:toggleFavorite(self.book_data, cur_id)
+                    image_entry.is_favorite = new_fav
+                    if self.cache_manager and self.ui.document and self.ui.document.file then
+                        self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
+                    end
+                    refreshActiveContext()
+                end
+            end,
         })
-        table.insert(content_items, VerticalSpan:new{ width = sc(5) })
+
+        -- 2. Series References
+        local series_slug = (self.book_data and self.book_data.series_slug) or (self.book_data and self.book_data.series and self.series_manager and self.series_manager:makeSlug(self.book_data.series)) or (self.book_data and self.book_data.title and self.series_manager and self.series_manager:makeSlug(self.book_data.title)) or "series"
+        local is_in_series = false
+        if self.series_manager then
+            local s_imgs = self.series_manager:getSeriesImages(series_slug, 999) or {}
+            local cur_id = image_entry.id or image_entry.href or image_entry.src
+            for _, s_item in ipairs(s_imgs) do
+                if (s_item.id and cur_id and s_item.id == cur_id) or (s_item.href and image_entry.href and s_item.href == image_entry.href) or (s_item.src and image_entry.src and s_item.src == image_entry.src) then
+                    is_in_series = true
+                    break
+                end
+            end
+        end
+
+        local series_title = is_in_series and "Remove from Series References" or "Add to Series References"
+        local series_desc = is_in_series and "Remove this map from the series-wide collection" or "Keep map accessible across all series volumes"
+        table.insert(action_items_list, {
+            icon = "book-open.svg",
+            title = series_title,
+            desc = series_desc,
+            cb = function()
+                if self.series_manager then
+                    local cur_id = image_entry.id or image_entry.href or image_entry.src
+                    if is_in_series then
+                        self.series_manager:removeSeriesImage(series_slug, cur_id)
+                        image_entry.is_series = false
+                    else
+                        local copy = {}
+                        for k, v in pairs(image_entry) do copy[k] = v end
+                        copy.is_series = true
+                        if not copy.cached_file and self.image_manager and self.ui.document and self.ui.document.file then
+                            copy.cached_file = self.image_manager:extractImageToFile(self.ui.document.file, image_entry)
+                        end
+                        copy.source_book_title = (self.book_data and self.book_data.title) or "Book"
+                        copy.source_book_index = (self.book_data and self.book_data.series_index) or 1
+                        self.series_manager:saveSeriesImage(series_slug, copy)
+                        image_entry.is_series = true
+                    end
+                    if self.book_data then
+                        self.book_data.series_slug = series_slug
+                    end
+                    if self.cache_manager and self.ui.document and self.ui.document.file then
+                        self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
+                    end
+                    refreshActiveContext()
+                end
+            end,
+        })
+
+        -- 3. Rename Label
+        table.insert(action_items_list, {
+            icon = "edit.svg",
+            title = self.loc:t("img_rename_title") or "Rename Label",
+            desc = "Edit custom image title and description",
+            cb = function()
+                self:renameImageDialog(image_entry, function()
+                    refreshActiveContext()
+                    rebuildOverlay()
+                end)
+            end,
+        })
+
+        -- 4. Jump to Page
+        local target_page = tonumber(image_entry.page) or 1
+        table.insert(action_items_list, {
+            icon = "external-link.svg",
+            title = string.format("Jump to Page %d", target_page),
+            desc = "Navigate directly to this illustration in reader",
+            should_close = true,
+            cb = function()
+                self:jumpToImagePage(target_page, image_entry)
+            end,
+        })
+
+        -- 5. Hide / Unhide Image
+        local is_hid = (image_entry.is_hidden == true)
+        local hide_title = is_hid and "Unhide Image" or "Hide Image"
+        local hide_desc = is_hid and "Restore image to main gallery" or "Remove decorative image from gallery"
+        table.insert(action_items_list, {
+            icon = is_hid and "eye.svg" or "eye-off.svg",
+            title = hide_title,
+            desc = hide_desc,
+            cb = function()
+                if self.image_manager and self.book_data then
+                    local cur_id = image_entry.id or image_entry.href or image_entry.src
+                    local new_hid = self.image_manager:toggleHideImage(self.book_data, cur_id)
+                    image_entry.is_hidden = new_hid
+                    if self.cache_manager and self.ui.document and self.ui.document.file then
+                        self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
+                    end
+                    refreshActiveContext()
+                end
+            end,
+        })
+
+        -- 6. Open Image Gallery
+        if self.active_image_viewer then
+            table.insert(action_items_list, {
+                icon = "grid.svg",
+                title = "Open Image Gallery",
+                desc = "Browse all illustrations and maps in book",
+                should_close = true,
+                cb = function()
+                    self:showImages{ force_gallery = true }
+                end,
+            })
+        end
+
+        total_nav_items = #action_items_list + 1
     end
 
-    local function makeActionRow(icon_name, title, desc, callback)
-        local icon_sz = sc(26)
-        local icon_widget = ImageWidget:new{
-            file = getAssetPath(icon_name),
-            width = icon_sz,
-            height = icon_sz,
-            scale_factor = 0,
-            is_icon = true,
-            alpha = true,
-        }
+    buildDialogWidget = function()
+        local content_items = {}
 
-        local max_text_w = inner_w - icon_sz - sc(40)
-
-        local t_label = TextWidget:new{
-            text = title,
-            face = Font:getFace("cfont", 16),
+        -- 1. Card Header
+        local display_title = image_entry.title or (self.loc:t("img_untitled") or "Image")
+        local title_label = TextBoxWidget:new{
+            text = (image_entry.is_favorite and "★ " or "") .. display_title,
+            face = Font:getFace("NotoSerif-Regular.ttf", 20),
             bold = true,
             fgcolor = Blitbuffer.COLOR_BLACK,
-            max_width = max_text_w,
+            width = inner_w,
+            alignment = "left",
         }
+        table.insert(content_items, title_label)
 
-        local text_vg = VerticalGroup:new{ align = "left", t_label }
-        if desc and desc ~= "" then
-            table.insert(text_vg, VerticalSpan:new{ width = sc(2) })
-            local d_label = TextWidget:new{
-                text = desc,
-                face = Font:getFace("cfont", 12),
-                fgcolor = Blitbuffer.Color8(75),
+        local sub_info = (image_entry.page and ("Page " .. tostring(image_entry.page)) or "Reference Image")
+        if image_entry.category then
+            sub_info = sub_info .. "  ·  [" .. image_entry.category:upper() .. "]"
+        end
+        if image_entry.is_series then
+            sub_info = sub_info .. "  ·  Series Reference"
+        end
+
+        local sub_label = TextWidget:new{
+            text = sub_info,
+            face = Font:getFace("cfont", 13),
+            fgcolor = Blitbuffer.Color8(70),
+        }
+        table.insert(content_items, sub_label)
+        table.insert(content_items, VerticalSpan:new{ width = sc(6) })
+        table.insert(content_items, LineWidget:new{
+            dimen = Geom:new{ w = inner_w, h = sc(1) },
+            background = Blitbuffer.COLOR_DARK_GRAY,
+        })
+        table.insert(content_items, VerticalSpan:new{ width = sc(6) })
+
+        -- 2. Render Action Rows
+        for idx, item_def in ipairs(action_items_list) do
+            if idx > 1 then
+                table.insert(content_items, VerticalSpan:new{ width = sc(5) })
+                table.insert(content_items, LineWidget:new{
+                    dimen = Geom:new{ w = inner_w, h = sc(1) },
+                    background = Blitbuffer.Color8(175),
+                })
+                table.insert(content_items, VerticalSpan:new{ width = sc(5) })
+            end
+
+            local is_focused = (focus_visible and idx == focused_action_idx)
+            local icon_sz = sc(26)
+            local icon_widget = ImageWidget:new{
+                file = getAssetPath(item_def.icon),
+                width = icon_sz,
+                height = icon_sz,
+                scale_factor = 0,
+                is_icon = true,
+                alpha = true,
+            }
+
+            local max_text_w = inner_w - icon_sz - sc(40)
+            local t_label = TextWidget:new{
+                text = item_def.title,
+                face = Font:getFace("cfont", 16),
+                bold = true,
+                fgcolor = Blitbuffer.COLOR_BLACK,
                 max_width = max_text_w,
             }
-            table.insert(text_vg, d_label)
-        end
 
-        local chevron = TextWidget:new{
-            text = "›",
-            face = Font:getFace("cfont", 19),
-            bold = true,
-            fgcolor = Blitbuffer.Color8(110),
-        }
+            local text_vg = VerticalGroup:new{ align = "left", t_label }
+            if item_def.desc and item_def.desc ~= "" then
+                table.insert(text_vg, VerticalSpan:new{ width = sc(2) })
+                local d_label = TextWidget:new{
+                    text = item_def.desc,
+                    face = Font:getFace("cfont", 12),
+                    fgcolor = Blitbuffer.Color8(75),
+                    max_width = max_text_w,
+                }
+                table.insert(text_vg, d_label)
+            end
 
-        local left_content = HorizontalGroup:new{
-            align = "center",
-            icon_widget,
-            HorizontalSpan:new{ width = sc(14) },
-            text_vg,
-        }
+            local chevron = TextWidget:new{
+                text = "›",
+                face = Font:getFace("cfont", 19),
+                bold = true,
+                fgcolor = Blitbuffer.Color8(110),
+            }
 
-        local row_w = inner_w - sc(16)
-        local row_elements = OverlapGroup:new{
-            dimen = Geom:new{ w = row_w, h = sc(38) },
-            LeftContainer:new{
-                dimen = Geom:new{ w = row_w - sc(24), h = sc(38) },
-                left_content,
-            },
-            RightContainer:new{
+            local left_content = HorizontalGroup:new{
+                align = "center",
+                icon_widget,
+                HorizontalSpan:new{ width = sc(14) },
+                text_vg,
+            }
+
+            local row_w = inner_w - sc(16)
+            local row_elements = OverlapGroup:new{
                 dimen = Geom:new{ w = row_w, h = sc(38) },
-                chevron,
-            },
-        }
+                LeftContainer:new{
+                    dimen = Geom:new{ w = row_w - sc(24), h = sc(38) },
+                    left_content,
+                },
+                RightContainer:new{
+                    dimen = Geom:new{ w = row_w, h = sc(38) },
+                    chevron,
+                },
+            }
 
-        local row_frame = FrameContainer:new{
-            padding = sc(8),
-            padding_h = sc(8),
-            bordersize = 0,
-            background = Blitbuffer.COLOR_WHITE,
-            radius = sc(4),
-            width = inner_w,
-            row_elements,
-        }
+            local row_frame = FrameContainer:new{
+                padding = sc(8),
+                padding_h = sc(8),
+                bordersize = is_focused and (xray_theme.border_focus or sc(2)) or 0,
+                color = is_focused and (xray_theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_WHITE,
+                background = is_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or Blitbuffer.COLOR_WHITE,
+                radius = sc(4),
+                width = inner_w,
+                row_elements,
+            }
 
-        local item = InputContainer:new{ row_frame }
-        item.ges_events = {
-            Tap = {
-                GestureRange:new{
-                    ges = "tap",
-                    range = function()
-                        local dim = item.dimen
-                        if not dim then return Geom:new{ x = -1, y = -1, w = 1, h = 1 } end
-                        return Geom:new{
-                            x = dim.x or 0,
-                            y = dim.y or 0,
-                            w = (dim.w and dim.w > 0 and dim.w) or inner_w,
-                            h = (dim.h and dim.h > 0 and dim.h) or sc(48),
-                        }
-                    end
+            local item = InputContainer:new{ row_frame }
+            item.ges_events = {
+                Tap = {
+                    GestureRange:new{
+                        ges = "tap",
+                        range = function()
+                            local dim = item.dimen
+                            if not dim then return Geom:new{ x = -1, y = -1, w = 1, h = 1 } end
+                            return Geom:new{
+                                x = dim.x or 0,
+                                y = dim.y or 0,
+                                w = (dim.w and dim.w > 0 and dim.w) or inner_w,
+                                h = (dim.h and dim.h > 0 and dim.h) or sc(48),
+                            }
+                        end
+                    }
                 }
             }
+            item.onTap = function()
+                runAction(item_def)
+                return true
+            end
+            table.insert(content_items, item)
+        end
+
+        -- 3. Close Button
+        table.insert(content_items, VerticalSpan:new{ width = sc(8) })
+        local is_close_focused = (focus_visible and focused_action_idx == total_nav_items)
+        local close_btn = Button:new{
+            text = self.loc:t("close") or "Close",
+            text_font_size = 15,
+            text_font_bold = true,
+            bordersize = is_close_focused and (xray_theme.border_focus or sc(3)) or sc(1),
+            color = is_close_focused and (xray_theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK,
+            background = is_close_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(200)) or Blitbuffer.Color8(240),
+            radius = sc(4),
+            width = inner_w,
+            height = sc(38),
+            callback = function() closeDialog() end,
         }
-        item.onTap = function()
-            closeDialog(callback)
-            return true
-        end
-        return item
+        table.insert(content_items, close_btn)
+
+        local content_vg = VerticalGroup:new(content_items)
+        content_vg.align = "left"
+
+        return FrameContainer:new{
+            padding = card_padding,
+            radius = sc(4),
+            bordersize = card_border,
+            color = Blitbuffer.COLOR_BLACK,
+            background = Blitbuffer.COLOR_WHITE,
+            width = dialog_w,
+            content_vg,
+        }
     end
 
-    -- ── 3. Build Action List ───────────────────────────────────────────────────
-
-    -- Favorite Toggle
-    local is_fav = (image_entry.is_favorite == true)
-    local fav_title = is_fav and "Remove from Favorites" or "Add to Favorites"
-    local fav_desc = is_fav and "Unpin from the favorites tab" or "Pin this image to the favorites tab"
-    table.insert(content_items, makeActionRow("star.svg", fav_title, fav_desc, function()
-        if self.image_manager and self.book_data then
-            local cur_id = image_entry.id or image_entry.href or image_entry.src
-            local new_fav = self.image_manager:toggleFavorite(self.book_data, cur_id)
-            image_entry.is_favorite = new_fav
-            if self.cache_manager and self.ui.document and self.ui.document.file then
-                self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
-            end
-            refreshActiveContext()
-        end
-    end))
-
-    -- Save to Series References
-    addDivider()
-    local series_slug = (self.book_data and self.book_data.series_slug) or (self.book_data and self.book_data.series and self.series_manager and self.series_manager:makeSlug(self.book_data.series)) or (self.book_data and self.book_data.title and self.series_manager and self.series_manager:makeSlug(self.book_data.title)) or "series"
-
-    local is_in_series = false
-    if self.series_manager then
-        local s_imgs = self.series_manager:getSeriesImages(series_slug, 999) or {}
-        local cur_id = image_entry.id or image_entry.href or image_entry.src
-        for _, s_item in ipairs(s_imgs) do
-            if (s_item.id and cur_id and s_item.id == cur_id) or (s_item.href and image_entry.href and s_item.href == image_entry.href) or (s_item.src and image_entry.src and s_item.src == image_entry.src) then
-                is_in_series = true
-                break
-            end
+    rebuildOverlay = function()
+        buildActionItemsList()
+        if overlay then
+            overlay[1] = CenterContainer:new{
+                dimen = Geom:new{ w = sw, h = sh },
+                buildDialogWidget(),
+            }
+            UIManager:setDirty(overlay, "ui")
         end
     end
 
-    local series_title = is_in_series and "Remove from Series References" or "Add to Series References"
-    local series_desc = is_in_series and "Remove this map from the series-wide collection" or "Keep map accessible across all series volumes"
-    table.insert(content_items, makeActionRow("book-open.svg", series_title, series_desc, function()
-        if self.series_manager then
-            local cur_id = image_entry.id or image_entry.href or image_entry.src
-            if is_in_series then
-                self.series_manager:removeSeriesImage(series_slug, cur_id)
-                image_entry.is_series = false
-            else
-                local copy = {}
-                for k, v in pairs(image_entry) do copy[k] = v end
-                copy.is_series = true
-                if not copy.cached_file and self.image_manager and self.ui.document and self.ui.document.file then
-                    copy.cached_file = self.image_manager:extractImageToFile(self.ui.document.file, image_entry)
+    runAction = function(item_def)
+        if not item_def then return end
+        if item_def.should_close then
+            closeDialog(item_def.cb)
+        else
+            if item_def.cb then
+                local ok, err = pcall(item_def.cb)
+                if not ok then
+                    logger.warn("xray: action failed: " .. tostring(err))
                 end
-                copy.source_book_title = (self.book_data and self.book_data.title) or "Book"
-                copy.source_book_index = (self.book_data and self.book_data.series_index) or 1
-                self.series_manager:saveSeriesImage(series_slug, copy)
-                image_entry.is_series = true
             end
-            if self.book_data then
-                self.book_data.series_slug = series_slug
-            end
-            if self.cache_manager and self.ui.document and self.ui.document.file then
-                self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
-            end
-            refreshActiveContext()
+            rebuildOverlay()
         end
-    end))
-
-    -- Rename Label
-    addDivider()
-    table.insert(content_items, makeActionRow("edit.svg", "Rename Label", "Edit custom image title and description", function()
-        local rename_dialog
-        rename_dialog = InputDialog:new{
-            title = self.loc:t("img_rename_title") or "Rename Image Label",
-            input = image_entry.title or "",
-            buttons = {
-                {
-                    {
-                        text = self.loc:t("cancel") or "Cancel",
-                        callback = function() UIManager:close(rename_dialog) end,
-                    },
-                    {
-                        text = self.loc:t("save") or "Save",
-                        is_enter_default = true,
-                        callback = function()
-                            local new_val = rename_dialog:getInputText()
-                            UIManager:close(rename_dialog)
-                            if new_val and #new_val > 0 and self.image_manager and self.book_data then
-                                image_entry.title = new_val
-                                image_entry.custom_title = true
-                                local cur_id = image_entry.id or image_entry.href or image_entry.src
-                                self.image_manager:renameImage(self.book_data, cur_id, new_val)
-                                if self.cache_manager and self.ui.document and self.ui.document.file then
-                                    self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
-                                end
-                                refreshActiveContext()
-                            end
-                        end,
-                    },
-                },
-            },
-        }
-        UIManager:show(rename_dialog)
-        rename_dialog:onShowKeyboard()
-    end))
-
-    -- Jump to Page in Book
-    if image_entry.page and tonumber(image_entry.page) then
-        addDivider()
-        table.insert(content_items, makeActionRow("external-link.svg", "Jump to Page " .. tostring(image_entry.page), "Navigate directly to this illustration in reader", function()
-            self:jumpToImagePage(tonumber(image_entry.page))
-        end))
     end
 
-    -- Hide / Unhide Image
-    addDivider()
-    local is_hid = (image_entry.is_hidden == true)
-    local hide_title = is_hid and "Unhide Image" or "Hide Image"
-    local hide_desc = is_hid and "Restore image to main gallery" or "Remove decorative image from gallery"
-    table.insert(content_items, makeActionRow(is_hid and "eye.svg" or "eye-off.svg", hide_title, hide_desc, function()
-        if self.image_manager and self.book_data then
-            local cur_id = image_entry.id or image_entry.href or image_entry.src
-            local new_hid = self.image_manager:toggleHideImage(self.book_data, cur_id)
-            image_entry.is_hidden = new_hid
-            if self.cache_manager and self.ui.document and self.ui.document.file then
-                self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
-            end
-            refreshActiveContext()
+    -- Initial build
+    if self.image_manager and self.image_manager.resolveImagePage then
+        self.image_manager:resolveImagePage(self.ui, image_entry)
+        if self.cache_manager and self.ui and self.ui.document and self.ui.document.file and self.book_data then
+            self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
         end
-    end))
+    end
+    buildActionItemsList()
+    local card = buildDialogWidget()
 
-    -- Open Image Gallery (when accessed from within the active image viewer)
-    if self.active_image_viewer then
-        addDivider()
-        table.insert(content_items, makeActionRow("grid.svg", "Open Image Gallery", "Browse all illustrations and maps in book", function()
-            self:showImages{ force_gallery = true }
-        end))
+    -- Build key name lookup sets for fast matching
+    local ok_dev, Device = pcall(require, "device")
+    local extra_enter_keys = {}
+    local extra_back_keys = {}
+    if ok_dev and Device and Device.input and Device.input.group then
+        if Device.input.group.Enter then extra_enter_keys[Device.input.group.Enter] = true end
+        if Device.input.group.Select then extra_enter_keys[Device.input.group.Select] = true end
+        if Device.input.group.Back then extra_back_keys[Device.input.group.Back] = true end
     end
 
-    -- ── 4. Card Close Footer ───────────────────────────────────────────────────
-    table.insert(content_items, VerticalSpan:new{ width = sc(8) })
-    local close_btn = Button:new{
-        text = self.loc:t("close") or "Close",
-        text_font_size = 15,
-        text_font_bold = true,
-        bordersize = sc(1),
-        radius = sc(4),
-        width = inner_w,
-        height = sc(36),
-        callback = function() closeDialog() end,
-    }
-    table.insert(content_items, close_btn)
-
-    -- ── 5. Assemble Dialog Card ────────────────────────────────────────────────
-    local content_vg = VerticalGroup:new(content_items)
-    content_vg.align = "left"
-
-    local card = FrameContainer:new{
-        padding = card_padding,
-        radius = sc(4),
-        bordersize = card_border,
-        color = Blitbuffer.COLOR_BLACK,
-        background = Blitbuffer.COLOR_WHITE,
-        width = dialog_w,
-        content_vg,
-    }
+    local UP_KEYS    = { Up=true, Left=true, PrevPage=true, PageUp=true, k=true, K=true }
+    local DOWN_KEYS  = { Down=true, Right=true, NextPage=true, PageDown=true, j=true, J=true }
+    local ENTER_KEYS = { Return=true, Enter=true, KP_Enter=true, Select=true, Space=true, Press=true }
+    local CLOSE_KEYS = { Escape=true, Back=true, q=true, Q=true }
+    for k in pairs(extra_enter_keys) do ENTER_KEYS[k] = true end
+    for k in pairs(extra_back_keys)  do CLOSE_KEYS[k] = true end
 
     overlay = InputContainer:new{
         dimen = Geom:new{ w = sw, h = sh },
-        key_events = {
-            Close = { { "Back" } }
-        },
+        stop_events_propagation = true,
         CenterContainer:new{
             dimen = Geom:new{ w = sw, h = sh },
             card,
         }
     }
 
-    overlay.onClose = function()
-        closeDialog()
-        return true
+    -- Use raw onKeyPress so we intercept keys before any other widget
+    overlay.onKeyPress = function(self_ov, key)
+        local key_name = key and key.key or key
+        if UP_KEYS[key_name] then
+            focus_visible = true
+            if not focused_action_idx then
+                focused_action_idx = total_nav_items
+            else
+                focused_action_idx = (focused_action_idx > 1) and (focused_action_idx - 1) or total_nav_items
+            end
+            overlay[1] = CenterContainer:new{
+                dimen = Geom:new{ w = sw, h = sh },
+                buildDialogWidget(),
+            }
+            UIManager:setDirty(overlay, "ui")
+            return true
+        elseif DOWN_KEYS[key_name] then
+            focus_visible = true
+            if not focused_action_idx then
+                focused_action_idx = 1
+            else
+                focused_action_idx = (focused_action_idx < total_nav_items) and (focused_action_idx + 1) or 1
+            end
+            overlay[1] = CenterContainer:new{
+                dimen = Geom:new{ w = sw, h = sh },
+                buildDialogWidget(),
+            }
+            UIManager:setDirty(overlay, "ui")
+            return true
+        elseif ENTER_KEYS[key_name] then
+            if not focus_visible or not focused_action_idx then
+                focused_action_idx = 1
+            end
+            if focused_action_idx <= #action_items_list then
+                local def = action_items_list[focused_action_idx]
+                if def then runAction(def) end
+            else
+                closeDialog()
+            end
+            return true
+        elseif CLOSE_KEYS[key_name] then
+            closeDialog()
+            return true
+        end
     end
 
     UIManager:show(overlay, "ui")
@@ -6357,20 +7097,115 @@ function M:resumeMinimizedImage()
     self:_launchImageViewer(state.image_entry, state)
 end
 
-function M:jumpToImagePage(page)
-    if not page then return end
+function M:resumeImagesFeature()
+    if self.return_banner then
+        local banner = self.return_banner
+        self.return_banner = nil
+        self.return_page_origin = nil
+        pcall(function() UIManager:close(banner) end)
+    end
+
+    if self.was_in_image_viewer and (self.last_minimized_state or (self.book_data and self.book_data.last_minimized_state)) then
+        self:resumeMinimizedImage()
+    else
+        self:showImages{
+            force_gallery = true,
+            tab = self.saved_gallery_tab,
+            current_page = self.saved_gallery_page,
+            view_mode = self.saved_gallery_view_mode,
+        }
+    end
+end
+
+function M:jumpToImagePage(page, image_entry)
+    local pg = tonumber(page)
+    if image_entry and self.image_manager and self.image_manager.resolveImagePage then
+        local resolved = self.image_manager:resolveImagePage(self.ui, image_entry)
+        if resolved and resolved > 0 then pg = resolved end
+        if self.cache_manager and self.ui and self.ui.document and self.ui.document.file and self.book_data then
+            self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
+        end
+    end
+    if not pg then return end
+
+    local current_pg = self.return_page_origin or self.last_pageno
+    if not current_pg and self.ui then
+        if self.ui.getCurrentPage then
+            local ok, p = pcall(function() return self.ui:getCurrentPage() end)
+            if ok and p then current_pg = p end
+        elseif self.ui.paging and self.ui.paging.getCurrentPage then
+            local ok, p = pcall(function() return self.ui.paging:getCurrentPage() end)
+            if ok and p then current_pg = p end
+        elseif self.ui.document and self.ui.document.getCurrentPage then
+            local ok, p = pcall(function() return self.ui.document:getCurrentPage() end)
+            if ok and p then current_pg = p end
+        end
+    end
+    local return_pg = current_pg or 1
+    self.return_page_origin = return_pg
+
+    self.pending_return_banner = {
+        return_page = return_pg,
+        image_entry = image_entry,
+        is_image = true,
+    }
+
     if self.image_gallery_overlay then
+        self.saved_gallery_page = self.image_gallery_overlay.current_page
+        self.saved_gallery_tab = self.image_gallery_overlay.tab
+        self.saved_gallery_view_mode = self.image_gallery_overlay.view_mode
         local ov = self.image_gallery_overlay
         self.image_gallery_overlay = nil
         UIManager:close(ov, "ui")
     end
-    self:closeAllMenus()
-    if self.ui and self.ui.handleEvent then
-        local ok_ev, Event = pcall(require, "ui/event")
-        if ok_ev and Event then
-            self.ui:handleEvent(Event:new("GotoPage", page))
+
+    if self.active_image_viewer then
+        self.was_in_image_viewer = true
+        self.last_minimized_state = {
+            image_entry = self.active_image_viewer.image_entry or image_entry,
+            rotation_angle = self.active_image_viewer.rotation_angle,
+            zoom_level = self.active_image_viewer.zoom_level,
+            pan_x = self.active_image_viewer.pan_x,
+            pan_y = self.active_image_viewer.pan_y,
+            inverted = self.active_image_viewer.inverted,
+        }
+        if self.book_data then
+            self.book_data.last_minimized_state = self.last_minimized_state
+        end
+        self.active_image_viewer:close(true)
+    else
+        self.was_in_image_viewer = false
+        if not self.last_minimized_state or not self.last_minimized_state.image_entry then
+            self.last_minimized_state = {
+                image_entry = image_entry,
+            }
         end
     end
+    self:closeAllMenus()
+
+    -- If already on this page, show the return banner immediately
+    if pg == return_pg then
+        self.pending_return_banner = nil
+        UIManager:nextTick(function()
+            if self.showImageReturnBanner then
+                self:showImageReturnBanner(return_pg, image_entry, pg)
+            end
+        end)
+        return
+    end
+
+    UIManager:nextTick(function()
+        if self.ui and self.ui.handleEvent then
+            local ok_ev, Event = pcall(require, "ui/event")
+            if ok_ev and Event then
+                self.ui:handleEvent(Event:new("GotoPage", pg))
+                return
+            end
+        end
+        if self.ui and self.ui.document and self.ui.document.gotoPage then
+            self.ui.document:gotoPage(pg)
+        end
+    end)
 end
 
 return M

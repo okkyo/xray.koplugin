@@ -122,6 +122,10 @@ package.loaded["ui/widget/textviewer"] = {
 package.loaded["ui/widget/menu"] = {
     new = function(a, b) return { type = "Menu", args = b or a } end
 }
+package.loaded["ui/widget/menuitem"] = {
+    onFocus = function(self) return true end,
+    onUnfocus = function(self) return true end,
+}
 package.loaded["ui/widget/imagewidget"] = {
     new = function(a, b) 
         local iw = { type = "ImageWidget", args = b or a }
@@ -314,11 +318,14 @@ package.loaded["ffi/blitbuffer"] = {
 package.loaded["ui/font"] = {
     getFace = function() return {} end
 }
-package.loaded["ui/rendertext"] = {}
+package.loaded["ui/rendertext"] = {
+    sizeUtf8Text = function(self, ...) return { x = 50, y = 20 } end
+}
 package.loaded["ui/event"] = {
     new = function(a, b, c) 
-        if type(a) == "string" then return { name = a, args = b } end
-        return { name = b, args = c }
+        local event_name = type(a) == "string" and a or b
+        local event_args = type(a) == "string" and b or c
+        return { name = event_name, type = event_name, args = event_args }
     end
 }
 package.loaded["ui/gesturerange"] = {

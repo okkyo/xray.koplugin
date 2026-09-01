@@ -1457,6 +1457,22 @@ function UnitTooltip:init()
             }
         }
     }
+    self.key_events = {
+        Close = {
+            { "Escape" },
+            { "Back" },
+            { "q" },
+            { "Q" },
+            { "Return" },
+            { "KP_Enter" },
+            { "Select" },
+            { "Space" },
+        }
+    }
+    local Device = require("device")
+    if Device.hasKeys and Device:hasKeys() and Device.input and Device.input.group and Device.input.group.Back then
+        table.insert(self.key_events.Close, { Device.input.group.Back })
+    end
     
     local OverlapGroup = require("ui/widget/overlapgroup")
     self[1] = OverlapGroup:new{
@@ -1549,4 +1565,5 @@ end
 
 M._PointerArrow = _PointerArrow
 M._draw_underline = _draw_underline
+M.UnitTooltip = UnitTooltip
 return M

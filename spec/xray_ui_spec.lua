@@ -1325,6 +1325,83 @@ describe("xray_ui", function()
             assert.are.equal("InputContainer", last.type)
         end)
     end)
+
+    describe("showImageActions", function()
+        it("should open actions overlay and handle key events and in-place toggles without crash", function()
+            local img_entry = { id = "img_test", title = "Map of Shire", page = 4, is_favorite = false }
+            plugin.book_data = { images = { img_entry } }
+            plugin.image_manager = {
+                toggleFavorite = function(self, bd, id)
+                    img_entry.is_favorite = not img_entry.is_favorite
+                    return img_entry.is_favorite
+                end,
+                toggleHideImage = function(self, bd, id)
+                    img_entry.is_hidden = not img_entry.is_hidden
+                    return img_entry.is_hidden
+                end,
+            }
+
+            local overlay = plugin:showImageActions(img_entry)
+            assert.is_not_nil(overlay)
+            assert.is_not_nil(overlay.onKeyPress)
+
+            -- Initial focus is index 1 (Favorite)
+            -- Test Return on Favorite action (idx 1)
+            local res = overlay:onKeyPress({ key = "Return" })
+            assert.is_true(res)
+            assert.is_true(img_entry.is_favorite)
+
+            -- Overlay should still be open (in-place update)
+            assert.is_not_nil(overlay[1])
+
+            -- Test Down arrow navigation to index 2 (Series)
+            res = overlay:onKeyPress({ key = "Down" })
+            assert.is_true(res)
+
+            -- Test Up arrow navigation back to index 1 (Favorite)
+            res = overlay:onKeyPress({ key = "Up" })
+            assert.is_true(res)
+
+            -- Toggle favorite back to false
+            res = overlay:onKeyPress({ key = "Return" })
+            assert.is_true(res)
+            assert.is_false(img_entry.is_favorite)
+
+            -- Test Close key (Escape)
+            res = overlay:onKeyPress({ key = "Escape" })
+            assert.is_true(res)
+        end)
+
+        it("should open rename dialog without crash", function()
+            local img_entry = { id = "img_test", title = "Map of Shire", page = 4 }
+            local renamed = false
+            plugin.image_manager = {
+                renameImage = function(self, bd, id, title)
+                    img_entry.title = title
+                    renamed = true
+                end,
+            }
+            plugin:renameImageDialog(img_entry, function()
+                renamed = true
+            end)
+            local last = _G.ui_tracker.last_shown
+            assert.is_not_nil(last)
+            assert.are.equal("InputDialog", last.type)
+        end)
+
+        it("should jump to image page via GotoPage event", function()
+            local navigated_page = nil
+            plugin.ui = {
+                handleEvent = function(self, ev)
+                    if ev and ev.name == "GotoPage" then
+                        navigated_page = (type(ev.args) == "table" and ev.args[1]) or ev.args
+                    end
+                end,
+            }
+            plugin:jumpToImagePage(42)
+            assert.are.equal(42, navigated_page)
+        end)
+    end)
 end)
 
 

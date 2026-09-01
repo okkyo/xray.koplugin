@@ -40,14 +40,17 @@ function M.show(ui_instance, args)
     local title_font_size = math.max(10, math.min(fs - 5, 15))
 
     local overlay
+    local focused_index = 1
     local refresh
 
     refresh = function()
-        if overlay then
-            UIManager:close(overlay, "ui")
-        end
-
         local current_val = args.get_current_func()
+        local options_list = (type(args.options) == "function") and args.options() or args.options
+        local total_options = #options_list
+        local total_items = total_options + (args.about_text and 2 or 1)
+
+        if focused_index > total_items then focused_index = total_items end
+        if focused_index < 1 then focused_index = 1 end
 
         local function span()
             return VerticalSpan:new{ width = xray_theme.gap }
@@ -76,9 +79,9 @@ function M.show(ui_instance, args)
             table.insert(content_vg, span())
         end
 
-        local options_list = (type(args.options) == "function") and args.options() or args.options
-        for _, opt in ipairs(options_list) do
+        for idx, opt in ipairs(options_list) do
             local is_selected = (opt.value == current_val)
+            local is_focused = (idx == focused_index)
             local dot_char = is_selected and "●" or "○"
             
             local row_content = HorizontalGroup:new{
@@ -115,11 +118,11 @@ function M.show(ui_instance, args)
             end
 
             local frame = FrameContainer:new{
-                bordersize = is_selected and xray_theme.border_btn or sc(1),
+                bordersize = is_focused and (xray_theme.border_focus or sc(2)) or (is_selected and xray_theme.border_btn or sc(1)),
                 radius = xray_theme.radius_btn,
                 padding = sc(6),
-                color = is_selected and xray_theme.color_border or xray_theme.color_section_rule,
-                background = xray_theme.color_bg,
+                color = is_focused and (xray_theme.color_focus_border or Blitbuffer.COLOR_BLACK) or (is_selected and xray_theme.color_border or xray_theme.color_section_rule),
+                background = is_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or xray_theme.color_bg,
                 width = dialog_w - sc(32),
                 row_content
             }
@@ -140,6 +143,7 @@ function M.show(ui_instance, args)
                 }
             }
             item.onTap = function()
+                focused_index = idx
                 local handled = args.save_func(opt.value, refresh)
                 if not handled then
                     refresh()
@@ -169,13 +173,20 @@ function M.show(ui_instance, args)
 
         -- Close & About buttons at the bottom
         local buttons = {}
+        local about_index = args.about_text and (total_options + 1) or nil
+        local close_index = args.about_text and (total_options + 2) or (total_options + 1)
+
+        local is_about_focused = (focused_index == about_index)
+        local is_close_focused = (focused_index == close_index)
+
         if args.about_text then
             local about_btn = Button:new{
                 text = ui_instance.loc:t("menu_about") or "About",
                 face = Font:getFace("cfont", ui_font_size),
                 width = (dialog_w - sc(40)) / 2,
                 height = sc(42),
-                bordersize = xray_theme.border_btn,
+                bordersize = is_about_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+                background = is_about_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
                 radius = xray_theme.radius_btn,
                 callback = function()
                     M.showAbout(ui_instance, args.title, args.about_text)
@@ -189,10 +200,11 @@ function M.show(ui_instance, args)
             face = Font:getFace("cfont", ui_font_size),
             width = args.about_text and ((dialog_w - sc(40)) / 2) or (dialog_w - sc(32)),
             height = sc(42),
-            bordersize = xray_theme.border_btn,
+            bordersize = is_close_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            background = is_close_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
             radius = xray_theme.radius_btn,
             callback = function()
-                UIManager:close(overlay, "ui")
+                if overlay then overlay:onClose() end
             end
         }
         table.insert(buttons, close_btn)
@@ -244,24 +256,109 @@ function M.show(ui_instance, args)
             return res
         end
 
-        overlay = InputContainer:new{
-            key_events = {
-                Close = { { "Back" } }
-            },
-            CenterContainer:new{
-                dimen = Geom:new{ w = sw, h = sh },
-                movable
-            }
+        local main_center = CenterContainer:new{
+            dimen = Geom:new{ w = sw, h = sh },
+            movable
         }
-        function overlay:onClose()
-            if self._closing then return end
-            self._closing = true
-            ui_instance._current_card_offset = nil
-            UIManager:close(self, "ui")
-            if args.on_close then args.on_close() end
-            return true
+
+        if overlay then
+            overlay[1] = main_center
+            UIManager:setDirty(overlay, "ui")
+        else
+            overlay = InputContainer:new{
+                key_events = {
+                    FocusUp = {
+                        { "Up" },
+                        { "PrevPage" },
+                    },
+                    FocusDown = {
+                        { "Down" },
+                        { "NextPage" },
+                    },
+                    FocusLeft = {
+                        { "Left" },
+                    },
+                    FocusRight = {
+                        { "Right" },
+                    },
+                    Select = {
+                        { "Return" },
+                        { "KP_Enter" },
+                        { "Select" },
+                        { "Space" },
+                    },
+                    Close = {
+                        { "Escape" },
+                        { "Back" },
+                        { "q" },
+                        { "Q" },
+                    },
+                },
+                main_center
+            }
+
+            overlay.onFocusUp = function()
+                if focused_index > 1 then
+                    focused_index = focused_index - 1
+                else
+                    focused_index = total_items
+                end
+                refresh()
+                return true
+            end
+
+            overlay.onFocusDown = function()
+                if focused_index < total_items then
+                    focused_index = focused_index + 1
+                else
+                    focused_index = 1
+                end
+                refresh()
+                return true
+            end
+
+            overlay.onFocusLeft = function()
+                if args.about_text and focused_index == close_index then
+                    focused_index = about_index
+                    refresh()
+                end
+                return true
+            end
+
+            overlay.onFocusRight = function()
+                if args.about_text and focused_index == about_index then
+                    focused_index = close_index
+                    refresh()
+                end
+                return true
+            end
+
+            overlay.onSelect = function()
+                if focused_index <= total_options then
+                    local opt = options_list[focused_index]
+                    if opt then
+                        local handled = args.save_func(opt.value, refresh)
+                        if not handled then refresh() end
+                    end
+                elseif args.about_text and focused_index == about_index then
+                    M.showAbout(ui_instance, args.title, args.about_text)
+                else
+                    overlay:onClose()
+                end
+                return true
+            end
+
+            function overlay:onClose()
+                if self._closing then return end
+                self._closing = true
+                ui_instance._current_card_offset = nil
+                UIManager:close(self, "ui")
+                if args.on_close then args.on_close() end
+                return true
+            end
+
+            UIManager:show(overlay, "ui")
         end
-        UIManager:show(overlay, "ui")
     end
 
     refresh()
@@ -390,10 +487,25 @@ function M.showAbout(ui_instance, title, text)
 
     overlay = InputContainer:new{
         key_events = {
-            Close = { { "Back" } }
+            Close = {
+                { "Escape" },
+                { "Back" },
+                { "q" },
+                { "Q" },
+                { "Return" },
+                { "KP_Enter" },
+                { "Select" },
+                { "Space" },
+            },
         },
         main_container
     }
+
+    overlay.onClose = function()
+        UIManager:close(overlay, "ui")
+        return true
+    end
+
     UIManager:show(overlay, "ui")
 end
 
