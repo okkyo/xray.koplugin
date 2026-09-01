@@ -621,6 +621,49 @@ msgstr "使用此图片"
 msgid "img_view"
 msgstr "查看图片"
 
+msgid "img_extract_failed"
+msgstr "无法提取图片文件。"
+
+msgid "img_minimized_hint"
+msgstr "最小化图片提示"
+
+msgid "img_no_favorites"
+msgstr "暂无收藏。\n\n在任何图片上使用 ⋮ 菜单即可将其添加到收藏。"
+
+msgid "img_no_hidden"
+msgstr "没有隐藏的图片。\n\n在图库中的任何图片上使用 ⋮ 菜单即可隐藏装饰性插图或首字下沉。"
+
+msgid "img_no_images"
+msgstr "未找到此标签/过滤器的图片。\n\n正在从书籍中提取或扫描图片..."
+
+msgid "img_no_series"
+msgstr "未保存系列参考资料。\n\n在任何地图上使用 ⋮ 菜单即可将其保存到系列参考资料中。"
+
+msgid "img_rename_title"
+msgstr "重命名图片标签"
+
+msgid "img_reveal"
+msgstr "显示"
+
+msgid "img_spoiler_confirm"
+msgstr "该图片位于第 %d 页（超出您当前的阅读进度）。是否显示图片？"
+
+msgid "img_spoiler_locked"
+msgstr "已锁定"
+
+msgid "img_tab_all"
+msgstr "全部"
+
+msgid "img_tab_favorites"
+msgstr "收藏"
+
+msgid "img_tab_series"
+msgstr "系列"
+
+msgid "img_untitled"
+msgstr "图片"
+
+
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
 msgstr "在存储根目录或设置目录中未找到 xray_key.txt 文件。"
@@ -913,6 +956,10 @@ msgstr "历史人物"
 msgid "menu_image_search"
 msgstr "图片搜索"
 
+msgid "menu_images"
+msgstr "图片与地图"
+
+
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
 msgstr "从 xray_key.txt 导入密钥"
@@ -1188,6 +1235,9 @@ msgstr "AI 发现了上次获取的 %d 个潜在重复项。现在查看吗？"
 # en-hash: d87f433b237815fa419a2ac953956c54
 msgid "plugin_description"
 msgstr "使用 AI 驱动的书籍分析提升您的阅读体验，就像 Kindle X-Ray 一样！"
+
+msgid "prev"
+msgstr "上一页"
 
 # en-hash: 136dbfc383f7b6799dbdcb4b37c65d13
 msgid "quick_menu_title"

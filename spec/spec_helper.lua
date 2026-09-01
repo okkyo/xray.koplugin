@@ -122,8 +122,23 @@ package.loaded["ui/widget/textviewer"] = {
 package.loaded["ui/widget/menu"] = {
     new = function(a, b) return { type = "Menu", args = b or a } end
 }
+package.loaded["ui/widget/imagewidget"] = {
+    new = function(a, b) 
+        local iw = { type = "ImageWidget", args = b or a }
+        iw.getSize = function() return { w = (b or a or {}).width or 200, h = (b or a or {}).height or 200 } end
+        iw.paintTo = function() end
+        return iw
+    end
+}
+package.loaded["ui/renderimage"] = {
+    renderImageFile = function() return nil end,
+    scaleBlitBuffer = function() return nil end,
+}
 package.loaded["ui/widget/verticalgroup"] = {
     new = function(a, b) return { type = "VerticalGroup", args = b or a } end
+}
+package.loaded["ui/widget/verticalspan"] = {
+    new = function(a, b) return { type = "VerticalSpan", args = b or a, getSize = function() return { w = 0, h = (b or a or {}).width or 0 } end } end
 }
 package.loaded["ui/widget/widget"] = (function()
     local klass = {}
@@ -149,6 +164,11 @@ package.loaded["ui/widget/container/framecontainer"] = {
     new = function(a, b) 
         local fc = { type = "FrameContainer", args = b or a }
         fc.getSize = function() return { w = 800, h = 300 } end
+        fc.paintTo = function(self, bb, x, y)
+            if self.args and self.args[1] and self.args[1].paintTo then
+                self.args[1]:paintTo(bb, x, y)
+            end
+        end
         return fc
     end
 }
@@ -162,7 +182,39 @@ package.loaded["ui/widget/container/alphacontainer"] = {
     end
 }
 package.loaded["ui/widget/container/centercontainer"] = {
-    new = function(a, b) return { type = "CenterContainer", args = b or a } end
+    new = function(a, b) 
+        local cc = { type = "CenterContainer", args = b or a }
+        cc.getSize = function() return { w = 800, h = 600 } end
+        return cc
+    end
+}
+package.loaded["ui/widget/container/leftcontainer"] = {
+    new = function(a, b) 
+        local lc = { type = "LeftContainer", args = b or a }
+        lc.getSize = function() return { w = 400, h = 600 } end
+        return lc
+    end
+}
+package.loaded["ui/widget/container/rightcontainer"] = {
+    new = function(a, b) 
+        local rc = { type = "RightContainer", args = b or a }
+        rc.getSize = function() return { w = 400, h = 600 } end
+        return rc
+    end
+}
+package.loaded["ui/widget/container/bottomcontainer"] = {
+    new = function(a, b) 
+        local bc = { type = "BottomContainer", args = b or a }
+        bc.getSize = function() return { w = 800, h = 100 } end
+        return bc
+    end
+}
+package.loaded["ui/widget/overlapgroup"] = {
+    new = function(a, b) 
+        local og = { type = "OverlapGroup", args = b or a }
+        og.getSize = function() return { w = 800, h = 600 } end
+        return og
+    end
 }
 package.loaded["ui/widget/container/movablecontainer"] = {
     new = function(a, b) return { type = "MovableContainer", args = b or a } end
@@ -209,10 +261,14 @@ package.loaded["ui/widget/verticalspan"] = {
     new = function(a, b) return { type = "VerticalSpan", args = b or a } end
 }
 package.loaded["ui/widget/horizontalgroup"] = {
-    new = function(a, b) return { type = "HorizontalGroup", args = b or a } end
+    new = function(a, b)
+        local hg = { type = "HorizontalGroup", args = b or a }
+        hg.getSize = function() return { w = 200, h = 30 } end
+        return hg
+    end
 }
 package.loaded["ui/widget/horizontalspan"] = {
-    new = function(a, b) return { type = "HorizontalSpan", args = b or a } end
+    new = function(a, b) return { type = "HorizontalSpan", args = b or a, getSize = function() return { w = (b or a or {}).width or 0, h = 0 } end } end
 }
 package.loaded["ui/size"] = {
     line = { thick = 2 },
@@ -220,9 +276,6 @@ package.loaded["ui/size"] = {
 }
 package.loaded["ui/geometry"] = {
     new = function(a, b) return b or a end
-}
-package.loaded["ui/widget/horizontalgroup"] = {
-    new = function(a, b) return { type = "HorizontalGroup", args = b or a } end
 }
 package.loaded["ui/widget/table"] = {
     new = function(a, b) return { type = "Table", args = b or a } end

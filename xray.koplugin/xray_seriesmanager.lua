@@ -314,6 +314,97 @@ function SeriesManager:loadSeriesCache(slug)
     return nil
 end
 
+-- Save a map / diagram to series-level cache
+function SeriesManager:saveSeriesImage(slug, image_data)
+    if not slug or not image_data then return false end
+    local data = self:loadSeriesCache(slug) or {
+        series_slug = slug,
+        images = {},
+    }
+    data.images = data.images or {}
+    
+    -- Check if image already exists in series (update or insert)
+    local found = false
+    local img_id = image_data.id or image_data.href
+    for i, existing in ipairs(data.images) do
+        local same_id = img_id and existing.id and (existing.id == img_id)
+        local same_href = image_data.href and existing.href and (existing.href == image_data.href)
+        if same_id or same_href then
+            data.images[i] = image_data
+            found = true
+            break
+        end
+    end
+    if not found then
+        table.insert(data.images, image_data)
+    end
+    
+    return self:saveSeriesCache(slug, data)
+end
+
+-- Retrieve series-level images up to max_book_index to avoid future book spoilers
+function SeriesManager:getSeriesImages(slug, max_book_index)
+    local results = {}
+    local seen = {}
+
+    local function addImages(data, enforce_filter)
+        if not data or not data.images then return end
+        for _, img in ipairs(data.images) do
+            local uid = img.id or img.href or (img.title and (img.title .. tostring(img.page)))
+            if uid and not seen[uid] then
+                local b_idx = tonumber(img.source_book_index) or 1
+                if not enforce_filter or not max_book_index or b_idx <= tonumber(max_book_index) then
+                    seen[uid] = true
+                    table.insert(results, img)
+                end
+            end
+        end
+    end
+
+    -- 1. Load primary series cache for the current book's slug
+    if slug and slug ~= "" then
+        local data = self:loadSeriesCache(slug)
+        if data then
+            addImages(data, true)
+        end
+    end
+
+    -- 2. Aggregate across all series cache files so references are accessible across all series volumes
+    local series_dir = DataStorage:getSettingsDir() .. "/xray/series"
+    if lfs and lfs.dir then
+        pcall(function()
+            for file in lfs.dir(series_dir) do
+                if file:match("%.lua$") then
+                    local file_slug = file:gsub("%.lua$", "")
+                    if file_slug ~= slug then
+                        local other_data = self:loadSeriesCache(file_slug)
+                        if other_data and other_data.images and #other_data.images > 0 then
+                            addImages(other_data, true)
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    return results
+end
+
+-- Remove a map / diagram from series cache
+function SeriesManager:removeSeriesImage(slug, image_id)
+    if not slug or not image_id then return false end
+    local data = self:loadSeriesCache(slug)
+    if not data or not data.images then return false end
+    
+    for i, img in ipairs(data.images) do
+        if img.id == image_id then
+            table.remove(data.images, i)
+            return self:saveSeriesCache(slug, data)
+        end
+    end
+    return false
+end
+
 -- Stream-serialize to file
 function SeriesManager:serializeToFile(f, obj, indent, seen)
     seen = seen or {}

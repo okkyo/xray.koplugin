@@ -621,6 +621,49 @@ msgstr "Usa questa immagine"
 msgid "img_view"
 msgstr "Visualizza immagine"
 
+msgid "img_extract_failed"
+msgstr "Impossibile estrarre il file immagine."
+
+msgid "img_minimized_hint"
+msgstr "Suggerimento immagine ridotta"
+
+msgid "img_no_favorites"
+msgstr "Nessun preferito.\n\nUsa il menu ⋮ su qualsiasi immagine per aggiungerla ai tuoi preferiti."
+
+msgid "img_no_hidden"
+msgstr "Nessuna immagine nascosta.\n\nUsa il menu ⋮ su qualsiasi immagine nella galleria per nascondere illustrazioni decorative o capilettera."
+
+msgid "img_no_images"
+msgstr "Nessuna immagine trovata per questa scheda/filtro.\n\nEstrazione o scansione delle immagini dal libro..."
+
+msgid "img_no_series"
+msgstr "Nessun riferimento della serie salvato.\n\nUsa il menu ⋮ su qualsiasi mappa per salvarla nei riferimenti della serie."
+
+msgid "img_rename_title"
+msgstr "Rinomina etichetta immagine"
+
+msgid "img_reveal"
+msgstr "Mostra"
+
+msgid "img_spoiler_confirm"
+msgstr "Questa immagine appare a pagina %d (oltre il tuo progresso attuale). Mostrare l'immagine?"
+
+msgid "img_spoiler_locked"
+msgstr "Bloccato"
+
+msgid "img_tab_all"
+msgstr "Tutte"
+
+msgid "img_tab_favorites"
+msgstr "Preferiti"
+
+msgid "img_tab_series"
+msgstr "Serie"
+
+msgid "img_untitled"
+msgstr "Immagine"
+
+
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
 msgstr "Nessun file xray_key.txt trovato nella root di memoria o nella cartella impostazioni."
@@ -913,6 +956,10 @@ msgstr "Figure storiche"
 msgid "menu_image_search"
 msgstr "Ricerca immagini"
 
+msgid "menu_images"
+msgstr "Immagini e mappe"
+
+
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
 msgstr "Importa chiavi da xray_key.txt"
@@ -1188,6 +1235,9 @@ msgstr "L'intelligenza artificiale ha trovato %d possibili duplicati dall'ultimo
 # en-hash: d87f433b237815fa419a2ac953956c54
 msgid "plugin_description"
 msgstr "Trasforma la tua esperienza di lettura con l'analisi dei libri basata sull'intelligenza artificiale, proprio come Amazon Kindle X-Ray!"
+
+msgid "prev"
+msgstr "Prec."
 
 # en-hash: 136dbfc383f7b6799dbdcb4b37c65d13
 msgid "quick_menu_title"

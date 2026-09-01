@@ -621,6 +621,49 @@ msgstr "この画像を使用"
 msgid "img_view"
 msgstr "画像を表示"
 
+msgid "img_extract_failed"
+msgstr "画像ファイルを抽出できませんでした。"
+
+msgid "img_minimized_hint"
+msgstr "縮小画像のヒント"
+
+msgid "img_no_favorites"
+msgstr "お気に入りはまだありません。\n\n画像の ⋮ メニューからお気に入りに追加できます。"
+
+msgid "img_no_hidden"
+msgstr "非表示の画像はありません。\n\nギャラリー内の画像にある ⋮ メニューから、装飾イラストやドロップキャップを非表示にできます。"
+
+msgid "img_no_images"
+msgstr "このタブ/フィルターに画像が見つかりません。\n\n本から画像を抽出またはスキャン中..."
+
+msgid "img_no_series"
+msgstr "保存されたシリーズ参照はありません。\n\n地図の ⋮ メニューからシリーズ参照に保存できます。"
+
+msgid "img_rename_title"
+msgstr "画像ラベルの名前を変更"
+
+msgid "img_reveal"
+msgstr "表示"
+
+msgid "img_spoiler_confirm"
+msgstr "この画像は%dページに掲載されています（現在の読書進捗より先です）。画像を表示しますか？"
+
+msgid "img_spoiler_locked"
+msgstr "ロック済み"
+
+msgid "img_tab_all"
+msgstr "すべて"
+
+msgid "img_tab_favorites"
+msgstr "お気に入り"
+
+msgid "img_tab_series"
+msgstr "シリーズ"
+
+msgid "img_untitled"
+msgstr "画像"
+
+
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
 msgstr "ストレージルートまたは設定ディレクトリに xray_key.txt が見つかりません。"
@@ -913,6 +956,10 @@ msgstr "歴史上の人物"
 msgid "menu_image_search"
 msgstr "画像検索"
 
+msgid "menu_images"
+msgstr "画像と地図"
+
+
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
 msgstr "xray_key.txt からキーをインポート"
@@ -1188,6 +1235,9 @@ msgstr "前回の取得で%d件の重複の可能性がある場所が見つか�
 # en-hash: d87f433b237815fa419a2ac953956c54
 msgid "plugin_description"
 msgstr "Amazon KindleのX-Rayのように、AIを活用した読書分析で読書体験を向上させます！"
+
+msgid "prev"
+msgstr "前へ"
 
 # en-hash: 136dbfc383f7b6799dbdcb4b37c65d13
 msgid "quick_menu_title"

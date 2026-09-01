@@ -621,6 +621,49 @@ msgstr "Gunakan Gambar Ini"
 msgid "img_view"
 msgstr "Lihat Gambar"
 
+msgid "img_extract_failed"
+msgstr "Gagal mengekstrak file gambar."
+
+msgid "img_minimized_hint"
+msgstr "Petunjuk gambar diminimalkan"
+
+msgid "img_no_favorites"
+msgstr "Belum ada favorit.\n\nGunakan menu ⋮ pada gambar apa pun untuk menambahkannya ke favorit Anda."
+
+msgid "img_no_hidden"
+msgstr "Tidak ada gambar yang disembunyikan.\n\nGunakan menu ⋮ pada gambar di galeri untuk menyembunyikan ilustrasi dekoratif atau huruf kapital awal."
+
+msgid "img_no_images"
+msgstr "Tidak ada gambar ditemukan untuk tab/filter ini.\n\nMengekstrak atau memindai gambar dari buku..."
+
+msgid "img_no_series"
+msgstr "Tidak ada referensi seri yang disimpan.\n\nGunakan menu ⋮ pada peta apa pun untuk menyimpannya ke referensi seri Anda."
+
+msgid "img_rename_title"
+msgstr "Ubah Nama Label Gambar"
+
+msgid "img_reveal"
+msgstr "Tampilkan"
+
+msgid "img_spoiler_confirm"
+msgstr "Gambar ini muncul di halaman %d (melewati kemajuan membaca Anda). Tampilkan gambar?"
+
+msgid "img_spoiler_locked"
+msgstr "Terkunci"
+
+msgid "img_tab_all"
+msgstr "Semua"
+
+msgid "img_tab_favorites"
+msgstr "Favorit"
+
+msgid "img_tab_series"
+msgstr "Seri"
+
+msgid "img_untitled"
+msgstr "Gambar"
+
+
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
 msgstr "Berkas xray_key.txt tidak ditemukan di penyimpanan utama atau direktori pengaturan."
@@ -913,6 +956,10 @@ msgstr "Tokoh Sejarah"
 msgid "menu_image_search"
 msgstr "Pencarian Gambar"
 
+msgid "menu_images"
+msgstr "Gambar & Peta"
+
+
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
 msgstr "Impor Kunci dari xray_key.txt"
@@ -1188,6 +1235,9 @@ msgstr "AI menemukan %d kemungkinan duplikat dari pengambilan terakhir. Tinjau s
 # en-hash: d87f433b237815fa419a2ac953956c54
 msgid "plugin_description"
 msgstr "Ubah pengalaman membaca Anda dengan analisis buku berbasis AI, seperti Amazon Kindle X-Ray!"
+
+msgid "prev"
+msgstr "Sblm"
 
 # en-hash: 136dbfc383f7b6799dbdcb4b37c65d13
 msgid "quick_menu_title"

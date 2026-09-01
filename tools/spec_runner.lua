@@ -156,8 +156,13 @@ local specs = {
     "spec/xray_seriesmanager_spec.lua",
     "spec/xray_units_spec.lua",
     "spec/xray_crypto_spec.lua",
-    "spec/xray_websetup_spec.lua"
+    "spec/xray_websetup_spec.lua",
+    "spec/xray_imagemanager_spec.lua"
 }
+
+if arg and arg[1] then
+    specs = { arg[1] }
+end
 
 print("=== Running KOReader X-Ray Unit Tests ===")
 for _, spec_path in ipairs(specs) do

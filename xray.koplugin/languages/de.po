@@ -621,6 +621,49 @@ msgstr "Dieses Bild verwenden"
 msgid "img_view"
 msgstr "Bild anzeigen"
 
+msgid "img_extract_failed"
+msgstr "Bilddatei konnte nicht extrahiert werden."
+
+msgid "img_minimized_hint"
+msgstr "Hinweis zu minimiertem Bild"
+
+msgid "img_no_favorites"
+msgstr "Noch keine Favoriten.\n\nVerwende das ⋮-Menü bei einem Bild, um es zu deinen Favoriten hinzuzufügen."
+
+msgid "img_no_hidden"
+msgstr "Keine ausgeblendeten Bilder.\n\nVerwende das ⋮-Menü bei einem Bild in der Galerie, um dekorative Illustrationen oder Initialen auszublenden."
+
+msgid "img_no_images"
+msgstr "Keine Bilder für diesen Tab/Filter gefunden.\n\nBilder werden aus dem Buch extrahiert oder gescannt..."
+
+msgid "img_no_series"
+msgstr "Keine Serien-Referenzen gespeichert.\n\nVerwende das ⋮-Menü bei einer Karte, um sie in deinen Serien-Referenzen zu speichern."
+
+msgid "img_rename_title"
+msgstr "Bildbezeichnung umbenennen"
+
+msgid "img_reveal"
+msgstr "Aufdecken"
+
+msgid "img_spoiler_confirm"
+msgstr "Dieses Bild erscheint auf Seite %d (nach Ihrem aktuellen Lesefortschritt). Bild aufdecken?"
+
+msgid "img_spoiler_locked"
+msgstr "Gesperrt"
+
+msgid "img_tab_all"
+msgstr "Alle"
+
+msgid "img_tab_favorites"
+msgstr "Favoriten"
+
+msgid "img_tab_series"
+msgstr "Serien"
+
+msgid "img_untitled"
+msgstr "Bild"
+
+
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
 msgstr "Keine xray_key.txt Datei im Speicher-Stammverzeichnis oder Einstellungsverzeichnis gefunden."
@@ -913,6 +956,10 @@ msgstr "Historische Personen"
 msgid "menu_image_search"
 msgstr "Bildersuche"
 
+msgid "menu_images"
+msgstr "Bilder & Karten"
+
+
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
 msgstr "Schlüssel aus xray_key.txt importieren"
@@ -1188,6 +1235,9 @@ msgstr "Die KI hat %d mögliche(s) Duplikat(e) aus dem letzten Abruf gefunden. J
 # en-hash: d87f433b237815fa419a2ac953956c54
 msgid "plugin_description"
 msgstr "Verbessern Sie Ihr Leseerlebnis mit KI-gestützter Buchanalyse, genau wie Amazon Kindle X-Ray!"
+
+msgid "prev"
+msgstr "Zurück"
 
 # en-hash: 136dbfc383f7b6799dbdcb4b37c65d13
 msgid "quick_menu_title"

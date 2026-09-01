@@ -621,6 +621,49 @@ msgstr "Використати це зображення"
 msgid "img_view"
 msgstr "Переглянути зображення"
 
+msgid "img_extract_failed"
+msgstr "Не вдалося витягти файл зображення."
+
+msgid "img_minimized_hint"
+msgstr "Підказка про згорнуте зображення"
+
+msgid "img_no_favorites"
+msgstr "Ще немає обраних.\n\nВикористовуйте меню ⋮ на будь-якому зображенні, щоб додати його до обраного."
+
+msgid "img_no_hidden"
+msgstr "Немає прихованих зображень.\n\nВикористовуйте меню ⋮ на будь-якому зображенні в галереї, щоб приховати декоративні ілюстрації або буквиці."
+
+msgid "img_no_images"
+msgstr "Зображень для цієї вкладки/фільтра не знайдено.\n\nВилучення або сканування зображень із книги..."
+
+msgid "img_no_series"
+msgstr "Немає збережених матеріалів серії.\n\nВикористовуйте меню ⋮ на будь-якій карті, щоб зберегти її до матеріалів серії."
+
+msgid "img_rename_title"
+msgstr "Зміна назви зображення"
+
+msgid "img_reveal"
+msgstr "Показати"
+
+msgid "img_spoiler_confirm"
+msgstr "Це зображення знаходиться на сторінці %d (далі за ваш поточний прогрес). Показати зображення?"
+
+msgid "img_spoiler_locked"
+msgstr "Заблоковано"
+
+msgid "img_tab_all"
+msgstr "Усі"
+
+msgid "img_tab_favorites"
+msgstr "Обране"
+
+msgid "img_tab_series"
+msgstr "Серії"
+
+msgid "img_untitled"
+msgstr "Зображення"
+
+
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
 msgstr "Файл xray_key.txt не знайдено в кореневому каталозі або папці налаштувань."
@@ -913,6 +956,10 @@ msgstr "Історичні постаті"
 msgid "menu_image_search"
 msgstr "Пошук зображень"
 
+msgid "menu_images"
+msgstr "Зображення та карти"
+
+
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
 msgstr "Імпортувати ключі з xray_key.txt"
@@ -1188,6 +1235,9 @@ msgstr "ШІ знайшов %d потенційних дублікатів з м
 # en-hash: d87f433b237815fa419a2ac953956c54
 msgid "plugin_description"
 msgstr "Перетворіть свій досвід читання за допомогою аналізу книг на основі ШІ, як в Amazon Kindle X-Ray!"
+
+msgid "prev"
+msgstr "Попер."
 
 # en-hash: 136dbfc383f7b6799dbdcb4b37c65d13
 msgid "quick_menu_title"

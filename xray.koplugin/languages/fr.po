@@ -621,6 +621,49 @@ msgstr "Utiliser cette image"
 msgid "img_view"
 msgstr "Afficher l'image"
 
+msgid "img_extract_failed"
+msgstr "Impossible d'extraire le fichier image."
+
+msgid "img_minimized_hint"
+msgstr "Indice d'image minimisée"
+
+msgid "img_no_favorites"
+msgstr "Pas encore de favoris.\n\nUtilisez le menu ⋮ sur n'importe quelle image pour l'ajouter à vos favoris."
+
+msgid "img_no_hidden"
+msgstr "Aucune image masquée.\n\nUtilisez le menu ⋮ sur n'importe quelle image de la galerie pour masquer les illustrations décoratives ou les lettrines."
+
+msgid "img_no_images"
+msgstr "Aucune image trouvée pour cet onglet/filtre.\n\nExtraction ou analyse des images du livre..."
+
+msgid "img_no_series"
+msgstr "Aucune référence de série enregistrée.\n\nUtilisez le menu ⋮ sur n'importe quelle carte pour l'enregistrer dans vos références de série."
+
+msgid "img_rename_title"
+msgstr "Renommer l'étiquette de l'image"
+
+msgid "img_reveal"
+msgstr "Révéler"
+
+msgid "img_spoiler_confirm"
+msgstr "Cette image apparaît à la page %d (au-delà de votre lecture actuelle). Révéler l'image ?"
+
+msgid "img_spoiler_locked"
+msgstr "Verrouillé"
+
+msgid "img_tab_all"
+msgstr "Toutes"
+
+msgid "img_tab_favorites"
+msgstr "Favoris"
+
+msgid "img_tab_series"
+msgstr "Séries"
+
+msgid "img_untitled"
+msgstr "Image"
+
+
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
 msgstr "Aucun fichier xray_key.txt trouvé à la racine du stockage ou des paramètres."
@@ -913,6 +956,10 @@ msgstr "Figures Historiques"
 msgid "menu_image_search"
 msgstr "Recherche d'images"
 
+msgid "menu_images"
+msgstr "Images et cartes"
+
+
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
 msgstr "Importer les clés depuis xray_key.txt"
@@ -1188,6 +1235,9 @@ msgstr "L'IA a trouvé %d doublon(s) potentiel(s) lors de la dernière analyse. 
 # en-hash: d87f433b237815fa419a2ac953956c54
 msgid "plugin_description"
 msgstr "Transformez votre expérience de lecture avec l'analyse de livre assistée par l'IA, tout comme Amazon Kindle X-Ray !"
+
+msgid "prev"
+msgstr "Préc."
 
 # en-hash: 136dbfc383f7b6799dbdcb4b37c65d13
 msgid "quick_menu_title"

@@ -8,10 +8,10 @@ end
 
 local M = {
     -- Borders & Separators
-    border_line_h = sc(2),
-    border_window = sc(2),
-    border_btn = sc(2),
-    border_preview = sc(2),
+    border_line_h = sc(1),
+    border_window = sc(1),
+    border_btn = sc(1),
+    border_preview = sc(1),
 
     -- Colors
     color_border = Blitbuffer.COLOR_DARK_GRAY,

@@ -6454,4 +6454,625 @@ function M:_promptImageSearchValue(config_key, title)
     dlg:onShowKeyboard()
 end
 
+-- Images, Maps & Diagrams Tracking UI
+-- ─────────────────────────────────────────────────────────────────────────────
+
+function M:showImages(opts)
+    opts = opts or {}
+    self.image_tab = opts.tab or self.image_tab or "all"
+    self.image_view_mode = opts.view_mode or self.image_view_mode or "mosaic"
+    self.image_filter_mode = opts.filter_mode or self.image_filter_mode or "standard"
+
+    -- Load images: prefer book_data.images from cache (preserves user customizations & rotations),
+    -- fall back to scan only if no cached images exist.
+    if (not self.book_data or not self.book_data.images) and self.cache_manager and self.ui and self.ui.document and self.ui.document.file then
+        local loaded = self.cache_manager:loadCache(self.ui.document.file)
+        if loaded and type(loaded) == "table" then
+            self.book_data = loaded
+        end
+    end
+
+    -- If the user minimized an image and is reopening via normal menu, seamlessly resume that image!
+    if not opts.force_gallery then
+        local min_state = self.last_minimized_state or (self.book_data and self.book_data.last_minimized_state)
+        if min_state and min_state.image_entry then
+            return self:resumeMinimizedImage()
+        end
+    end
+
+    if not self.image_manager then
+        local ImageManager = require(plugin_path .. "xray_imagemanager")
+        self.image_manager = ImageManager:new(self)
+    end
+
+    if not self.images or #self.images == 0 then
+        if self.book_data and self.book_data.images and #self.book_data.images > 0 then
+            self.images = self.book_data.images
+        elseif self.ui and self.ui.document then
+            -- No cached images — scan fresh
+            local scanned = self.image_manager:scanDocumentImages(self.ui)
+            self.book_data = self.book_data or {}
+            -- Merge all custom user fields from existing book_data.images
+            if self.book_data.images and #self.book_data.images > 0 then
+                local user_data = {}
+                for _, img in ipairs(self.book_data.images) do
+                    local entry = {
+                        title = img.title,
+                        custom_title = img.custom_title,
+                        rotation = img.rotation,
+                        zoom_level = img.zoom_level,
+                        pan_x = img.pan_x,
+                        pan_y = img.pan_y,
+                        is_favorite = img.is_favorite,
+                        is_hidden = img.is_hidden,
+                        is_series = img.is_series,
+                        cached_file = img.cached_file,
+                    }
+                    if img.id then user_data[img.id] = entry end
+                    if img.href then user_data[img.href] = entry end
+                    if img.src then user_data[img.src] = entry end
+                end
+                for _, img in ipairs(scanned) do
+                    local saved = (img.id and user_data[img.id]) or (img.href and user_data[img.href]) or (img.src and user_data[img.src])
+                    if saved then
+                        if saved.custom_title and saved.title then
+                            img.title = saved.title
+                            img.custom_title = true
+                        end
+                        if saved.rotation then img.rotation = saved.rotation end
+                        if saved.zoom_level then img.zoom_level = saved.zoom_level end
+                        if saved.pan_x then img.pan_x = saved.pan_x end
+                        if saved.pan_y then img.pan_y = saved.pan_y end
+                        if saved.is_favorite ~= nil then img.is_favorite = saved.is_favorite end
+                        if saved.is_hidden ~= nil then img.is_hidden = saved.is_hidden end
+                        if saved.is_series ~= nil then img.is_series = saved.is_series end
+                        if saved.cached_file then img.cached_file = saved.cached_file end
+                    end
+                end
+            end
+            self.images = scanned
+            self.book_data.images = self.images
+            if self.cache_manager and self.ui.document.file then
+                self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
+            end
+        end
+    end
+
+    if self.image_gallery_overlay then
+        local ov = self.image_gallery_overlay
+        self.image_gallery_overlay = nil
+        UIManager:close(ov, "ui")
+    end
+
+    local ImageGallery = require(plugin_path .. "xray_image_gallery")
+    local gallery = ImageGallery:new{
+        plugin = self,
+        current_page = opts.current_page or 1,
+        view_mode = self.image_view_mode,
+        tab = self.image_tab,
+        filter_mode = self.image_filter_mode,
+    }
+    self.image_gallery_overlay = gallery
+    UIManager:show(gallery, "ui")
+end
+
+function M:showImageActions(image_entry)
+    if not image_entry then return end
+    local InputContainer = require("ui/widget/container/inputcontainer")
+    local FrameContainer = require("ui/widget/container/framecontainer")
+    local CenterContainer = require("ui/widget/container/centercontainer")
+    local LeftContainer = require("ui/widget/container/leftcontainer")
+    local RightContainer = require("ui/widget/container/rightcontainer")
+    local OverlapGroup = require("ui/widget/overlapgroup")
+    local VerticalGroup = require("ui/widget/verticalgroup")
+    local HorizontalGroup = require("ui/widget/horizontalgroup")
+    local VerticalSpan = require("ui/widget/verticalspan")
+    local HorizontalSpan = require("ui/widget/horizontalspan")
+    local LineWidget = require("ui/widget/linewidget")
+    local TextWidget = require("ui/widget/textwidget")
+    local TextBoxWidget = require("ui/widget/textboxwidget")
+    local Button = require("ui/widget/button")
+    local ImageWidget = require("ui/widget/imagewidget")
+    local Font = require("ui/font")
+    local Geom = require("ui/geometry")
+    local GestureRange = require("ui/gesturerange")
+    local Blitbuffer = require("ffi/blitbuffer")
+    local Device = require("device")
+    local Screen = Device.screen
+    local InputDialog = require("ui/widget/inputdialog")
+
+    local function sc(val)
+        return (Screen and Screen.scaleBySize and Screen:scaleBySize(val)) or val
+    end
+
+    local sw = Screen:getWidth()
+    local sh = Screen:getHeight()
+    local dialog_w = math.min(sw - sc(24), sc(400))
+    local card_padding = sc(14)
+    local card_border = sc(2)
+    local inner_w = dialog_w - (card_padding * 2) - (card_border * 2)
+
+    local function getAssetPath(filename)
+        local info = debug.getinfo(1, "S")
+        local file_dir = (info and info.source and info.source:match("^@?(.*[/\\])")) or ""
+        local candidates = {
+            file_dir .. "assets/" .. filename,
+            file_dir .. "../assets/" .. filename,
+            "plugins/xray.koplugin/assets/" .. filename,
+            "./plugins/xray.koplugin/assets/" .. filename,
+        }
+        for _, path in ipairs(candidates) do
+            local f = io.open(path, "r")
+            if f then f:close(); return path end
+        end
+        return "plugins/xray.koplugin/assets/" .. filename
+    end
+
+    local overlay
+    local function closeDialog(callback)
+        if overlay then
+            local ov = overlay
+            overlay = nil
+            ov.onClose = nil
+            UIManager:close(ov, "ui")
+        end
+        if callback then callback() end
+    end
+
+    local content_items = {}
+
+    -- ── 1. Card Header ──────────────────────────────────────────────────────────
+    local display_title = image_entry.title or (self.loc:t("img_untitled") or "Image")
+    local title_label = TextBoxWidget:new{
+        text = (image_entry.is_favorite and "★ " or "") .. display_title,
+        face = Font:getFace("NotoSerif-Regular.ttf", 20),
+        bold = true,
+        fgcolor = Blitbuffer.COLOR_BLACK,
+        width = inner_w,
+        alignment = "left",
+    }
+    table.insert(content_items, title_label)
+
+    local sub_info = (image_entry.page and ("Page " .. tostring(image_entry.page)) or "Reference Image")
+    if image_entry.category then
+        sub_info = sub_info .. "  ·  [" .. image_entry.category:upper() .. "]"
+    end
+    if image_entry.is_series then
+        sub_info = sub_info .. "  ·  Series Reference"
+    end
+
+    local sub_label = TextWidget:new{
+        text = sub_info,
+        face = Font:getFace("cfont", 13),
+        fgcolor = Blitbuffer.Color8(70),
+    }
+    table.insert(content_items, sub_label)
+    table.insert(content_items, VerticalSpan:new{ width = sc(6) })
+    table.insert(content_items, LineWidget:new{
+        dimen = Geom:new{ w = inner_w, h = sc(1) },
+        background = Blitbuffer.COLOR_DARK_GRAY,
+    })
+    table.insert(content_items, VerticalSpan:new{ width = sc(6) })
+
+    local function refreshActiveContext()
+        if self.active_image_viewer then
+            self.active_image_viewer.image_entry = image_entry
+            self.active_image_viewer:buildUI()
+            UIManager:setDirty(self.active_image_viewer, "ui")
+        end
+        if self.image_gallery_overlay then
+            self.image_gallery_overlay:buildUI()
+            UIManager:setDirty(self.image_gallery_overlay, "ui")
+        end
+    end
+
+    -- ── 2. Action Row Helper with Visual Separation ────────────────────────────
+    local function addDivider()
+        table.insert(content_items, VerticalSpan:new{ width = sc(5) })
+        table.insert(content_items, LineWidget:new{
+            dimen = Geom:new{ w = inner_w, h = sc(1) },
+            background = Blitbuffer.Color8(175),
+        })
+        table.insert(content_items, VerticalSpan:new{ width = sc(5) })
+    end
+
+    local function makeActionRow(icon_name, title, desc, callback)
+        local icon_sz = sc(26)
+        local icon_widget = ImageWidget:new{
+            file = getAssetPath(icon_name),
+            width = icon_sz,
+            height = icon_sz,
+            scale_factor = 0,
+            is_icon = true,
+            alpha = true,
+        }
+
+        local max_text_w = inner_w - icon_sz - sc(40)
+
+        local t_label = TextWidget:new{
+            text = title,
+            face = Font:getFace("cfont", 16),
+            bold = true,
+            fgcolor = Blitbuffer.COLOR_BLACK,
+            max_width = max_text_w,
+        }
+
+        local text_vg = VerticalGroup:new{ align = "left", t_label }
+        if desc and desc ~= "" then
+            table.insert(text_vg, VerticalSpan:new{ width = sc(2) })
+            local d_label = TextWidget:new{
+                text = desc,
+                face = Font:getFace("cfont", 12),
+                fgcolor = Blitbuffer.Color8(75),
+                max_width = max_text_w,
+            }
+            table.insert(text_vg, d_label)
+        end
+
+        local chevron = TextWidget:new{
+            text = "›",
+            face = Font:getFace("cfont", 19),
+            bold = true,
+            fgcolor = Blitbuffer.Color8(110),
+        }
+
+        local left_content = HorizontalGroup:new{
+            align = "center",
+            icon_widget,
+            HorizontalSpan:new{ width = sc(14) },
+            text_vg,
+        }
+
+        local row_w = inner_w - sc(16)
+        local row_elements = OverlapGroup:new{
+            dimen = Geom:new{ w = row_w, h = sc(38) },
+            LeftContainer:new{
+                dimen = Geom:new{ w = row_w - sc(24), h = sc(38) },
+                left_content,
+            },
+            RightContainer:new{
+                dimen = Geom:new{ w = row_w, h = sc(38) },
+                chevron,
+            },
+        }
+
+        local row_frame = FrameContainer:new{
+            padding = sc(8),
+            padding_h = sc(8),
+            bordersize = 0,
+            background = Blitbuffer.COLOR_WHITE,
+            radius = sc(4),
+            width = inner_w,
+            row_elements,
+        }
+
+        local item = InputContainer:new{ row_frame }
+        item.ges_events = {
+            Tap = {
+                GestureRange:new{
+                    ges = "tap",
+                    range = function()
+                        local dim = item.dimen
+                        if not dim then return Geom:new{ x = -1, y = -1, w = 1, h = 1 } end
+                        return Geom:new{
+                            x = dim.x or 0,
+                            y = dim.y or 0,
+                            w = (dim.w and dim.w > 0 and dim.w) or inner_w,
+                            h = (dim.h and dim.h > 0 and dim.h) or sc(48),
+                        }
+                    end
+                }
+            }
+        }
+        item.onTap = function()
+            closeDialog(callback)
+            return true
+        end
+        return item
+    end
+
+    -- ── 3. Build Action List ───────────────────────────────────────────────────
+
+    -- Favorite Toggle
+    local is_fav = (image_entry.is_favorite == true)
+    local fav_title = is_fav and "Remove from Favorites" or "Add to Favorites"
+    local fav_desc = is_fav and "Unpin from the favorites tab" or "Pin this image to the favorites tab"
+    table.insert(content_items, makeActionRow("star.svg", fav_title, fav_desc, function()
+        if self.image_manager and self.book_data then
+            local cur_id = image_entry.id or image_entry.href or image_entry.src
+            local new_fav = self.image_manager:toggleFavorite(self.book_data, cur_id)
+            image_entry.is_favorite = new_fav
+            if self.cache_manager and self.ui.document and self.ui.document.file then
+                self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
+            end
+            refreshActiveContext()
+        end
+    end))
+
+    -- Save to Series References
+    addDivider()
+    local series_slug = (self.book_data and self.book_data.series_slug) or (self.book_data and self.book_data.series and self.series_manager and self.series_manager:makeSlug(self.book_data.series)) or (self.book_data and self.book_data.title and self.series_manager and self.series_manager:makeSlug(self.book_data.title)) or "series"
+
+    local is_in_series = false
+    if self.series_manager then
+        local s_imgs = self.series_manager:getSeriesImages(series_slug, 999) or {}
+        local cur_id = image_entry.id or image_entry.href or image_entry.src
+        for _, s_item in ipairs(s_imgs) do
+            if (s_item.id and cur_id and s_item.id == cur_id) or (s_item.href and image_entry.href and s_item.href == image_entry.href) or (s_item.src and image_entry.src and s_item.src == image_entry.src) then
+                is_in_series = true
+                break
+            end
+        end
+    end
+
+    local series_title = is_in_series and "Remove from Series References" or "Add to Series References"
+    local series_desc = is_in_series and "Remove this map from the series-wide collection" or "Keep map accessible across all series volumes"
+    table.insert(content_items, makeActionRow("book-open.svg", series_title, series_desc, function()
+        if self.series_manager then
+            local cur_id = image_entry.id or image_entry.href or image_entry.src
+            if is_in_series then
+                self.series_manager:removeSeriesImage(series_slug, cur_id)
+                image_entry.is_series = false
+            else
+                local copy = {}
+                for k, v in pairs(image_entry) do copy[k] = v end
+                copy.is_series = true
+                if not copy.cached_file and self.image_manager and self.ui.document and self.ui.document.file then
+                    copy.cached_file = self.image_manager:extractImageToFile(self.ui.document.file, image_entry)
+                end
+                copy.source_book_title = (self.book_data and self.book_data.title) or "Book"
+                copy.source_book_index = (self.book_data and self.book_data.series_index) or 1
+                self.series_manager:saveSeriesImage(series_slug, copy)
+                image_entry.is_series = true
+            end
+            if self.book_data then
+                self.book_data.series_slug = series_slug
+            end
+            if self.cache_manager and self.ui.document and self.ui.document.file then
+                self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
+            end
+            refreshActiveContext()
+        end
+    end))
+
+    -- Rename Label
+    addDivider()
+    table.insert(content_items, makeActionRow("edit.svg", "Rename Label", "Edit custom image title and description", function()
+        local rename_dialog
+        rename_dialog = InputDialog:new{
+            title = self.loc:t("img_rename_title") or "Rename Image Label",
+            input = image_entry.title or "",
+            buttons = {
+                {
+                    {
+                        text = self.loc:t("cancel") or "Cancel",
+                        callback = function() UIManager:close(rename_dialog) end,
+                    },
+                    {
+                        text = self.loc:t("save") or "Save",
+                        is_enter_default = true,
+                        callback = function()
+                            local new_val = rename_dialog:getInputText()
+                            UIManager:close(rename_dialog)
+                            if new_val and #new_val > 0 and self.image_manager and self.book_data then
+                                image_entry.title = new_val
+                                image_entry.custom_title = true
+                                local cur_id = image_entry.id or image_entry.href or image_entry.src
+                                self.image_manager:renameImage(self.book_data, cur_id, new_val)
+                                if self.cache_manager and self.ui.document and self.ui.document.file then
+                                    self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
+                                end
+                                refreshActiveContext()
+                            end
+                        end,
+                    },
+                },
+            },
+        }
+        UIManager:show(rename_dialog)
+        rename_dialog:onShowKeyboard()
+    end))
+
+    -- Jump to Page in Book
+    if image_entry.page and tonumber(image_entry.page) then
+        addDivider()
+        table.insert(content_items, makeActionRow("external-link.svg", "Jump to Page " .. tostring(image_entry.page), "Navigate directly to this illustration in reader", function()
+            self:jumpToImagePage(tonumber(image_entry.page))
+        end))
+    end
+
+    -- Hide / Unhide Image
+    addDivider()
+    local is_hid = (image_entry.is_hidden == true)
+    local hide_title = is_hid and "Unhide Image" or "Hide Image"
+    local hide_desc = is_hid and "Restore image to main gallery" or "Remove decorative image from gallery"
+    table.insert(content_items, makeActionRow(is_hid and "eye.svg" or "eye-off.svg", hide_title, hide_desc, function()
+        if self.image_manager and self.book_data then
+            local cur_id = image_entry.id or image_entry.href or image_entry.src
+            local new_hid = self.image_manager:toggleHideImage(self.book_data, cur_id)
+            image_entry.is_hidden = new_hid
+            if self.cache_manager and self.ui.document and self.ui.document.file then
+                self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
+            end
+            refreshActiveContext()
+        end
+    end))
+
+    -- Open Image Gallery (when accessed from within the active image viewer)
+    if self.active_image_viewer then
+        addDivider()
+        table.insert(content_items, makeActionRow("grid.svg", "Open Image Gallery", "Browse all illustrations and maps in book", function()
+            self:showImages{ force_gallery = true }
+        end))
+    end
+
+    -- ── 4. Card Close Footer ───────────────────────────────────────────────────
+    table.insert(content_items, VerticalSpan:new{ width = sc(8) })
+    local close_btn = Button:new{
+        text = self.loc:t("close") or "Close",
+        text_font_size = 15,
+        text_font_bold = true,
+        bordersize = sc(1),
+        radius = sc(4),
+        width = inner_w,
+        height = sc(36),
+        callback = function() closeDialog() end,
+    }
+    table.insert(content_items, close_btn)
+
+    -- ── 5. Assemble Dialog Card ────────────────────────────────────────────────
+    local content_vg = VerticalGroup:new(content_items)
+    content_vg.align = "left"
+
+    local card = FrameContainer:new{
+        padding = card_padding,
+        radius = sc(4),
+        bordersize = card_border,
+        color = Blitbuffer.COLOR_BLACK,
+        background = Blitbuffer.COLOR_WHITE,
+        width = dialog_w,
+        content_vg,
+    }
+
+    overlay = InputContainer:new{
+        dimen = Geom:new{ w = sw, h = sh },
+        key_events = {
+            Close = { { "Back" } }
+        },
+        CenterContainer:new{
+            dimen = Geom:new{ w = sw, h = sh },
+            card,
+        }
+    }
+
+    overlay.onClose = function()
+        closeDialog()
+        return true
+    end
+
+    UIManager:show(overlay, "ui")
+    return overlay
+end
+
+function M:openImageViewer(image_entry)
+    if not image_entry then return end
+    
+    -- Check spoiler protection
+    local is_spoiler = image_entry.is_spoiler
+    if is_spoiler and self.ai_helper and self.ai_helper.settings and self.ai_helper.settings.no_spoilers ~= false then
+        local ConfirmBox = require("ui/widget/confirmbox")
+        local msg = string.format(self.loc:t("img_spoiler_confirm") or "This image appears on page %d (past your current reading progress). Reveal image?", tonumber(image_entry.page) or 0)
+        local confirm
+        confirm = ConfirmBox:new{
+            text = msg,
+            ok_text = self.loc:t("img_reveal") or "Reveal",
+            cancel_text = self.loc:t("cancel"),
+            ok_callback = function()
+                image_entry.is_spoiler = false
+                if self.image_gallery_overlay then
+                    self.image_gallery_overlay:buildUI()
+                    UIManager:setDirty(self.image_gallery_overlay, "ui")
+                end
+                self:_launchImageViewer(image_entry)
+            end,
+        }
+        UIManager:show(confirm)
+        return
+    end
+
+    self:_launchImageViewer(image_entry)
+end
+
+function M:_launchImageViewer(image_entry, custom_state)
+    if not image_entry then return end
+
+    local file_path = image_entry.cached_file or image_entry.local_file or image_entry.file_path
+    if file_path then
+        local f = io.open(file_path, "rb")
+        if f then
+            f:close()
+        else
+            file_path = nil
+        end
+    end
+
+    if not file_path then
+        local book_path = self.ui and self.ui.document and self.ui.document.file
+        if not self.image_manager then
+            local ImageManager = require(plugin_path .. "xray_imagemanager")
+            self.image_manager = ImageManager:new(self)
+        end
+        if book_path and self.image_manager then
+            file_path = self.image_manager:extractImageToFile(book_path, image_entry)
+        end
+    end
+
+    if not file_path then
+        UIManager:show(InfoMessage:new{
+            text = self.loc:t("img_extract_failed") or "Could not extract image file.",
+            timeout = 3,
+        })
+        return
+    end
+
+    if not self.book_data and self.cache_manager and self.ui and self.ui.document and self.ui.document.file then
+        self.book_data = self.cache_manager:loadCache(self.ui.document.file) or {}
+    end
+    if self.book_data and self.book_data.images then
+        for _, b_img in ipairs(self.book_data.images) do
+            if (image_entry.id and b_img.id == image_entry.id)
+                or (image_entry.href and b_img.href == image_entry.href)
+                or (image_entry.src and b_img.src == image_entry.src)
+                or (image_entry.title and b_img.title == image_entry.title)
+                or (image_entry.cached_file and b_img.cached_file == image_entry.cached_file) then
+                if b_img.rotation ~= nil then image_entry.rotation = b_img.rotation end
+                if b_img.zoom_level ~= nil then image_entry.zoom_level = b_img.zoom_level end
+                if b_img.pan_x ~= nil then image_entry.pan_x = b_img.pan_x end
+                if b_img.pan_y ~= nil then image_entry.pan_y = b_img.pan_y end
+                break
+            end
+        end
+    end
+
+    local ImageViewer = require(plugin_path .. "xray_image_viewer")
+    local viewer = ImageViewer:new{
+        plugin = self,
+        image_entry = image_entry,
+        file_path = file_path,
+        rotation_angle = (custom_state and custom_state.rotation_angle) or image_entry.rotation,
+        zoom_level = (custom_state and custom_state.zoom_level) or image_entry.zoom_level,
+        pan_x = (custom_state and custom_state.pan_x) or image_entry.pan_x,
+        pan_y = (custom_state and custom_state.pan_y) or image_entry.pan_y,
+        inverted = (custom_state and custom_state.inverted ~= nil and custom_state.inverted) or image_entry.inverted,
+        is_resumed = (custom_state and custom_state.is_resumed) or false,
+    }
+    self.active_image_viewer = viewer
+    UIManager:show(viewer, "ui")
+end
+
+function M:resumeMinimizedImage()
+    local state = self.last_minimized_state or (self.book_data and self.book_data.last_minimized_state)
+    if not state or not state.image_entry then
+        return self:showImages()
+    end
+    state.is_resumed = true
+    self:_launchImageViewer(state.image_entry, state)
+end
+
+function M:jumpToImagePage(page)
+    if not page then return end
+    if self.image_gallery_overlay then
+        local ov = self.image_gallery_overlay
+        self.image_gallery_overlay = nil
+        UIManager:close(ov, "ui")
+    end
+    self:closeAllMenus()
+    if self.ui and self.ui.handleEvent then
+        local ok_ev, Event = pcall(require, "ui/event")
+        if ok_ev and Event then
+            self.ui:handleEvent(Event:new("GotoPage", page))
+        end
+    end
+end
+
 return M

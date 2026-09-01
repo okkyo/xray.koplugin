@@ -621,6 +621,49 @@ msgstr "استخدام هذه الصورة"
 msgid "img_view"
 msgstr "عرض الصورة"
 
+msgid "img_extract_failed"
+msgstr "تعذر استخراج ملف الصورة."
+
+msgid "img_minimized_hint"
+msgstr "تلميح صورة مصغرة"
+
+msgid "img_no_favorites"
+msgstr "لا توجد مفضلات بعد.\n\nاستخدم القائمة ⋮ على أي صورة لإضافتها إلى المفضلات."
+
+msgid "img_no_hidden"
+msgstr "لا توجد صور مخفية.\n\nاستخدم القائمة ⋮ على أي صورة في المعرض لإخفاء الرسوم الزخرفية أو الأحرف الاستهلالية."
+
+msgid "img_no_images"
+msgstr "لم يتم العثور على صور لتبويب/مرشح التصفية هذا.\n\nجاري استخراج الصور أو فحصها من الكتاب..."
+
+msgid "img_no_series"
+msgstr "لم يتم حفظ مراجع السلسلة.\n\nاستخدم القائمة ⋮ على أي خريطة لحفظها في مراجع السلسلة."
+
+msgid "img_rename_title"
+msgstr "إعادة تسمية تسمية الصورة"
+
+msgid "img_reveal"
+msgstr "كشف"
+
+msgid "img_spoiler_confirm"
+msgstr "تظهر هذه الصورة في الصفحة %d (تتجاوز تقدمك الحالي في القراءة). هل تريد كشف الصورة؟"
+
+msgid "img_spoiler_locked"
+msgstr "مقفل"
+
+msgid "img_tab_all"
+msgstr "الكل"
+
+msgid "img_tab_favorites"
+msgstr "المفضلة"
+
+msgid "img_tab_series"
+msgstr "السلاسل"
+
+msgid "img_untitled"
+msgstr "صورة"
+
+
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
 msgstr "لم يتم العثور على ملف xray_key.txt في الدليل الجذري أو مجلد الإعدادات."
@@ -913,6 +956,10 @@ msgstr "الشخصيات التاريخية"
 msgid "menu_image_search"
 msgstr "البحث عن الصور"
 
+msgid "menu_images"
+msgstr "الصور والخرائط"
+
+
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
 msgstr "استيراد المفاتيح من xray_key.txt"
@@ -1188,6 +1235,9 @@ msgstr "وجد الذكاء الاصطناعي %d تكرارًا محتملاً 
 # en-hash: d87f433b237815fa419a2ac953956c54
 msgid "plugin_description"
 msgstr "حول تجربة القراءة الخاصة بك من خلال تحليل الكتب بمساعدة الذكاء الاصطناعي، تمامًا مثل ميزة X-Ray في أجهزة Amazon Kindle!"
+
+msgid "prev"
+msgstr "السابق"
 
 # en-hash: 136dbfc383f7b6799dbdcb4b37c65d13
 msgid "quick_menu_title"

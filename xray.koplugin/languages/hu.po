@@ -621,6 +621,49 @@ msgstr "Ezen kép használata"
 msgid "img_view"
 msgstr "Kép megtekintése"
 
+msgid "img_extract_failed"
+msgstr "Nem sikerült kinyerni a képfájlt."
+
+msgid "img_minimized_hint"
+msgstr "Kicsinyített kép tippe"
+
+msgid "img_no_favorites"
+msgstr "Még nincsenek kedvencek.\n\nHasználd a ⋮ menüt bármelyik képen a kedvencekhez adáshoz."
+
+msgid "img_no_hidden"
+msgstr "Nincsenek rejtett képek.\n\nHasználd a képek ⋮ menüjét a galériában a díszítő illusztrációk vagy iniciálék elrejtéséhez."
+
+msgid "img_no_images"
+msgstr "Nem található kép ehhez a laphoz/szűrőhöz.\n\nKépek kinyerése vagy beolvasása a könyvből..."
+
+msgid "img_no_series"
+msgstr "Nincsenek mentett sorozathivatkozások.\n\nHasználd a ⋮ menüt bármely térképen a sorozathivatkozások közé mentéshez."
+
+msgid "img_rename_title"
+msgstr "Képcímke átnevezése"
+
+msgid "img_reveal"
+msgstr "Megjelenítés"
+
+msgid "img_spoiler_confirm"
+msgstr "Ez a kép a(z) %d. oldalon található (a jelenlegi olvasási helyed után). Megjeleníted a képet?"
+
+msgid "img_spoiler_locked"
+msgstr "Zárolva"
+
+msgid "img_tab_all"
+msgstr "Összes"
+
+msgid "img_tab_favorites"
+msgstr "Kedvencek"
+
+msgid "img_tab_series"
+msgstr "Sorozatok"
+
+msgid "img_untitled"
+msgstr "Kép"
+
+
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
 msgstr "Nem található xray_key.txt fájl a gyökérkönyvtárban vagy a beállításoknál."
@@ -913,6 +956,10 @@ msgstr "Történelmi alakok"
 msgid "menu_image_search"
 msgstr "Képkeresés"
 
+msgid "menu_images"
+msgstr "Képek és térképek"
+
+
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
 msgstr "Kulcsok importálása az xray_key.txt fájlból"
@@ -1188,6 +1235,9 @@ msgstr "A MI %d lehetséges másolatot talált a legutóbbi lekérdezésből. El
 # en-hash: d87f433b237815fa419a2ac953956c54
 msgid "plugin_description"
 msgstr "Alakítsa át olvasási élményét AI-alapú könyvelemzéssel, pont mint az Amazon Kindle X-Ray!"
+
+msgid "prev"
+msgstr "Előző"
 
 # en-hash: 136dbfc383f7b6799dbdcb4b37c65d13
 msgid "quick_menu_title"

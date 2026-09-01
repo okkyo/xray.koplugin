@@ -55,6 +55,7 @@ function XRayPlugin:init()
         if self.ui and self.ui.menu then
             self.ui.menu:registerToMainMenu(self)
         end
+        self:onDispatcherRegisterActions()
         
         -- Force plugin to be first in the tools menu order (enforced on every document load)
         pcall(function()
@@ -141,6 +142,7 @@ function XRayPlugin:init()
     self.timeline = {}
     self.historical_figures = {}
     self.terms = {}
+    self.images = {}
     self.book_type = nil
     
     -- Mentions Feature Gating
@@ -159,6 +161,10 @@ function XRayPlugin:init()
     -- Standalone Series Manager
     local SeriesManager = require(plugin_path .. "xray_seriesmanager")
     self.series_manager = SeriesManager:new()
+
+    -- Standalone Image Manager
+    local ImageManager = require(plugin_path .. "xray_imagemanager")
+    self.image_manager = ImageManager:new(self)
     
     self:log("XRayPlugin: Initialized with language: " .. self.loc:getLanguage())
     self:onDispatcherRegisterActions()
@@ -168,6 +174,10 @@ function XRayPlugin:init()
             ShowXRayMenu = {
                 { "Alt", "X" },
                 event = "ShowXRayMenu",
+            },
+            ShowXRayImages = {
+                { "Alt", "I" },
+                event = "ShowXRayImages",
             },
         })
 
@@ -711,14 +721,20 @@ function XRayPlugin:onDispatcherRegisterActions()
         Dispatcher:registerAction("xray_quick_menu", {
             category = "none",
             event = "ShowXRayQuickMenu",
-            title = _t(self, "quick_menu_title", "X-Ray Quick Menu"),
+            title = _t(self, "quick_menu_title", "X-Ray: Quick Menu"),
             general = true,
             separator = true,
         })
         Dispatcher:registerAction("xray_characters", {
             category = "none",
             event = "ShowXRayCharacters",
-            title = _t(self, "menu_characters", "Characters"),
+            title = _t(self, "menu_characters", "X-Ray: Characters"),
+            general = true,
+        })
+        Dispatcher:registerAction("xray_open_image_gallery", {
+            category = "none",
+            event = "ShowXRayImageGallery",
+            title = _t(self, "menu_images", "X-Ray: Images & Maps"),
             general = true,
         })
     end)
@@ -731,6 +747,22 @@ end
 
 function XRayPlugin:onShowXRayMenu()
     self:showQuickXRayMenu()
+    return true
+end
+
+function XRayPlugin:onShowXRayImageGallery()
+    local UIManager = require("ui/uimanager")
+    UIManager:nextTick(function()
+        self:showImages()
+    end)
+    return true
+end
+
+function XRayPlugin:onShowXRayImages()
+    local UIManager = require("ui/uimanager")
+    UIManager:nextTick(function()
+        self:showImages()
+    end)
     return true
 end
 
@@ -753,6 +785,7 @@ function XRayPlugin:autoLoadCache()
         self.timeline = cached_data.timeline or {}
         self.historical_figures = cached_data.historical_figures or {}
         self.terms = cached_data.terms or {}
+        self.images = cached_data.images or {}
         
         -- Explicitly mark terms as fetched if they exist in cache
         if #self.terms > 0 then
@@ -842,6 +875,7 @@ function XRayPlugin:getMenuCounts()
         timeline = self.timeline and #self.timeline or 0,
         historical_figures = self.historical_figures and #self.historical_figures or 0,
         terms = self.terms and #self.terms or 0,
+        images = self.images and #self.images or 0,
     }
 end
 
@@ -874,6 +908,12 @@ function XRayPlugin:getSubMenuItems()
         text = self.loc:t("menu_terms") or "Glossary",
         keep_menu_open = true,
         callback = function() self:showTerms() end,
+    })
+
+    table.insert(items, {
+        text = self.loc:t("menu_images") or "Images & Maps",
+        keep_menu_open = true,
+        callback = function() self:showImages() end,
     })
 
     table.insert(items, {

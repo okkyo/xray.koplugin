@@ -1765,5 +1765,65 @@ describe("xray_ui", function()
             end)
         end)
     end)
+
+    describe("showImageActions", function()
+        it("should render image actions dialog without crashing and show action options", function()
+            local img = {
+                id = "map_01",
+                title = "Roshar Map",
+                page = 12,
+                is_favorite = false,
+                is_hidden = false,
+            }
+            local ok, err = pcall(function()
+                plugin:showImageActions(img)
+            end)
+            assert.is_true(ok, "showImageActions failed: " .. tostring(err))
+            local last = _G.ui_tracker.last_shown
+            assert.is_not_nil(last)
+            assert.are.equal("InputContainer", last.type)
+        end)
+    end)
+
+    describe("showImages resume flow", function()
+        it("should seamlessly resume minimized image when showImages is called without force_gallery", function()
+            local resumed_entry = nil
+            plugin.last_minimized_state = {
+                image_entry = { id = "map_01", title = "Roshar Map", rotation = 90, zoom_level = 1.5, pan_x = 10, pan_y = 20 },
+                file_path = "/tmp/map.png",
+                rotation_angle = 90,
+                zoom_level = 1.5,
+                pan_x = 10,
+                pan_y = 20,
+            }
+            plugin._launchImageViewer = function(self, entry, custom_state)
+                resumed_entry = entry
+            end
+
+            plugin:showImages()
+            assert.is_not_nil(resumed_entry)
+            assert.are.equal("map_01", resumed_entry.id)
+        end)
+
+        it("should open image gallery when force_gallery is true even if minimized state exists", function()
+            plugin.last_minimized_state = {
+                image_entry = { id = "map_01", title = "Roshar Map" },
+                file_path = "/tmp/map.png",
+            }
+            plugin.images = { { id = "map_01", title = "Roshar Map" } }
+            plugin.book_data = { images = plugin.images }
+            plugin.image_manager = {
+                getFilteredImages = function() return plugin.images end,
+                scanDocumentImages = function() return plugin.images end,
+                extractImageToFile = function() return "/tmp/map.png" end,
+            }
+
+            plugin:showImages{ force_gallery = true }
+            local last = _G.ui_tracker.last_shown
+            assert.is_not_nil(last)
+            assert.are.equal("InputContainer", last.type)
+        end)
+    end)
 end)
+
 
