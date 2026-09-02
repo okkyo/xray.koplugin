@@ -501,6 +501,10 @@ msgstr "Keine Bilder für diesen Tab/Filter gefunden.\n\nBilder werden aus dem B
 msgid "img_no_series"
 msgstr "Keine Serien-Referenzen gespeichert.\n\nVerwende das ⋮-Menü bei einer Karte, um sie in deinen Serien-Referenzen zu speichern."
 
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Dieses Buch ist nicht Teil einer bekannten Serie.\n\nSerienverweise sind nur für Bücher innerhalb einer Serie verfügbar."
+
 # en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
 msgstr "Etikett umbenennen"
@@ -1060,6 +1064,10 @@ msgstr "Keine Zusammenführungen durchgeführt."
 # en-hash: 6f19d0bda35aaa9b39c3adc080e31220
 msgid "no_new_text"
 msgstr "An deiner aktuellen Position war kein neuer Text verfügbar; X-Ray ist hier bereits aktuell."
+
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Keine Serie für dieses Buch erkannt"
 
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"

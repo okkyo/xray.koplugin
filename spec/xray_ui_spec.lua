@@ -1411,6 +1411,41 @@ describe("xray_ui", function()
             plugin:jumpToImagePage(42)
             assert.are.equal(42, navigated_page)
         end)
+
+        it("should invalidate gallery cached_pages and rebuild gallery immediately when hiding an image", function()
+            local img_entry = { id = "img_hide_test", title = "Map of Mordor", page = 10, is_hidden = false }
+            plugin.book_data = { images = { img_entry } }
+            plugin.images = { img_entry }
+            local gallery_rebuilt = false
+            plugin.image_gallery_overlay = {
+                cached_pages = { { img_entry } },
+                buildUI = function(self)
+                    gallery_rebuilt = true
+                end,
+            }
+            plugin.image_manager = {
+                toggleHideImage = function(self, bd, id)
+                    img_entry.is_hidden = true
+                    return true
+                end,
+            }
+
+            local overlay = plugin:showImageActions(img_entry)
+            assert.is_not_nil(overlay)
+
+            -- Navigate down to Hide action (index 5)
+            overlay:onKeyPress({ key = "Down" }) -- to index 1
+            overlay:onKeyPress({ key = "Down" }) -- to index 2
+            overlay:onKeyPress({ key = "Down" }) -- to index 3
+            overlay:onKeyPress({ key = "Down" }) -- to index 4
+            overlay:onKeyPress({ key = "Down" }) -- to index 5 (Hide)
+            overlay:onKeyPress({ key = "Return" })
+
+            assert.is_true(img_entry.is_hidden)
+            assert.is_true(plugin.images[1].is_hidden)
+            assert.is_nil(plugin.image_gallery_overlay.cached_pages)
+            assert.is_true(gallery_rebuilt)
+        end)
     end)
 end)
 

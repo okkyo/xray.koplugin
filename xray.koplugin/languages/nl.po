@@ -501,6 +501,10 @@ msgstr "Geen afbeeldingen gevonden voor dit tabblad/filter.\n\nAfbeeldingen word
 msgid "img_no_series"
 msgstr "Geen serie-referenties opgeslagen.\n\nGebruik het menu ⋮ bij een kaart om deze op te slaan in je serie-referenties."
 
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Dit boek maakt geen deel uit van een herkende serie.\n\nSerie-referenties zijn alleen beschikbaar voor boeken in een serie."
+
 # en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
 msgstr "Label hernoemen"
@@ -1060,6 +1064,10 @@ msgstr "Geen samenvoegingen uitgevoerd."
 # en-hash: 6f19d0bda35aaa9b39c3adc080e31220
 msgid "no_new_text"
 msgstr "Er was geen nieuwe tekst beschikbaar op je huidige positie; X-Ray is hier al bijgewerkt."
+
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Geen serie gedetecteerd voor dit boek"
 
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"

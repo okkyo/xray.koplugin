@@ -501,6 +501,10 @@ msgstr "Aucune image trouvée pour cet onglet/filtre.\n\nExtraction ou analyse d
 msgid "img_no_series"
 msgstr "Aucune référence de série enregistrée.\n\nUtilisez le menu ⋮ sur n'importe quelle carte pour l'enregistrer dans vos références de série."
 
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Ce livre ne fait pas partie d'une série reconnue.\n\nLes références de série ne sont disponibles que pour les livres faisant partie d'une série."
+
 # en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
 msgstr "Renommer l'étiquette"
@@ -1060,6 +1064,10 @@ msgstr "Aucune fusion effectuée."
 # en-hash: 6f19d0bda35aaa9b39c3adc080e31220
 msgid "no_new_text"
 msgstr "Aucun nouveau texte n'était disponible à votre position actuelle ; X-Ray est déjà à jour ici."
+
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Aucune série détectée pour ce livre"
 
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"

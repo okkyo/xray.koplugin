@@ -501,6 +501,10 @@ msgstr "Tidak ada gambar ditemukan untuk tab/filter ini.\n\nMengekstrak atau mem
 msgid "img_no_series"
 msgstr "Tidak ada referensi seri yang disimpan.\n\nGunakan menu ⋮ pada peta apa pun untuk menyimpannya ke referensi seri Anda."
 
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Buku ini bukan bagian dari seri yang dikenali.\n\nReferensi seri hanya tersedia untuk buku dalam sebuah seri."
+
 # en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
 msgstr "Ubah Nama Label"
@@ -1060,6 +1064,10 @@ msgstr "Tidak ada penggabungan yang dilakukan."
 # en-hash: 6f19d0bda35aaa9b39c3adc080e31220
 msgid "no_new_text"
 msgstr "Tidak ada teks baru pada posisi Anda saat ini; X-Ray sudah diperbarui di sini."
+
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Tidak ada seri yang terdeteksi untuk buku ini"
 
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"

@@ -501,6 +501,10 @@ msgstr "Nie znaleziono obrazów dla tej karty/filtra.\n\nWyciąganie lub skanowa
 msgid "img_no_series"
 msgstr "Brak zapisanych odniesień serii.\n\nUżyj menu ⋮ na dowolnej mapie, aby zapisać ją w odniesieniach serii."
 
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Ta książka nie jest częścią rozpoznanej serii.\n\nOdniesienia do serii są dostępne tylko dla książek należących do serii."
+
 # en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
 msgstr "Zmień nazwę etykiety"
@@ -1060,6 +1064,10 @@ msgstr "Nie wykonano żadnych scaleń."
 # en-hash: 6f19d0bda35aaa9b39c3adc080e31220
 msgid "no_new_text"
 msgstr "W bieżącej pozycji nie było nowego tekstu; X-Ray jest już tutaj aktualny."
+
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Nie wykryto serii dla tej książki"
 
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"

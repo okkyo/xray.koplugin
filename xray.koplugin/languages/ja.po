@@ -501,6 +501,10 @@ msgstr "このタブ/フィルターに画像が見つかりません。\n\n本�
 msgid "img_no_series"
 msgstr "保存されたシリーズ参照はありません。\n\n地図の ⋮ メニューからシリーズ参照に保存できます。"
 
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "この書籍は認識されたシリーズの一部ではありません。\n\nシリーズの参照は、シリーズに含まれる書籍でのみ利用できます。"
+
 # en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
 msgstr "ラベル名を変更"
@@ -1060,6 +1064,10 @@ msgstr "統合は実行されませんでした。"
 # en-hash: 6f19d0bda35aaa9b39c3adc080e31220
 msgid "no_new_text"
 msgstr "現在の位置には新しいテキストがありません。ここではX-Rayはすでに最新です。"
+
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "この書籍のシリーズは検出されませんでした"
 
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"

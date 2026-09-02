@@ -501,6 +501,10 @@ msgstr "Нема слика за ову картицу/филтер.\n\nИзвл
 msgid "img_no_series"
 msgstr "Nema sačuvanih referenci serijala.\n\nKoristite meni ⋮ na bilo kojoj mapi da biste je sačuvali u reference serijala."
 
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Ова књига није део препознатог серијала.\n\nРеференце серијала су доступне само за књиге у серијалу."
+
 # en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
 msgstr "Преименуј ознаку"
@@ -1060,6 +1064,10 @@ msgstr "Није извршено ниједно спајање."
 # en-hash: 6f19d0bda35aaa9b39c3adc080e31220
 msgid "no_new_text"
 msgstr "Na vašoj trenutnoj poziciji nema novog teksta; X-Ray je ovde već ažuriran."
+
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Није препознат серијал за ову књигу"
 
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"

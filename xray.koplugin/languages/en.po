@@ -377,6 +377,9 @@ msgstr "No images found for this tab/filter.\n\nExtracting or scanning images fr
 msgid "img_no_series"
 msgstr "No series references saved.\n\nUse the ⋮ menu on any map to save it to your series references."
 
+msgid "img_no_series_detected"
+msgstr "This book is not part of a recognized series.\n\nSeries references are only available for books in a series."
+
 msgid "img_rename_title"
 msgstr "Rename Label"
 
@@ -796,6 +799,9 @@ msgstr "No merges performed."
 
 msgid "no_new_text"
 msgstr "No new text was available at your current position; X-Ray is already up to date here."
+
+msgid "no_series_detected"
+msgstr "No series detected for this book"
 
 msgid "no_series_to_clear"
 msgstr "No series detected for this book."

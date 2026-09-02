@@ -177,6 +177,52 @@ describe("xray_imagemanager", function()
             local for_book3 = series_mgr:getSeriesImages(slug, 3)
             assert.are.equal(2, #for_book3)
         end)
+
+        it("strictly isolates images to the requested series slug and ignores other series", function()
+            local lotr_slug = "middle_earth_test"
+            local cormoran_slug = "cormoran_strike_test"
+
+            local shire_map = { id = "shire", title = "Shire Map", source_book_index = 1 }
+            local london_map = { id = "london", title = "Soho Map", source_book_index = 1 }
+
+            series_mgr:saveSeriesImage(lotr_slug, shire_map)
+            series_mgr:saveSeriesImage(cormoran_slug, london_map)
+
+            -- Cormoran Strike must ONLY return London map, never Shire map
+            local cormoran_imgs = series_mgr:getSeriesImages(cormoran_slug, 1)
+            assert.are.equal(1, #cormoran_imgs)
+            assert.are.equal("london", cormoran_imgs[1].id)
+
+            -- Middle Earth must ONLY return Shire map
+            local lotr_imgs = series_mgr:getSeriesImages(lotr_slug, 1)
+            assert.are.equal(1, #lotr_imgs)
+            assert.are.equal("shire", lotr_imgs[1].id)
+        end)
+
+        it("refuses to save or return images for generic 'series' slug", function()
+            local dummy = { id = "orphan", title = "Orphan Map" }
+            assert.is_false(series_mgr:saveSeriesImage("series", dummy))
+            assert.is_false(series_mgr:saveSeriesImage("", dummy))
+            assert.is_false(series_mgr:saveSeriesImage(nil, dummy))
+
+            assert.are.same({}, series_mgr:getSeriesImages("series", 1))
+            assert.are.same({}, series_mgr:getSeriesImages("", 1))
+            assert.are.same({}, series_mgr:getSeriesImages(nil, 1))
+        end)
+
+        it("getSeriesInfo resolves series metadata and returns nil for standalone books", function()
+            -- Book with metadata
+            local props = { series = "Cormoran Strike", series_index = 3 }
+            local info = series_mgr:getSeriesInfo({}, props, "Career of Evil", "Robert Galbraith")
+            assert.is_not_nil(info)
+            assert.are.equal("cormoran_strike", info.slug)
+            assert.are.equal(3, info.index)
+
+            -- Standalone book without series
+            local standalone_props = { title = "To Kill a Mockingbird" }
+            local standalone_info = series_mgr:getSeriesInfo({}, standalone_props, "To Kill a Mockingbird", "Harper Lee")
+            assert.is_nil(standalone_info)
+        end)
     end)
 
     describe("resolveImagePage", function()

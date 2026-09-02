@@ -501,6 +501,10 @@ msgstr "Bu sekme/filtre için resim bulunamadı.\n\nKitaptan resimler çıkarıl
 msgid "img_no_series"
 msgstr "Kaydedilmiş seri referansı yok.\n\nSeri referanslarınıza kaydetmek için herhangi bir haritada ⋮ menüsünü kullanın."
 
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Bu kitap tanınan bir serinin parçası değil.\n\nSeri referansları yalnızca bir serideki kitaplar için geçerlidir."
+
 # en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
 msgstr "Etiketi Yeniden Adlandır"
@@ -1060,6 +1064,10 @@ msgstr "Hiçbir birleştirme işlemi yapılmadı."
 # en-hash: 6f19d0bda35aaa9b39c3adc080e31220
 msgid "no_new_text"
 msgstr "Mevcut konumunuzda yeni metin yoktu; X-Ray burada zaten güncel."
+
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Bu kitap için seri tespit edilmedi"
 
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"

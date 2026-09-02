@@ -209,15 +209,33 @@ package.loaded["ui/widget/container/rightcontainer"] = {
 }
 package.loaded["ui/widget/container/bottomcontainer"] = {
     new = function(a, b) 
-        local bc = { type = "BottomContainer", args = b or a }
+        local args = b or a or {}
+        local bc = { type = "BottomContainer", args = args }
+        for k, v in pairs(args) do bc[k] = v end
         bc.getSize = function() return { w = 800, h = 100 } end
+        bc.handleEvent = function(s, ev)
+            if s.propagateEvent then return s:propagateEvent(ev) end
+            for i = 1, #s do
+                if s[i] and s[i].handleEvent and s[i]:handleEvent(ev) then return true end
+            end
+            return false
+        end
         return bc
     end
 }
 package.loaded["ui/widget/overlapgroup"] = {
     new = function(a, b) 
-        local og = { type = "OverlapGroup", args = b or a }
+        local args = b or a or {}
+        local og = { type = "OverlapGroup", args = args }
+        for k, v in pairs(args) do og[k] = v end
         og.getSize = function() return { w = 800, h = 600 } end
+        og.handleEvent = function(s, ev)
+            if s.propagateEvent then return s:propagateEvent(ev) end
+            for i = 1, #s do
+                if s[i] and s[i].handleEvent and s[i]:handleEvent(ev) then return true end
+            end
+            return false
+        end
         return og
     end
 }
@@ -242,6 +260,13 @@ package.loaded["ui/widget/container/inputcontainer"] = (function()
         end
         return prototype
     end
+    klass.handleEvent = function(s, ev)
+        if s.propagateEvent and s:propagateEvent(ev) then return true end
+        for i = 1, #s do
+            if s[i] and s[i].handleEvent and s[i]:handleEvent(ev) then return true end
+        end
+        return false
+    end
     klass.new = function(self, args)
         return klass:extend(args):new()
     end
@@ -252,9 +277,6 @@ package.loaded["ui/widget/container/leftcontainer"] = {
 }
 package.loaded["ui/widget/container/rightcontainer"] = {
     new = function(a, b) return { type = "RightContainer", args = b or a } end
-}
-package.loaded["ui/widget/container/bottomcontainer"] = {
-    new = function(a, b) return { type = "BottomContainer", args = b or a } end
 }
 package.loaded["ui/widget/textboxwidget"] = {
     new = function(a, b) return { type = "TextBoxWidget", args = b or a } end

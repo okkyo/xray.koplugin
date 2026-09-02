@@ -501,6 +501,10 @@ msgstr "未找到此标签/过滤器的图片。\n\n正在从书籍中提取或�
 msgid "img_no_series"
 msgstr "未保存系列参考资料。\n\n在任何地图上使用 ⋮ 菜单即可将其保存到系列参考资料中。"
 
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "本书不属于任何已识别的系列。\n\n系列参考仅适用于系列丛书。"
+
 # en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
 msgstr "重命名标签"
@@ -1060,6 +1064,10 @@ msgstr "未执行任何合并。"
 # en-hash: 6f19d0bda35aaa9b39c3adc080e31220
 msgid "no_new_text"
 msgstr "当前位置没有可用的新文本；X-Ray 在这里已经是最新的。"
+
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "未检测到本书的系列信息"
 
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"

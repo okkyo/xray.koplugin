@@ -501,6 +501,10 @@ msgstr "Зображень для цієї вкладки/фільтра не з
 msgid "img_no_series"
 msgstr "Немає збережених матеріалів серії.\n\nВикористовуйте меню ⋮ на будь-якій карті, щоб зберегти її до матеріалів серії."
 
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Ця книга не є частиною розпізнаної серії.\n\nПосилання на серію доступні лише для книг із серій."
+
 # en-hash: 52366b2ac097fd22d80d475b8b125d8c
 msgid "img_rename_title"
 msgstr "Перейменувати мітку"
@@ -1060,6 +1064,10 @@ msgstr "Об'єднання не виконувалися."
 # en-hash: 6f19d0bda35aaa9b39c3adc080e31220
 msgid "no_new_text"
 msgstr "У поточній позиції немає нового тексту; тут X-Ray уже оновлено."
+
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Серію для цієї книги не виявлено"
 
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"

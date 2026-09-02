@@ -6344,9 +6344,32 @@ function M:handleUnitConversionLookup(text)
     return false
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Images, Maps & Diagrams Tracking UI
--- ─────────────────────────────────────────────────────────────────────────────
+function M:getCurrentSeriesInfo()
+    if not self.series_manager then
+        local SeriesManager = require(plugin_path .. "xray_seriesmanager")
+        self.series_manager = SeriesManager:new()
+    end
+
+    local props = self.ui and self.ui.document and self.ui.document.getProps and self.ui.document:getProps() or {}
+    local function sanitizeMetadata(val)
+        if type(val) == "string" then return val
+        elseif type(val) == "table" then return table.concat(val, ", ")
+        else return nil end
+    end
+    local title = sanitizeMetadata(props.title)
+    local author = sanitizeMetadata(props.authors)
+
+    local info = self.series_manager:getSeriesInfo(self.book_data, props, title, author)
+    if info and self.book_data then
+        self.book_data.series_slug = info.slug
+        self.book_data.series = info.name
+        self.book_data.series_index = info.index
+        if not self.book_data.title and title then
+            self.book_data.title = title
+        end
+    end
+    return info
+end
 
 function M:showImages(opts)
     opts = opts or {}
@@ -6473,6 +6496,14 @@ function M:renameImageDialog(image_entry, on_success)
                             image_entry.custom_title = true
                             local cur_id = image_entry.id or image_entry.href or image_entry.src
                             self.image_manager:renameImage(self.book_data, cur_id, new_val)
+                            if self.images then
+                                for _, img in ipairs(self.images) do
+                                    if (img.id and img.id == cur_id) or (img.href and img.href == cur_id) or (img.src and img.src == cur_id) then
+                                        img.title = new_val
+                                        img.custom_title = true
+                                    end
+                                end
+                            end
                             if self.cache_manager and self.ui and self.ui.document and self.ui.document.file then
                                 self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
                             end
@@ -6588,9 +6619,12 @@ function M:showImageActions(image_entry)
             self.active_image_viewer:buildUI()
             UIManager:setDirty(self.active_image_viewer, "ui")
         end
-        if self.image_gallery_overlay and self.image_gallery_overlay.buildUI then
-            self.image_gallery_overlay:buildUI()
-            UIManager:setDirty(self.image_gallery_overlay, "ui")
+        if self.image_gallery_overlay then
+            self.image_gallery_overlay.cached_pages = nil
+            if self.image_gallery_overlay.buildUI then
+                self.image_gallery_overlay:buildUI()
+                UIManager:setDirty(self.image_gallery_overlay, "ui")
+            end
         end
     end
 
@@ -6610,6 +6644,13 @@ function M:showImageActions(image_entry)
                     local cur_id = image_entry.id or image_entry.href or image_entry.src
                     local new_fav = self.image_manager:toggleFavorite(self.book_data, cur_id)
                     image_entry.is_favorite = new_fav
+                    if self.images then
+                        for _, img in ipairs(self.images) do
+                            if (img.id and img.id == cur_id) or (img.href and img.href == cur_id) or (img.src and img.src == cur_id) then
+                                img.is_favorite = new_fav
+                            end
+                        end
+                    end
                     if self.cache_manager and self.ui.document and self.ui.document.file then
                         self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
                     end
@@ -6619,28 +6660,48 @@ function M:showImageActions(image_entry)
         })
 
         -- 2. Series References
-        local series_slug = (self.book_data and self.book_data.series_slug) or (self.book_data and self.book_data.series and self.series_manager and self.series_manager:makeSlug(self.book_data.series)) or (self.book_data and self.book_data.title and self.series_manager and self.series_manager:makeSlug(self.book_data.title)) or "series"
+        local series_info = self:getCurrentSeriesInfo()
         local is_in_series = false
-        if type(image_entry.is_series) == "boolean" then
-            is_in_series = image_entry.is_series
-        elseif self.series_manager then
-            local s_imgs = self.series_manager:getSeriesImages(series_slug, 999) or {}
-            local cur_id = image_entry.id or image_entry.href or image_entry.src
-            for _, s_item in ipairs(s_imgs) do
-                if (s_item.id and cur_id and s_item.id == cur_id) or (s_item.href and image_entry.href and s_item.href == image_entry.href) or (s_item.src and image_entry.src and s_item.src == image_entry.src) then
-                    is_in_series = true
-                    break
+        local series_slug = series_info and series_info.slug
+        if series_slug and series_slug ~= "" and series_slug ~= "series" then
+            if type(image_entry.is_series) == "boolean" then
+                is_in_series = image_entry.is_series
+            elseif self.series_manager then
+                local s_imgs = self.series_manager:getSeriesImages(series_slug, 999) or {}
+                local cur_id = image_entry.id or image_entry.href or image_entry.src
+                for _, s_item in ipairs(s_imgs) do
+                    if (s_item.id and cur_id and s_item.id == cur_id) or (s_item.href and image_entry.href and s_item.href == image_entry.href) or (s_item.src and image_entry.src and s_item.src == image_entry.src) then
+                        is_in_series = true
+                        break
+                    end
                 end
             end
         end
 
         local series_title = is_in_series and "Remove from Series References" or "Add to Series References"
-        local series_desc = is_in_series and "Remove this map from the series-wide collection" or "Keep map accessible across all series volumes"
+        local series_desc
+        if not series_info then
+            series_desc = self.loc:t("no_series_detected") or "No series detected for this book"
+        elseif is_in_series then
+            series_desc = "Remove this map from the series-wide collection"
+        else
+            series_desc = string.format("Keep map accessible across all %s volumes", series_info.name or "series")
+        end
+
         table.insert(action_items_list, {
             icon = "book-open.svg",
             title = series_title,
             desc = series_desc,
             cb = function()
+                if not series_info or not series_slug or series_slug == "" or series_slug == "series" then
+                    local InfoMessage = require("ui/widget/infomessage")
+                    UIManager:show(InfoMessage:new{
+                        text = self.loc:t("no_series_to_clear") or "No series detected for this book.",
+                        timeout = 3
+                    })
+                    return
+                end
+
                 if self.series_manager then
                     local cur_id = image_entry.id or image_entry.href or image_entry.src
                     if is_in_series then
@@ -6650,18 +6711,28 @@ function M:showImageActions(image_entry)
                         local copy = {}
                         for k, v in pairs(image_entry) do copy[k] = v end
                         copy.is_series = true
-                        if not copy.cached_file and self.image_manager and self.ui.document and self.ui.document.file then
+                        if not copy.cached_file and self.image_manager and self.ui and self.ui.document and self.ui.document.file then
                             copy.cached_file = self.image_manager:extractImageToFile(self.ui.document.file, image_entry)
                         end
-                        copy.source_book_title = (self.book_data and self.book_data.title) or "Book"
-                        copy.source_book_index = (self.book_data and self.book_data.series_index) or 1
+                        local doc_props = self.ui and self.ui.document and self.ui.document.getProps and self.ui.document:getProps()
+                        copy.source_book_title = (self.book_data and self.book_data.title) or (doc_props and doc_props.title) or "Book"
+                        copy.source_book_index = (self.book_data and self.book_data.series_index) or series_info.index or 1
                         self.series_manager:saveSeriesImage(series_slug, copy)
                         image_entry.is_series = true
                     end
                     if self.book_data then
                         self.book_data.series_slug = series_slug
+                        self.book_data.series = series_info.name
+                        self.book_data.series_index = series_info.index
                     end
-                    if self.cache_manager and self.ui.document and self.ui.document.file then
+                    if self.images then
+                        for _, img in ipairs(self.images) do
+                            if (img.id and img.id == cur_id) or (img.href and img.href == cur_id) or (img.src and img.src == cur_id) then
+                                img.is_series = image_entry.is_series
+                            end
+                        end
+                    end
+                    if self.cache_manager and self.ui and self.ui.document and self.ui.document.file then
                         self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
                     end
                     refreshActiveContext()
@@ -6707,6 +6778,13 @@ function M:showImageActions(image_entry)
                     local cur_id = image_entry.id or image_entry.href or image_entry.src
                     local new_hid = self.image_manager:toggleHideImage(self.book_data, cur_id)
                     image_entry.is_hidden = new_hid
+                    if self.images then
+                        for _, img in ipairs(self.images) do
+                            if (img.id and img.id == cur_id) or (img.href and img.href == cur_id) or (img.src and img.src == cur_id) then
+                                img.is_hidden = new_hid
+                            end
+                        end
+                    end
                     if self.cache_manager and self.ui.document and self.ui.document.file then
                         self.cache_manager:asyncSaveCache(self.ui.document.file, self.book_data)
                     end

@@ -1,6 +1,7 @@
 -- X-Ray Series Cache v6.0
 return {
-  series_slug = "stormlight_test",
+  cache_version = "6.0",
+  cached_at = 1788367632,
   images = {
     [2] = {
       id = "s_img2",
@@ -15,6 +16,5 @@ return {
       source_book_index = 1,
     },
   },
-  cache_version = "6.0",
-  cached_at = 1788287440,
+  series_slug = "stormlight_test",
 }

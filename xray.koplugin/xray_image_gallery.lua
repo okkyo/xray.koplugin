@@ -306,6 +306,7 @@ end
 local function createButton(opts)
     opts = opts or {}
     local is_primary = (opts.is_primary == true) or (opts.primary == true)
+    local is_enabled = (opts.enabled ~= false)
     local border_sz = opts.bordersize or sc(1)
     local radius = opts.radius or (theme.radius_btn or sc(4))
 
@@ -320,22 +321,36 @@ local function createButton(opts)
         padding = opts.padding or 0,
         padding_h = opts.padding_h or sc(12),
         callback = opts.callback,
+        enabled = is_enabled,
     }
 
-    if is_primary then
+    if not is_enabled then
+        btn_opts.background = nil
+        btn_opts.text_font_color = Blitbuffer.Color8(160)
+    elseif is_primary then
         btn_opts.background = Blitbuffer.COLOR_BLACK
         btn_opts.text_font_color = Blitbuffer.COLOR_WHITE
     else
-        btn_opts.background = nil
-        btn_opts.text_font_color = Blitbuffer.COLOR_BLACK
+        btn_opts.background = opts.background
+        btn_opts.text_font_color = opts.text_font_color or Blitbuffer.COLOR_BLACK
     end
 
     local btn = Button:new(btn_opts)
-    if is_primary and btn.label_widget then
+    btn.enabled = is_enabled
+    if not is_enabled then
+        if btn.label_widget then
+            btn.label_widget.fgcolor = Blitbuffer.Color8(160)
+        end
+        if btn.frame then
+            btn.frame.color = Blitbuffer.Color8(200)
+            btn.frame.bordersize = border_sz
+            btn.frame.invert = false
+        end
+    elseif is_primary and btn.label_widget then
         btn.label_widget.fgcolor = Blitbuffer.COLOR_WHITE
     end
-    if btn.frame then
-        btn.frame.color = Blitbuffer.COLOR_BLACK
+    if is_enabled and btn.frame then
+        btn.frame.color = opts.color or Blitbuffer.COLOR_BLACK
         btn.frame.bordersize = border_sz
     end
     return btn
@@ -829,9 +844,10 @@ function ImageGallery:buildUI()
     local p = self.plugin
 
     local series_images = {}
-    local series_slug = (p.book_data and p.book_data.series_slug) or (p.book_data and p.book_data.series and p.series_manager and p.series_manager:makeSlug(p.book_data.series)) or (p.book_data and p.book_data.title and p.series_manager and p.series_manager:makeSlug(p.book_data.title)) or "series"
-    if p.series_manager then
-        local max_idx = (p.book_data and p.book_data.series_index) or 1
+    local series_info = p.getCurrentSeriesInfo and p:getCurrentSeriesInfo()
+    local series_slug = series_info and series_info.slug
+    if p.series_manager and series_slug and series_slug ~= "" and series_slug ~= "series" then
+        local max_idx = (series_info and series_info.index) or (p.book_data and p.book_data.series_index) or 1
         series_images = p.series_manager:getSeriesImages(series_slug, max_idx) or {}
     end
 
@@ -984,7 +1000,11 @@ function ImageGallery:buildUI()
     if self.tab == "favorites" then
         sub_str = string.format("%d %s", #filtered, (#filtered == 1 and "favorite image" or "favorite images"))
     elseif self.tab == "series" then
-        sub_str = string.format("%d %s across series", #filtered, (#filtered == 1 and "map / reference" or "maps / references"))
+        if series_info and series_info.name then
+            sub_str = string.format("%d %s across %s", #filtered, (#filtered == 1 and "map / reference" or "maps / references"), series_info.name)
+        else
+            sub_str = string.format("%d %s across series", #filtered, (#filtered == 1 and "map / reference" or "maps / references"))
+        end
     elseif self.tab == "hidden" then
         sub_str = string.format("%d %s", #filtered, (#filtered == 1 and "hidden image" or "hidden images"))
     else
@@ -1176,6 +1196,7 @@ function ImageGallery:buildUI()
     local footer_h = sc(48)
     local avail_content_h = sh - header_h - footer_h - sc(8)
     self.avail_content_h = avail_content_h
+    self.footer_h = footer_h
     self.max_mosaic_thumb_h = math.floor(avail_content_h * 0.46)
 
     -- ── 3. Page Layout Budgeting ───────────────────────────────────────────────
@@ -1225,7 +1246,7 @@ function ImageGallery:buildUI()
                     end
                 end
                 aspect_ratio = math.max(0.35, math.min(1.85, aspect_ratio))
-                local thumb_h = math.floor(cell_w * aspect_ratio)
+                local thumb_h = math.min(math.floor(cell_w * aspect_ratio), avail_content_h)
                 local est_h = thumb_h + grid_gap_v
 
                 if col1_h <= col2_h then
@@ -1298,7 +1319,11 @@ function ImageGallery:buildUI()
         elseif self.tab == "favorites" then
             empty_msg = p.loc:t("img_no_favorites") or "No favorites yet.\n\nUse the ⋮ menu on any image to add it to your favorites."
         elseif self.tab == "series" then
-            empty_msg = p.loc:t("img_no_series") or "No series references saved.\n\nUse the ⋮ menu on any map to save it to your series references."
+            if not series_info then
+                empty_msg = p.loc:t("img_no_series_detected") or "This book is not part of a recognized series.\n\nSeries references are only available for books in a series."
+            else
+                empty_msg = p.loc:t("img_no_series") or "No series references saved.\n\nUse the ⋮ menu on any map to save it to your series references."
+            end
         end
         local empty_text = TextBoxWidget:new{
             text = empty_msg,
@@ -1392,13 +1417,17 @@ function ImageGallery:buildUI()
     -- ── 4. Fixed Bottom Pagination Bar (Always Anchored at Bottom) ─────────────
     local is_prev_focused = (self.focus_zone == "footer" and self.footer_focus_idx == 1)
     local is_next_focused = (self.focus_zone == "footer" and self.footer_focus_idx == 2)
+    local can_prev = self.current_page > 1
+    local can_next = self.current_page < self.total_pages
+
     local prev_btn = createButton{
         text = "‹ " .. (p.loc:t("prev") or "Prev"),
         width = sc(85),
         height = sc(34),
+        enabled = can_prev,
         bold = is_prev_focused,
         bordersize = is_prev_focused and (theme.border_focus or sc(3)) or sc(1),
-        color = is_prev_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK,
+        color = not can_prev and Blitbuffer.Color8(200) or (is_prev_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK),
         background = is_prev_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
         callback = function()
             if self.is_touch_device then
@@ -1417,9 +1446,10 @@ function ImageGallery:buildUI()
         text = (p.loc:t("next") or "Next") .. " ›",
         width = sc(85),
         height = sc(34),
+        enabled = can_next,
         bold = is_next_focused,
         bordersize = is_next_focused and (theme.border_focus or sc(3)) or sc(1),
-        color = is_next_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK,
+        color = not can_next and Blitbuffer.Color8(200) or (is_next_focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK),
         background = is_next_focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
         callback = function()
             if self.is_touch_device then
@@ -1436,14 +1466,32 @@ function ImageGallery:buildUI()
 
     local orig_prev_paint = prev_btn.paintTo
     prev_btn.paintTo = function(this, bb, x, y)
-        local focused = (self.focus_zone == "footer" and self.footer_focus_idx == 1)
-        this.bordersize = focused and (theme.border_focus or sc(3)) or sc(1)
-        this.color = focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK
-        this.background = focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil
-        if this.frame then
-            this.frame.bordersize = this.bordersize
-            this.frame.color = this.color
-            this.frame.background = this.background
+        if not this.enabled then
+            this.bordersize = sc(1)
+            this.color = Blitbuffer.Color8(200)
+            this.background = nil
+            if this.frame then
+                this.frame.bordersize = sc(1)
+                this.frame.color = Blitbuffer.Color8(200)
+                this.frame.background = nil
+                this.frame.invert = false
+            end
+            if this.label_widget then
+                this.label_widget.fgcolor = Blitbuffer.Color8(160)
+            end
+        else
+            local focused = (self.focus_zone == "footer" and self.footer_focus_idx == 1)
+            this.bordersize = focused and (theme.border_focus or sc(3)) or sc(1)
+            this.color = focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK
+            this.background = focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil
+            if this.frame then
+                this.frame.bordersize = this.bordersize
+                this.frame.color = this.color
+                this.frame.background = this.background
+            end
+            if this.label_widget then
+                this.label_widget.fgcolor = Blitbuffer.COLOR_BLACK
+            end
         end
         if orig_prev_paint then
             orig_prev_paint(this, bb, x, y)
@@ -1452,14 +1500,32 @@ function ImageGallery:buildUI()
 
     local orig_next_paint = next_btn.paintTo
     next_btn.paintTo = function(this, bb, x, y)
-        local focused = (self.focus_zone == "footer" and self.footer_focus_idx == 2)
-        this.bordersize = focused and (theme.border_focus or sc(3)) or sc(1)
-        this.color = focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK
-        this.background = focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil
-        if this.frame then
-            this.frame.bordersize = this.bordersize
-            this.frame.color = this.color
-            this.frame.background = this.background
+        if not this.enabled then
+            this.bordersize = sc(1)
+            this.color = Blitbuffer.Color8(200)
+            this.background = nil
+            if this.frame then
+                this.frame.bordersize = sc(1)
+                this.frame.color = Blitbuffer.Color8(200)
+                this.frame.background = nil
+                this.frame.invert = false
+            end
+            if this.label_widget then
+                this.label_widget.fgcolor = Blitbuffer.Color8(160)
+            end
+        else
+            local focused = (self.focus_zone == "footer" and self.footer_focus_idx == 2)
+            this.bordersize = focused and (theme.border_focus or sc(3)) or sc(1)
+            this.color = focused and (theme.color_focus_border or Blitbuffer.COLOR_BLACK) or Blitbuffer.COLOR_BLACK
+            this.background = focused and (theme.color_focus_bg or Blitbuffer.Color8(215)) or nil
+            if this.frame then
+                this.frame.bordersize = this.bordersize
+                this.frame.color = this.color
+                this.frame.background = this.background
+            end
+            if this.label_widget then
+                this.label_widget.fgcolor = Blitbuffer.COLOR_BLACK
+            end
         end
         if orig_next_paint then
             orig_next_paint(this, bb, x, y)
@@ -1477,6 +1543,9 @@ function ImageGallery:buildUI()
         dimen = Geom:new{ w = sw - sc(32) - (sc(85) * 2), h = sc(34) },
         page_label,
     }
+
+    self.prev_btn = prev_btn
+    self.next_btn = next_btn
 
     local footer_row = HorizontalGroup:new{
         align = "center",
@@ -1561,7 +1630,8 @@ function ImageGallery:renderMosaicCard(img, cell_w, is_focused_or_idx, opt_idx)
     end
 
     aspect_ratio = math.max(0.35, math.min(1.85, aspect_ratio))
-    local thumb_h = math.floor(thumb_w * aspect_ratio)
+    local avail_h = self.avail_content_h or (self.sh and (self.sh - sc(140))) or 500
+    local thumb_h = math.min(math.floor(thumb_w * aspect_ratio), avail_h)
 
     local image_widget = nil
 
@@ -1730,7 +1800,15 @@ function ImageGallery:renderMosaicCard(img, cell_w, is_focused_or_idx, opt_idx)
             GestureRange:new{
                 ges = "tap",
                 range = function()
-                    return card_container.dimen or Geom:new{ x = -1, y = -1, w = 1, h = 1 }
+                    local d = card_container.dimen
+                    if not d or not d.x or not d.y or not d.w or not d.h then
+                        return Geom:new{ x = -1, y = -1, w = 1, h = 1 }
+                    end
+                    local g = card_container.gallery or self
+                    local f_h = (g and g.footer_h) or sc(48)
+                    local max_y = (g and g.sh and (g.sh - f_h)) or (d.y + d.h)
+                    local safe_h = math.max(0, math.min(d.h, max_y - d.y))
+                    return Geom:new{ x = d.x, y = d.y, w = d.w, h = safe_h }
                 end
             }
         }
@@ -1738,6 +1816,11 @@ function ImageGallery:renderMosaicCard(img, cell_w, is_focused_or_idx, opt_idx)
 
     card_container.onTap = function(this, arg, ges)
         local g = card_container.gallery or self
+        local f_h = (g and g.footer_h) or sc(48)
+        local footer_top = (g and g.sh and (g.sh - f_h)) or (self.sh - f_h)
+        if ges and ges.pos and ges.pos.y and ges.pos.y >= footer_top then
+            return false
+        end
         if g and g.is_touch_device and g.focus_zone then
             g.focus_zone = nil
             g.focused_index = nil
@@ -1745,7 +1828,7 @@ function ImageGallery:renderMosaicCard(img, cell_w, is_focused_or_idx, opt_idx)
         end
         if ges and ges.pos and card_container.dimen then
             local right_edge = card_container.dimen.x + card_container.dimen.w
-            local bottom_edge = card_container.dimen.y + card_container.dimen.h
+            local bottom_edge = math.min(card_container.dimen.y + card_container.dimen.h, footer_top)
             local btn_hit_w = sc(44)
             local btn_hit_h = sc(44)
             if ges.pos.x >= (right_edge - btn_hit_w) and ges.pos.y >= (bottom_edge - btn_hit_h) then
@@ -1948,7 +2031,15 @@ function ImageGallery:renderGridCard(img, cell_w, is_focused_or_idx, opt_idx)
             GestureRange:new{
                 ges = "tap",
                 range = function()
-                    return card_item.dimen or Geom:new{ x = -1, y = -1, w = 1, h = 1 }
+                    local d = card_item.dimen
+                    if not d or not d.x or not d.y or not d.w or not d.h then
+                        return Geom:new{ x = -1, y = -1, w = 1, h = 1 }
+                    end
+                    local g = card_item.gallery or self
+                    local f_h = (g and g.footer_h) or sc(48)
+                    local max_y = (g and g.sh and (g.sh - f_h)) or (d.y + d.h)
+                    local safe_h = math.max(0, math.min(d.h, max_y - d.y))
+                    return Geom:new{ x = d.x, y = d.y, w = d.w, h = safe_h }
                 end
             }
         }
@@ -1956,6 +2047,11 @@ function ImageGallery:renderGridCard(img, cell_w, is_focused_or_idx, opt_idx)
 
     card_item.onTap = function(this, arg, ges)
         local g = card_item.gallery or self
+        local f_h = (g and g.footer_h) or sc(48)
+        local footer_top = (g and g.sh and (g.sh - f_h)) or (self.sh - f_h)
+        if ges and ges.pos and ges.pos.y and ges.pos.y >= footer_top then
+            return false
+        end
         if g and g.is_touch_device and g.focus_zone then
             g.focus_zone = nil
             g.focused_index = nil
@@ -1963,7 +2059,7 @@ function ImageGallery:renderGridCard(img, cell_w, is_focused_or_idx, opt_idx)
         end
         if ges and ges.pos and card_item.dimen then
             local right_edge = card_item.dimen.x + card_item.dimen.w
-            local bottom_edge = card_item.dimen.y + card_item.dimen.h
+            local bottom_edge = math.min(card_item.dimen.y + card_item.dimen.h, footer_top)
             local btn_hit_w = sc(44)
             local btn_hit_h = sc(44)
             if ges.pos.x >= (right_edge - btn_hit_w) and ges.pos.y >= (bottom_edge - btn_hit_h) then
@@ -2135,7 +2231,15 @@ function ImageGallery:renderListRow(img, content_w, is_focused_or_idx, opt_idx)
             GestureRange:new{
                 ges = "tap",
                 range = function()
-                    return row_item.dimen or Geom:new{ x = -1, y = -1, w = 1, h = 1 }
+                    local d = row_item.dimen
+                    if not d or not d.x or not d.y or not d.w or not d.h then
+                        return Geom:new{ x = -1, y = -1, w = 1, h = 1 }
+                    end
+                    local g = row_item.gallery or self
+                    local f_h = (g and g.footer_h) or sc(48)
+                    local max_y = (g and g.sh and (g.sh - f_h)) or (d.y + d.h)
+                    local safe_h = math.max(0, math.min(d.h, max_y - d.y))
+                    return Geom:new{ x = d.x, y = d.y, w = d.w, h = safe_h }
                 end
             }
         }
@@ -2143,6 +2247,11 @@ function ImageGallery:renderListRow(img, content_w, is_focused_or_idx, opt_idx)
 
     row_item.onTap = function(this, arg, ges)
         local g = row_item.gallery or self
+        local f_h = (g and g.footer_h) or sc(48)
+        local footer_top = (g and g.sh and (g.sh - f_h)) or (self.sh - f_h)
+        if ges and ges.pos and ges.pos.y and ges.pos.y >= footer_top then
+            return false
+        end
         if g and g.is_touch_device and g.focus_zone then
             g.focus_zone = nil
             g.focused_index = nil

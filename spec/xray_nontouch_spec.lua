@@ -548,5 +548,104 @@ describe("X-Ray Non-Touch & Keyboard Support", function()
             Device.isTouchDevice = function() return false end
             assert.is_false(XRayUtils:isTouchDevice())
         end)
+
+        it("ensures cards cannot intercept footer taps and respects safe gesture bounds", function()
+            Device.isTouchDevice = function() return true end
+            local gallery = ImageGallery:new{
+                plugin = mock_plugin,
+                images = sample_images,
+                view_mode = "mosaic",
+                tab = "all",
+            }
+            gallery:buildUI()
+
+            local root = gallery[1]
+            assert.are_not.equal(nil, root)
+            -- root[2] is bottom_pinned_footer
+            local footer_container = root[2]
+            assert.are_not.equal(nil, footer_container)
+
+            -- Test renderMosaicCard refuses tap in footer area
+            local card_container, thumb_h = gallery:renderMosaicCard(sample_images[1], 300, false, 1)
+            assert.are_not.equal(nil, card_container)
+            -- thumb_h must not exceed avail_content_h
+            assert.is_true(thumb_h <= gallery.avail_content_h)
+
+            -- Nil-safety before paintTo:
+            card_container.dimen = { w = 300, h = 60 }
+            local gr = card_container.ges_events.Tap[1]
+            local range_fn = gr.range or (gr.args and gr.args.range)
+            assert.are_not.equal(nil, range_fn)
+            local safe_range = range_fn()
+            assert.are_not.equal(nil, safe_range)
+            assert.are.equal(-1, safe_range.x)
+
+            -- Card position overlapping footer:
+            card_container.dimen = { x = 20, y = gallery.sh - gallery.footer_h - 20, w = 300, h = 60 }
+            local card_tap_in_footer = {
+                type = "Gesture",
+                name = "Tap",
+                pos = { x = 50, y = gallery.sh - gallery.footer_h + 10 },
+            }
+            local card_handled = card_container:onTap(nil, card_tap_in_footer)
+            assert.is_false(card_handled)
+
+            -- Tap above footer is accepted:
+            local card_tap_valid = {
+                type = "Gesture",
+                name = "Tap",
+                pos = { x = 50, y = gallery.sh - gallery.footer_h - 10 },
+            }
+            local valid_handled = card_container:onTap(nil, card_tap_valid)
+            assert.is_true(valid_handled)
+        end)
+
+        it("disables pagination buttons when on single page or boundaries", function()
+            local gallery = ImageGallery:new{
+                plugin = mock_plugin,
+                images = { sample_images[1] },
+                view_mode = "grid",
+                tab = "all",
+            }
+            gallery:buildUI()
+            assert.are.equal(1, gallery.total_pages)
+
+            -- When 1/1, both prev and next must be disabled
+            assert.is_false(gallery.prev_btn.enabled)
+            assert.is_false(gallery.next_btn.enabled)
+
+            -- 15 images in grid view = 3 pages (6 per page)
+            local many_images = {}
+            for i = 1, 15 do
+                table.insert(many_images, { id = "img" .. i, title = "Image " .. i, page = i })
+            end
+            mock_plugin.images = many_images
+            local multi_gallery = ImageGallery:new{
+                plugin = mock_plugin,
+                images = many_images,
+                view_mode = "grid",
+                tab = "all",
+            }
+            multi_gallery:buildUI()
+            assert.is_true(multi_gallery.total_pages > 1)
+            local last_page = multi_gallery.total_pages
+
+            -- Page 1: prev disabled, next enabled
+            assert.are.equal(1, multi_gallery.current_page)
+            assert.is_false(multi_gallery.prev_btn.enabled)
+            assert.is_true(multi_gallery.next_btn.enabled)
+
+            -- Page 2: both enabled
+            multi_gallery.current_page = 2
+            multi_gallery:buildUI()
+            assert.is_true(multi_gallery.prev_btn.enabled)
+            assert.is_true(multi_gallery.next_btn.enabled)
+
+            -- Last page: prev enabled, next disabled
+            multi_gallery.current_page = last_page
+            multi_gallery:buildUI()
+            assert.is_true(multi_gallery.prev_btn.enabled)
+            assert.is_false(multi_gallery.next_btn.enabled)
+        end)
     end)
 end)
