@@ -1,0 +1,5 @@
+# Keep line endings stable across the Windows and Linux checkouts.
+# xray_aihelper.lua was once committed with CRLF, which turned an 11-line
+# change into a whole-file diff.
+*.lua text eol=lf
+*.po  text eol=lf
