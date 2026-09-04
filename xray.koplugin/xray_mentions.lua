@@ -336,8 +336,10 @@ function M:showMentionsMenu(entity)
         is_borderless = true,
         width = Screen:getWidth(),
         height = Screen:getHeight(),
+        _xray_highlight = true,
         on_close_callback = function() self.mentions_menu = nil end,
     }
+    self.mentions_menu._xray_highlight = true
     UIManager:show(self.mentions_menu)
 end
 
@@ -608,6 +610,92 @@ function M:showReturnBanner(return_page, entity, mentions, current_page)
     
     plugin:highlightMentionsOnPage(current_page, entity)
     
+    self.is_programmatic_navigation = true
+    if UIManager and type(UIManager.scheduleIn) == "function" then
+        UIManager:scheduleIn(0.5, function()
+            self.is_programmatic_navigation = nil
+        end)
+    else
+        self.is_programmatic_navigation = nil
+    end
+end
+
+function M:showImageReturnBanner(return_page, image_entry, current_page)
+    if self.return_banner then UIManager:close(self.return_banner); self.return_banner = nil end
+
+    local plugin = self
+    local image_title = (image_entry and image_entry.title) or (self.loc and self.loc:t("illustration") or "Illustration")
+    local title = image_title
+    if current_page and tonumber(current_page) then
+        title = string.format("%s · Page %d", image_title, tonumber(current_page))
+    end
+
+    local buttons = {{
+        {
+            text = (self.loc and self.loc:t("back_to_reading") or "Back to Reading"),
+            callback = function() plugin:_doReturnJump(return_page) end,
+        },
+        {
+            text = (self.loc and self.loc:t("menu_images") or "Images & Maps"),
+            callback = function()
+                UIManager:nextTick(function()
+                    if plugin.resumeImagesFeature then
+                        plugin:resumeImagesFeature()
+                    elseif plugin.showImages then
+                        plugin:showImages()
+                    end
+                end)
+            end,
+        },
+        {
+            text = "\xE2\x9C\x95", -- Close icon
+            callback = function()
+                UIManager:nextTick(function()
+                    if plugin.return_banner then UIManager:close(plugin.return_banner) end
+                end)
+            end,
+        },
+    }}
+
+    self.return_banner = ButtonDialog:new{
+        title = title,
+        buttons = buttons,
+        is_borderless = true,
+        width = Screen:getWidth(),
+        show_close_button = false,
+    }
+
+    self.return_banner.onCloseWidget = function(this)
+        UIManager:setDirty(nil, function()
+            return "flashui", this.movable.dimen
+        end)
+        plugin.return_banner = nil
+        plugin.return_page_origin = nil
+    end
+
+    local bottom_offset = 32
+    self.return_banner.recenter = function(this)
+        if this.movable and this.movable.dimen then
+            this.movable.dimen.x = 0
+            this.movable.dimen.y = Screen:getHeight() - this.movable.dimen.h - bottom_offset
+        end
+        this.dimen = this.movable and this.movable.dimen
+    end
+
+    if self.return_banner[1] then
+        self.return_banner[1].paintTo = function(this, bb, x, y)
+            local content_size = this[1]:getSize()
+            local x_pos = x + math.floor((this.dimen.w - content_size.w) / 2)
+            local y_pos = y + this.dimen.h - content_size.h - bottom_offset
+            this[1]:paintTo(bb, x_pos, y_pos)
+        end
+    end
+
+    UIManager:show(self.return_banner)
+    if UIManager and type(UIManager.forceRePaint) == "function" then
+        UIManager:forceRePaint()
+    end
+
     self.is_programmatic_navigation = true
     if UIManager and type(UIManager.scheduleIn) == "function" then
         UIManager:scheduleIn(0.5, function()

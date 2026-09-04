@@ -249,6 +249,10 @@ msgstr "Biztosan törölni szeretné az összes beállított API-kulcsot és egy
 msgid "confirm_clear_single_key"
 msgstr "Törli a beállított API-kulcsot a következőhöz: %s?"
 
+# en-hash: 9cfefed8fb9497baa5cd519d7d2bb5d7
+msgid "current_language"
+msgstr "hu"
+
 # en-hash: 97b9ad7336ac722cf16044cf603bfe10
 msgid "current_mode"
 msgstr "Jelenlegi: "
@@ -509,6 +513,10 @@ msgstr "Teljes könyv mód"
 msgid "gemini_key_hint"
 msgstr "Adja meg ingyenes Gemini kulcsát a Google AI Studio-ból (AQ. vagy AIzaSy... kezdetű):"
 
+# en-hash: 33dca68e340b8d6c21472341130cf45a
+msgid "illustration"
+msgstr "Illusztráció"
+
 # en-hash: 8365f32698c816ead0032549239eaf01
 msgid "img_attach_button"
 msgstr "Képek keresése"
@@ -592,6 +600,10 @@ msgstr "Nem találhatók képek."
 # en-hash: 74ab2b6d760dc64ea26012a4fca84490
 msgid "img_no_series"
 msgstr "Nincsenek mentett sorozathivatkozások.\n\nHasználd a ⋮ menüt bármely térképen a sorozathivatkozások közé mentéshez."
+
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Ez a könyv nem része egyetlen felismerhető sorozatnak sem.\n\nA sorozathivatkozások csak sorozatokhoz tartozó könyvek esetében érhetők el."
 
 # en-hash: dd1f775e443ff3b9a89270713580a51b
 msgid "img_prev"
@@ -1249,6 +1261,10 @@ msgstr "Nem történt összevonás."
 msgid "no_new_text"
 msgstr "A jelenlegi pozíciódnál nem volt új szöveg; az X-Ray itt már naprakész."
 
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Nem található sorozat ehhez a könyvhöz"
+
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"
 msgstr "Nem található sorozat ehhez a könyvhöz."
@@ -1276,6 +1292,10 @@ msgstr "Nincs pontos találat erre: „%s”. Koppintson egy kapcsolódó bejegy
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"
 msgstr "Használja a vágólapon található API kulcsot a(z) %s szolgáltatáshoz?"
+
+# en-hash: 607481fc96e754b33650eb171aac9447
+msgid "path"
+msgstr "plugins/xray.koplugin"
 
 # en-hash: 046763a0d64321194477604b7751c8e4
 msgid "pending_duplicates_prompt"
@@ -1761,6 +1781,10 @@ msgstr "Újdonságok:"
 msgid "updating_ai"
 msgstr "X-Ray adatok frissítése..."
 
+# en-hash: 0d1b08c34858921bc7c662b228acb7ba
+msgid "val"
+msgstr "???"
+
 # en-hash: 1739e3ae6d734407aef8af879665b8ee
 msgid "validate_keys_title"
 msgstr "API kulcsok állapota és érvényesítése"
@@ -1856,6 +1880,14 @@ msgstr "Olvasson be egy QR-kódot a kulcs megadásához Cloud Relay-en vagy hely
 # en-hash: f5d12f602967b00beea3f12412fcb3a2
 msgid "welcome_opt_phone_title"
 msgstr "Beállítás telefonról / PC-ről (Ajánlott)"
+
+# en-hash: 97d815bfab1c9a82c9e305a76b4b559f
+msgid "welcome_opt_skip_desc"
+msgstr "Helyi szószám, olvasási statisztikák és gyorsítótárazott sorozat-infók használata MI nélkül."
+
+# en-hash: 93c52d3e72f67abf20b2ec1c235f5dc5
+msgid "welcome_opt_skip_title"
+msgstr "Kihagyás egyelőre (csak offline funkciók)"
 
 # en-hash: 741987eccc2e46095fdd70cf9377e31e
 msgid "welcome_select_provider"

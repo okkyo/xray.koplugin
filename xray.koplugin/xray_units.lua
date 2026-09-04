@@ -1,61 +1,11 @@
 -- xray_units.lua - Core logic for unit detection, conversion and formatting
+local plugin_path = ((...) or ""):match("(.-)[^%.]+$") or ""
+local utils = require(plugin_path .. "xray_utils")
+
 local M = {}
 
--- Fast UTF-8 lowercasing in pure Lua covering ASCII, Cyrillic (ru, uk, sr, bg),
--- Latin-1 Supplement & Extended (de, fr, es, it, pt, pl, tr, hu, nl, etc.), and Greek.
 local function utf8Lower(str)
-    if not str then return "" end
-    local res = str:lower()
-    
-    -- Cyrillic UTF-8:
-    -- А-П: \xD0\x90-\xD0\x9F -> \xD0\xB0-\xD0\xBF
-    -- Р-Я: \xD0\xA0-\xD0\xAF -> \xD1\x80-\xD1\x8F
-    res = res:gsub("\208([\144-\159])", function(b)
-        return "\208" .. string.char(string.byte(b) + 32)
-    end)
-    res = res:gsub("\208([\160-\175])", function(b)
-        return "\209" .. string.char(string.byte(b) - 32)
-    end)
-    res = res:gsub("\208\129", "\209\145") -- Ё -> ё
-    res = res:gsub("\208\132", "\209\148") -- Є -> є (uk)
-    res = res:gsub("\208\134", "\209\150") -- І -> і (uk/be)
-    res = res:gsub("\208\135", "\209\151") -- Ї -> ї (uk)
-    res = res:gsub("\210\144", "\210\145") -- Ґ -> ґ (uk)
-    res = res:gsub("\208\130", "\209\146") -- Ђ -> ђ (sr)
-    res = res:gsub("\208\136", "\209\152") -- Ј -> ј (sr)
-    res = res:gsub("\208\137", "\209\153") -- Љ -> љ (sr)
-    res = res:gsub("\208\138", "\209\154") -- Њ -> њ (sr)
-    res = res:gsub("\208\139", "\209\155") -- Ћ -> ћ (sr)
-    res = res:gsub("\208\143", "\209\159") -- Џ -> џ (sr)
-
-    -- Latin-1 Supplement accented characters (À-Ö, Ø-Þ -> à-ö, ø-þ)
-    -- \xC3\x80-\x96 -> \xC3\xA0-\xB6
-    -- \xC3\x98-\x9E -> \xC3\xB8-\xBE
-    res = res:gsub("\195([\128-\150])", function(b)
-        return "\195" .. string.char(string.byte(b) + 32)
-    end)
-    res = res:gsub("\195([\152-\158])", function(b)
-        return "\195" .. string.char(string.byte(b) + 32)
-    end)
-    
-    -- Latin Extended:
-    res = res:gsub("\196\176", "i")          -- İ -> i (Turkish dotted capital I)
-    res = res:gsub("\197\129", "\197\130")   -- Ł -> ł (Polish)
-    res = res:gsub("\196\132", "\196\133")   -- Ą -> ą (Polish)
-    res = res:gsub("\196\134", "\196\135")   -- Ć -> ć (Polish)
-    res = res:gsub("\196\152", "\196\153")   -- Ę -> ę (Polish)
-    res = res:gsub("\197\131", "\197\132")   -- Ń -> ń (Polish)
-    res = res:gsub("\197\154", "\197\155")   -- Ś -> ś (Polish)
-    res = res:gsub("\197\185", "\197\186")   -- Ź -> ź (Polish)
-    res = res:gsub("\197\187", "\197\188")   -- Ż -> ż (Polish)
-    res = res:gsub("\197\144", "\197\145")   -- Ő -> ő (Hungarian)
-    res = res:gsub("\197\176", "\197\177")   -- Ű -> ű (Hungarian)
-    res = res:gsub("\196\140", "\196\141")   -- Č -> č (Serbian/Czech)
-    res = res:gsub("\197\160", "\197\161")   -- Š -> š (Serbian/Czech)
-    res = res:gsub("\197\189", "\197\190")   -- Ž -> ž (Serbian/Czech)
-    res = res:gsub("\196\144", "\196\145")   -- Đ -> đ (Serbian)
-    
-    return res
+    return utils:utf8Lower(str)
 end
 
 M.utf8Lower = utf8Lower
@@ -852,28 +802,30 @@ function M.detectMeasurements(text, direction, enabled_categories, current_lang)
 
     -- 1. Compound length units (e.g. 6 feet 2 inches, 6'2", 6 футов 2 дюйма, 6 футов и 2 дюйма)
     if enabled_categories.length and (direction == "to_metric" or direction == "auto") then
-        local init = 1
-        while true do
-            local s, e, f, i = text_lower:find("(%d+)%s*'%s*(%d+)%s*\"", init)
-            if not s then break end
-            local ft_val = tonumber(f)
-            local in_val = tonumber(i)
-            if ft_val and in_val then
-                local total_in = ft_val * 12 + in_val
-                local total_m = M.convert(total_in, "length", "in", "m")
-                local orig_str = text:sub(s, e)
-                local conv_val, conv_unit = applySmartScaling(total_m, "length", "m")
-                local conv_str = M.formatNumber(conv_val, current_lang) .. " " .. conv_unit
-                
-                table.insert(results, {
-                    start_pos = s,
-                    end_pos = e,
-                    original = orig_str,
-                    converted = conv_str,
-                    category = "length"
-                })
+        if text_lower:find("'", 1, true) and text_lower:find("\"", 1, true) then
+            local init = 1
+            while true do
+                local s, e, f, i = text_lower:find("(%d+)%s*'%s*(%d+)%s*\"", init)
+                if not s then break end
+                local ft_val = tonumber(f)
+                local in_val = tonumber(i)
+                if ft_val and in_val then
+                    local total_in = ft_val * 12 + in_val
+                    local total_m = M.convert(total_in, "length", "in", "m")
+                    local orig_str = text:sub(s, e)
+                    local conv_val, conv_unit = applySmartScaling(total_m, "length", "m")
+                    local conv_str = M.formatNumber(conv_val, current_lang) .. " " .. conv_unit
+                    
+                    table.insert(results, {
+                        start_pos = s,
+                        end_pos = e,
+                        original = orig_str,
+                        converted = conv_str,
+                        category = "length"
+                    })
+                end
+                init = e + 1
             end
-            init = e + 1
         end
         
         local ft_aliases = {
@@ -886,42 +838,62 @@ function M.detectMeasurements(text, direction, enabled_categories, current_lang)
             "дюймов", "дюйма", "дюйм", "дюймы", "дюймів", "дюймі",
             "zoll", "pouces", "pouce", "pulgadas", "pulgada", "pollici", "pollice", "polegadas", "polegada"
         }
-        local length_connectors = { "", "and", "и", "und", "et", "y", "e", "," }
+        
+        -- Fast pre-check: only test foot/inch pairs that actually occur in text_lower
+        local present_ft = {}
         for _, ft_a in ipairs(ft_aliases) do
-            for _, in_a in ipairs(in_aliases) do
-                for _, conn in ipairs(length_connectors) do
-                    local init = 1
-                    local pattern
-                    if conn == "" then
-                        pattern = "(%d+)%s*" .. ft_a .. "%s*(%d+)%s*" .. in_a
-                    elseif conn == "," then
-                        pattern = "(%d+)%s*" .. ft_a .. "%s*,%s*(%d+)%s*" .. in_a
-                    else
-                        pattern = "(%d+)%s*" .. ft_a .. "%s+" .. conn .. "%s+(%d+)%s*" .. in_a
-                    end
-                    while true do
-                        local s, e, f, i = text_lower:find(pattern, init)
-                        if not s then break end
-                        if not is_word_char_at(text_lower, e + 1) then
-                            local ft_val = tonumber(f)
-                            local in_val = tonumber(i)
-                            if ft_val and in_val then
-                                local total_in = ft_val * 12 + in_val
-                                local total_m = M.convert(total_in, "length", "in", "m")
-                                local orig_str = text:sub(s, e)
-                                local conv_val, conv_unit = applySmartScaling(total_m, "length", "m")
-                                local conv_str = M.formatNumber(conv_val, current_lang) .. " " .. conv_unit
-                                
-                                table.insert(results, {
-                                    start_pos = s,
-                                    end_pos = e,
-                                    original = orig_str,
-                                    converted = conv_str,
-                                    category = "length"
-                                })
+            if text_lower:find(ft_a, 1, true) then
+                table.insert(present_ft, ft_a)
+            end
+        end
+        
+        local present_in = {}
+        for _, in_a in ipairs(in_aliases) do
+            if text_lower:find(in_a, 1, true) then
+                table.insert(present_in, in_a)
+            end
+        end
+        
+        if #present_ft > 0 and #present_in > 0 then
+            local length_connectors = { "", "and", "и", "und", "et", "y", "e", "," }
+            for _, ft_a in ipairs(present_ft) do
+                for _, in_a in ipairs(present_in) do
+                    for _, conn in ipairs(length_connectors) do
+                        if conn == "" or conn == "," or text_lower:find(conn, 1, true) then
+                            local init = 1
+                            local pattern
+                            if conn == "" then
+                                pattern = "(%d+)%s*" .. ft_a .. "%s*(%d+)%s*" .. in_a
+                            elseif conn == "," then
+                                pattern = "(%d+)%s*" .. ft_a .. "%s*,%s*(%d+)%s*" .. in_a
+                            else
+                                pattern = "(%d+)%s*" .. ft_a .. "%s+" .. conn .. "%s+(%d+)%s*" .. in_a
+                            end
+                            while true do
+                                local s, e, f, i = text_lower:find(pattern, init)
+                                if not s then break end
+                                if not is_word_char_at(text_lower, e + 1) then
+                                    local ft_val = tonumber(f)
+                                    local in_val = tonumber(i)
+                                    if ft_val and in_val then
+                                        local total_in = ft_val * 12 + in_val
+                                        local total_m = M.convert(total_in, "length", "in", "m")
+                                        local orig_str = text:sub(s, e)
+                                        local conv_val, conv_unit = applySmartScaling(total_m, "length", "m")
+                                        local conv_str = M.formatNumber(conv_val, current_lang) .. " " .. conv_unit
+                                        
+                                        table.insert(results, {
+                                            start_pos = s,
+                                            end_pos = e,
+                                            original = orig_str,
+                                            converted = conv_str,
+                                            category = "length"
+                                        })
+                                    end
+                                end
+                                init = e + 1
                             end
                         end
-                        init = e + 1
                     end
                 end
             end
@@ -932,43 +904,80 @@ function M.detectMeasurements(text, direction, enabled_categories, current_lang)
     if enabled_categories.weight and (direction == "to_metric" or direction == "auto") then
         local st_aliases = { "st", "stone", "stones", "стоунов", "стоуна", "стоун", "стоуны", "стоунів" }
         local lb_aliases = { "lb", "lbs", "pound", "pounds", "фунтов", "фунта", "фунт", "фунты", "фунтів", "фунті", "pfund", "livres", "livre", "libras", "libra", "libbre", "libbra" }
-        local weight_connectors = { "", "and", "и", "und", "et", "y", "e", "," }
+        
+        local present_st = {}
         for _, st_a in ipairs(st_aliases) do
-            for _, lb_a in ipairs(lb_aliases) do
-                for _, conn in ipairs(weight_connectors) do
-                    local init = 1
-                    local pattern
-                    if conn == "" then
-                        pattern = "(%d+)%s*" .. st_a .. "%s*(%d+)%s*" .. lb_a
-                    elseif conn == "," then
-                        pattern = "(%d+)%s*" .. st_a .. "%s*,%s*(%d+)%s*" .. lb_a
-                    else
-                        pattern = "(%d+)%s*" .. st_a .. "%s+" .. conn .. "%s+(%d+)%s*" .. lb_a
-                    end
-                    while true do
-                        local s, e, st, lb = text_lower:find(pattern, init)
-                        if not s then break end
-                        if not is_word_char_at(text_lower, e + 1) then
-                            local st_val = tonumber(st)
-                            local lb_val = tonumber(lb)
-                            if st_val and lb_val then
-                                local total_lb = st_val * 14 + lb_val
-                                local total_kg = M.convert(total_lb, "weight", "lb", "kg")
-                                local conv_str = M.formatNumber(total_kg, current_lang) .. " kg"
-                                
-                                table.insert(results, {
-                                    start_pos = s,
-                                    end_pos = e,
-                                    original = text:sub(s, e),
-                                    converted = conv_str,
-                                    category = "weight"
-                                })
+            if text_lower:find(st_a, 1, true) then
+                table.insert(present_st, st_a)
+            end
+        end
+        
+        local present_lb = {}
+        for _, lb_a in ipairs(lb_aliases) do
+            if text_lower:find(lb_a, 1, true) then
+                table.insert(present_lb, lb_a)
+            end
+        end
+
+        if #present_st > 0 and #present_lb > 0 then
+            local weight_connectors = { "", "and", "и", "und", "et", "y", "e", "," }
+            for _, st_a in ipairs(present_st) do
+                for _, lb_a in ipairs(present_lb) do
+                    for _, conn in ipairs(weight_connectors) do
+                        if conn == "" or conn == "," or text_lower:find(conn, 1, true) then
+                            local init = 1
+                            local pattern
+                            if conn == "" then
+                                pattern = "(%d+)%s*" .. st_a .. "%s*(%d+)%s*" .. lb_a
+                            elseif conn == "," then
+                                pattern = "(%d+)%s*" .. st_a .. "%s*,%s*(%d+)%s*" .. lb_a
+                            else
+                                pattern = "(%d+)%s*" .. st_a .. "%s+" .. conn .. "%s+(%d+)%s*" .. lb_a
+                            end
+                            while true do
+                                local s, e, st, lb = text_lower:find(pattern, init)
+                                if not s then break end
+                                if not is_word_char_at(text_lower, e + 1) then
+                                    local st_val = tonumber(st)
+                                    local lb_val = tonumber(lb)
+                                    if st_val and lb_val then
+                                        local total_lb = st_val * 14 + lb_val
+                                        local total_kg = M.convert(total_lb, "weight", "lb", "kg")
+                                        local conv_str = M.formatNumber(total_kg, current_lang) .. " kg"
+                                        
+                                        table.insert(results, {
+                                            start_pos = s,
+                                            end_pos = e,
+                                            original = text:sub(s, e),
+                                            converted = conv_str,
+                                            category = "weight"
+                                        })
+                                    end
+                                end
+                                init = e + 1
                             end
                         end
-                        init = e + 1
                     end
                 end
             end
+        end
+    end
+
+    -- Pre-calculate present connectors in text_lower for fast range matching
+    local active_connectors = {}
+    local all_connectors = { "to", "or", "and", "-", "–", "—", ",", "до", "или", "и", "або", "bis", "oder", "und", "à", "ou", "et", "a", "o", "y", "e" }
+    for _, conn in ipairs(all_connectors) do
+        if text_lower:find(conn, 1, true) then
+            table.insert(active_connectors, conn)
+        end
+    end
+
+    -- Pre-calculate if text contains vague quantifiers
+    local has_vague = false
+    for _, q in ipairs(VAGUE_ORDER) do
+        if text_lower:find(q, 1, true) then
+            has_vague = true
+            break
         end
     end
 
@@ -989,172 +998,40 @@ function M.detectMeasurements(text, direction, enabled_categories, current_lang)
                     local alias = utf8Lower(raw_alias)
                     local is_en = (current_lang:lower() == "en")
                     if not (is_en and NON_ENGLISH_ASCII[alias]) then
-                        local escaped_alias = alias:gsub("[%-%+%.%?%*%^%$%(%)%[%]%%]", "%%%1")
-                    
-                    -- A: Digit pattern: matches numbers like "12.5", "12", "12,5", "50км", "36,6 °С", "1 000 km"
-                    local pattern = "([%d][0-9%s%.,\194\160\226\128\175]*)%-?%s*(" .. escaped_alias .. ")"
-                    local init = 1
-                    while true do
-                        local s, e, num_str, unit_match = text_lower:find(pattern, init)
-                        if not s then break end
-                        
-                        local before_char = s > 1 and text_lower:sub(s - 1, s - 1) or ""
-                        local ok_before = not before_char:match("[%d]")
-                        local ok_after = not is_word_char_at(text_lower, e + 1)
-                        
-                        if ok_before and ok_after then
-                            local val = parseNumberText(num_str)
-                            if val then
-                                local sign = ""
-                                local match_start = s
-                                if u.category == "temp" then
-                                    sign = getPrecedingSign(text, s)
-                                    if sign ~= "" then
-                                        val = -val
-                                        match_start = s - #sign
-                                    end
-                                end
-                                
-                                local conv_raw = M.convert(val, u.category, u.name, u.std_target)
-                                local conv_val, conv_unit = applySmartScaling(conv_raw, u.category, u.std_target)
-                                
-                                if conv_unit == "c" then conv_unit = "°C"
-                                elseif conv_unit == "f" then conv_unit = "°F" end
-
-                                local conv_str = M.formatNumber(conv_val, current_lang) .. " " .. M.pluralizeUnit(conv_val, conv_unit)
-                                
-                                table.insert(results, {
-                                    start_pos = match_start,
-                                    end_pos = e,
-                                    original = text:sub(match_start, e),
-                                    converted = conv_str,
-                                    category = u.category
-                                })
-                            end
-                        end
-                        init = e + 1
-                    end
-                    
-                    -- Range patterns
-                    local is_tens = { twenty=true, thirty=true, forty=true, fifty=true, sixty=true, seventy=true, eighty=true, ninety=true }
-                    local is_units = { one=true, two=true, three=true, four=true, five=true, six=true, seven=true, eight=true, nine=true }
-                    local function process_range_pattern(pat, is_word)
-                        local r_init = 1
-                        while true do
-                            local s, e, r1, r2 = text_lower:find(pat, r_init)
-                            if not s then break end
-                            local before_char = s > 1 and text_lower:sub(s - 1, s - 1) or ""
-                            local ok_boundary = true
-                            if is_word and before_char:match("[%a\194-\244]") then
-                                ok_boundary = false
-                            elseif not is_word and before_char:match("[%d%.%,]") then
-                                ok_boundary = false
-                            end
-                            if ok_boundary and not is_word_char_at(text_lower, e + 1) then
-                                local is_range = true
-                                if is_word and is_tens[r1] and is_units[r2] and not text_lower:sub(s, e):find("%s+to%s") and not text_lower:sub(s, e):find("%s+or%s") and not text_lower:sub(s, e):find("%s+and%s") and not text_lower:sub(s, e):find(",") then
-                                    is_range = false
-                                end
-                                if is_range then
-                                    local val1 = parseNumberText(r1)
-                                    local val2 = parseNumberText(r2)
-                                    if val1 and val2 then
-                                        local conv_raw1 = M.convert(val1, u.category, u.name, u.std_target)
-                                        local conv_val1, conv_unit = applySmartScaling(conv_raw1, u.category, u.std_target)
-                                        local conv_raw2 = M.convert(val2, u.category, u.name, u.std_target)
-                                        local conv_val2 = applySmartScaling(conv_raw2, u.category, u.std_target)
-                                        if conv_unit == "c" then conv_unit = "°C"
-                                        elseif conv_unit == "f" then conv_unit = "°F" end
-                                        local conv_str = M.formatNumber(conv_val1, current_lang) .. "–" .. M.formatNumber(conv_val2, current_lang) .. " " .. M.pluralizeUnit(conv_val2, conv_unit)
-                                        table.insert(results, {
-                                            start_pos = s,
-                                            end_pos = e,
-                                            original = text:sub(s, e),
-                                            converted = conv_str,
-                                            category = u.category
-                                        })
-                                    end
-                                end
-                            end
-                            r_init = e + 1
-                        end
-                    end
-                    
-                    local connectors = { "to", "or", "and", "-", "–", "—", ",", "до", "или", "и", "або", "bis", "oder", "und", "à", "ou", "et", "a", "o", "y", "e" }
-                    for _, conn in ipairs(connectors) do
-                        local d_pat
-                        if conn == "," then
-                            d_pat = "([%d%.%,]+)%s*,%s+([%d%.%,]+)%s*(" .. escaped_alias .. ")"
-                        elseif conn == "-" then
-                            d_pat = "([%d%.%,]+)%s*-%s*([%d%.%,]+)%s*(" .. escaped_alias .. ")"
-                        elseif conn == "–" or conn == "—" then
-                            d_pat = "([%d%.%,]+)%s*" .. conn .. "%s*([%d%.%,]+)%s*(" .. escaped_alias .. ")"
-                        else
-                            d_pat = "([%d%.%,]+)%s+" .. conn .. "%s+([%d%.%,]+)%s*(" .. escaped_alias .. ")"
-                        end
-                        process_range_pattern(d_pat, false)
-                    end
-
-                    if not (alias == "in" or alias == "st" or alias == "m" or alias == "l" or alias == "g") then
-                        for _, conn in ipairs(connectors) do
-                            local w_pat
-                            if conn == "," then
-                                w_pat = "([%a\194-\244%d%-]+)%s*,%s+([%a\194-\244%d%-]+)%s*(" .. escaped_alias .. ")"
-                            else
-                                w_pat = "([%a\194-\244%d%-]+)%s+" .. conn .. "%s+([%a\194-\244%d%-]+)%s*(" .. escaped_alias .. ")"
-                            end
-                            process_range_pattern(w_pat, true)
-                        end
-                    end
-
-                    -- B: Written numbers: e.g. "three miles", "шесть футов", "три мили"
-                    -- Note: character class ONLY contains ASCII non-word punctuation to avoid corrupting UTF-8 byte sequences
-                    if not (alias == "in" or alias == "st" or alias == "m" or alias == "l" or alias == "g") then
-                        local written_pattern = "([^%d%.,:;!?'\"()/\r\n\t]+)%s+(" .. escaped_alias .. ")"
-                        init = 1
-                        while true do
-                            local s, e, word_str = text_lower:find(written_pattern, init)
-                            if not s then break end
+                        -- FAST SUBSTRING FILTER: Only execute patterns if alias is present in text_lower
+                        if text_lower:find(alias, 1, true) then
+                            local escaped_alias = alias:gsub("[%-%+%.%?%*%^%$%(%)%[%]%%]", "%%%1")
                             
-                            if not is_word_char_at(text_lower, e + 1) then
-                                local phrase_words = {}
-                                for w in word_str:gmatch("[%S]+") do
-                                    table.insert(phrase_words, w)
-                                end
+                            -- A: Digit pattern: matches numbers like "12.5", "12", "12,5", "50км", "36,6 °С", "1 000 km"
+                            local pattern = "([%d][0-9%s%.,\194\160\226\128\175]*)%-?%s*(" .. escaped_alias .. ")"
+                            local init = 1
+                            while true do
+                                local s, e, num_str, unit_match = text_lower:find(pattern, init)
+                                if not s then break end
                                 
-                                local valid_words = {}
-                                local i_w = #phrase_words
-                                while i_w >= 1 do
-                                    local w = phrase_words[i_w]
-                                    local clean_w = utf8Lower(w):gsub("[%-,]$", "")
-                                    if clean_w == "and" or clean_w == "a" or clean_w == "an" or clean_w == "и" or clean_w == "und" or clean_w == "et" or clean_w == "y" or parseNumberText(clean_w) then
-                                        table.insert(valid_words, 1, clean_w)
-                                        i_w = i_w - 1
-                                    else
-                                        break
-                                    end
-                                end
-
-                                while #valid_words > 0 and (valid_words[1] == "and" or valid_words[1] == "и" or valid_words[1] == "und" or valid_words[1] == "et" or valid_words[1] == "y") do
-                                    table.remove(valid_words, 1)
-                                end
-
-                                if #valid_words > 0 then
-                                    local phrase = table.concat(valid_words, " ")
-                                    local val = parseNumberText(phrase)
+                                local before_char = s > 1 and text_lower:sub(s - 1, s - 1) or ""
+                                local ok_before = not before_char:match("[%d]")
+                                local ok_after = not is_word_char_at(text_lower, e + 1)
+                                
+                                if ok_before and ok_after then
+                                    local val = parseNumberText(num_str)
                                     if val then
-                                        local phrase_start_idx = find_phrase_start(word_str, phrase)
+                                        local sign = ""
                                         local match_start = s
-                                        if phrase_start_idx then
-                                            match_start = s + phrase_start_idx - 1
+                                        if u.category == "temp" then
+                                            sign = getPrecedingSign(text, s)
+                                            if sign ~= "" then
+                                                val = -val
+                                                match_start = s - #sign
+                                            end
                                         end
-
+                                        
                                         local conv_raw = M.convert(val, u.category, u.name, u.std_target)
                                         local conv_val, conv_unit = applySmartScaling(conv_raw, u.category, u.std_target)
                                         
                                         if conv_unit == "c" then conv_unit = "°C"
                                         elseif conv_unit == "f" then conv_unit = "°F" end
-                                        
+
                                         local conv_str = M.formatNumber(conv_val, current_lang) .. " " .. M.pluralizeUnit(conv_val, conv_unit)
                                         
                                         table.insert(results, {
@@ -1166,65 +1043,202 @@ function M.detectMeasurements(text, direction, enabled_categories, current_lang)
                                         })
                                     end
                                 end
+                                init = e + 1
                             end
-                            init = e + 1
-                        end
-                    end
-
-                    -- C: Vague quantifiers (e.g. "a few hundred yards", "несколько сотен ярдов")
-                    if not (alias == "in" or alias == "st" or alias == "m" or alias == "l" or alias == "g") then
-                        for mult_word, mult_val in pairs(VAGUE_MULTIPLIERS) do
-                            local vague_pattern = "([^%d%.,:;!?'\"()/\r\n\t]+)%s+" .. mult_word .. "%s*(" .. escaped_alias .. ")"
-                            init = 1
-                            while true do
-                                local s, e, prefix = text_lower:find(vague_pattern, init)
-                                if not s then break end
-                                
-                                if not is_word_char_at(text_lower, e + 1) then
-                                    local clean_pref = prefix:gsub("^%s+", ""):gsub("%s+$", "")
-                                    for _, q in ipairs(VAGUE_ORDER) do
-                                        if clean_pref == q or clean_pref:sub(-#q) == q then
-                                            local band = VAGUE_BANDS[q]
-                                            if band and mult_val then
-                                                local val1 = band[1] * mult_val
-                                                local val2 = band[2] * mult_val
-                                                local conv_raw1 = M.convert(val1, u.category, u.name, u.std_target)
-                                                local conv_val1, conv_unit = applySmartScaling(conv_raw1, u.category, u.std_target)
-                                                local conv_raw2 = M.convert(val2, u.category, u.name, u.std_target)
-                                                local conv_val2 = applySmartScaling(conv_raw2, u.category, u.std_target)
-                                                
-                                                if conv_unit == "c" then conv_unit = "°C"
-                                                elseif conv_unit == "f" then conv_unit = "°F" end
-                                                
-                                                local conv_str
-                                                if val1 == val2 then
-                                                    conv_str = "≈" .. M.formatNumber(conv_val1, current_lang) .. " " .. M.pluralizeUnit(conv_val1, conv_unit)
-                                                else
-                                                    conv_str = "≈" .. M.formatNumber(conv_val1, current_lang) .. "–" .. M.formatNumber(conv_val2, current_lang) .. " " .. M.pluralizeUnit(conv_val2, conv_unit)
+                            
+                            -- Range patterns (only run on connectors actually present in text_lower)
+                            if #active_connectors > 0 then
+                                local is_tens = { twenty=true, thirty=true, forty=true, fifty=true, sixty=true, seventy=true, eighty=true, ninety=true }
+                                local is_units = { one=true, two=true, three=true, four=true, five=true, six=true, seven=true, eight=true, nine=true }
+                                local function process_range_pattern(pat, is_word)
+                                    local r_init = 1
+                                    while true do
+                                        local s, e, r1, r2 = text_lower:find(pat, r_init)
+                                        if not s then break end
+                                        local before_char = s > 1 and text_lower:sub(s - 1, s - 1) or ""
+                                        local ok_boundary = true
+                                        if is_word and before_char:match("[%a\194-\244]") then
+                                            ok_boundary = false
+                                        elseif not is_word and before_char:match("[%d%.%,]") then
+                                            ok_boundary = false
+                                        end
+                                        if ok_boundary and not is_word_char_at(text_lower, e + 1) then
+                                            local is_range = true
+                                            if is_word and is_tens[r1] and is_units[r2] and not text_lower:sub(s, e):find("%s+to%s") and not text_lower:sub(s, e):find("%s+or%s") and not text_lower:sub(s, e):find("%s+and%s") and not text_lower:sub(s, e):find(",") then
+                                                is_range = false
+                                            end
+                                            if is_range then
+                                                local val1 = parseNumberText(r1)
+                                                local val2 = parseNumberText(r2)
+                                                if val1 and val2 then
+                                                    local conv_raw1 = M.convert(val1, u.category, u.name, u.std_target)
+                                                    local conv_val1, conv_unit = applySmartScaling(conv_raw1, u.category, u.std_target)
+                                                    local conv_raw2 = M.convert(val2, u.category, u.name, u.std_target)
+                                                    local conv_val2 = applySmartScaling(conv_raw2, u.category, u.std_target)
+                                                    if conv_unit == "c" then conv_unit = "°C"
+                                                    elseif conv_unit == "f" then conv_unit = "°F" end
+                                                    local conv_str = M.formatNumber(conv_val1, current_lang) .. "–" .. M.formatNumber(conv_val2, current_lang) .. " " .. M.pluralizeUnit(conv_val2, conv_unit)
+                                                    table.insert(results, {
+                                                        start_pos = s,
+                                                        end_pos = e,
+                                                        original = text:sub(s, e),
+                                                        converted = conv_str,
+                                                        category = u.category
+                                                    })
                                                 end
-                                                
-                                                local phrase_start_idx = find_phrase_start(prefix, q)
+                                            end
+                                        end
+                                        r_init = e + 1
+                                    end
+                                end
+                                
+                                for _, conn in ipairs(active_connectors) do
+                                    local d_pat
+                                    if conn == "," then
+                                        d_pat = "([%d%.%,]+)%s*,%s+([%d%.%,]+)%s*(" .. escaped_alias .. ")"
+                                    elseif conn == "-" then
+                                        d_pat = "([%d%.%,]+)%s*-%s*([%d%.%,]+)%s*(" .. escaped_alias .. ")"
+                                    elseif conn == "–" or conn == "—" then
+                                        d_pat = "([%d%.%,]+)%s*" .. conn .. "%s*([%d%.%,]+)%s*(" .. escaped_alias .. ")"
+                                    else
+                                        d_pat = "([%d%.%,]+)%s+" .. conn .. "%s+([%d%.%,]+)%s*(" .. escaped_alias .. ")"
+                                    end
+                                    process_range_pattern(d_pat, false)
+                                end
+
+                                if not (alias == "in" or alias == "st" or alias == "m" or alias == "l" or alias == "g") then
+                                    for _, conn in ipairs(active_connectors) do
+                                        local w_pat
+                                        if conn == "," then
+                                            w_pat = "([%a\194-\244%d%-]+)%s*,%s+([%a\194-\244%d%-]+)%s*(" .. escaped_alias .. ")"
+                                        else
+                                            w_pat = "([%a\194-\244%d%-]+)%s+" .. conn .. "%s+([%a\194-\244%d%-]+)%s*(" .. escaped_alias .. ")"
+                                        end
+                                        process_range_pattern(w_pat, true)
+                                    end
+                                end
+                            end
+
+                            -- B: Written numbers: e.g. "three miles", "шесть футов", "три мили"
+                            if not (alias == "in" or alias == "st" or alias == "m" or alias == "l" or alias == "g") then
+                                local written_pattern = "([^%d%.,:;!?'\"()/\r\n\t]+)%s+(" .. escaped_alias .. ")"
+                                init = 1
+                                while true do
+                                    local s, e, word_str = text_lower:find(written_pattern, init)
+                                    if not s then break end
+                                    
+                                    if not is_word_char_at(text_lower, e + 1) then
+                                        local phrase_words = {}
+                                        for w in word_str:gmatch("[%S]+") do
+                                            table.insert(phrase_words, w)
+                                        end
+                                        
+                                        local valid_words = {}
+                                        local i_w = #phrase_words
+                                        while i_w >= 1 do
+                                            local w = phrase_words[i_w]
+                                            local clean_w = utf8Lower(w):gsub("[%-,]$", "")
+                                            if clean_w == "and" or clean_w == "a" or clean_w == "an" or clean_w == "и" or clean_w == "und" or clean_w == "et" or clean_w == "y" or parseNumberText(clean_w) then
+                                                table.insert(valid_words, 1, clean_w)
+                                                i_w = i_w - 1
+                                            else
+                                                break
+                                            end
+                                        end
+
+                                        while #valid_words > 0 and (valid_words[1] == "and" or valid_words[1] == "и" or valid_words[1] == "und" or valid_words[1] == "et" or valid_words[1] == "y") do
+                                            table.remove(valid_words, 1)
+                                        end
+
+                                        if #valid_words > 0 then
+                                            local phrase = table.concat(valid_words, " ")
+                                            local val = parseNumberText(phrase)
+                                            if val then
+                                                local phrase_start_idx = find_phrase_start(word_str, phrase)
                                                 local match_start = s
                                                 if phrase_start_idx then
                                                     match_start = s + phrase_start_idx - 1
                                                 end
+
+                                                local conv_raw = M.convert(val, u.category, u.name, u.std_target)
+                                                local conv_val, conv_unit = applySmartScaling(conv_raw, u.category, u.std_target)
+                                                
+                                                if conv_unit == "c" then conv_unit = "°C"
+                                                elseif conv_unit == "f" then conv_unit = "°F" end
+                                                
+                                                local conv_str = M.formatNumber(conv_val, current_lang) .. " " .. M.pluralizeUnit(conv_val, conv_unit)
+                                                
                                                 table.insert(results, {
                                                     start_pos = match_start,
                                                     end_pos = e,
                                                     original = text:sub(match_start, e),
                                                     converted = conv_str,
-                                                    category = u.category,
-                                                    vague = true
+                                                    category = u.category
                                                 })
-                                                break
                                             end
                                         end
                                     end
+                                    init = e + 1
                                 end
-                                init = e + 1
+                            end
+
+                            -- C: Vague quantifiers (e.g. "a few hundred yards", "несколько сотен ярдов")
+                            if has_vague and not (alias == "in" or alias == "st" or alias == "m" or alias == "l" or alias == "g") then
+                                for mult_word, mult_val in pairs(VAGUE_MULTIPLIERS) do
+                                    if text_lower:find(mult_word, 1, true) then
+                                        local vague_pattern = "([^%d%.,:;!?'\"()/\r\n\t]+)%s+" .. mult_word .. "%s*(" .. escaped_alias .. ")"
+                                        init = 1
+                                        while true do
+                                            local s, e, prefix = text_lower:find(vague_pattern, init)
+                                            if not s then break end
+                                            
+                                            if not is_word_char_at(text_lower, e + 1) then
+                                                local clean_pref = prefix:gsub("^%s+", ""):gsub("%s+$", "")
+                                                for _, q in ipairs(VAGUE_ORDER) do
+                                                    if clean_pref == q or clean_pref:sub(-#q) == q then
+                                                        local band = VAGUE_BANDS[q]
+                                                        if band and mult_val then
+                                                            local val1 = band[1] * mult_val
+                                                            local val2 = band[2] * mult_val
+                                                            local conv_raw1 = M.convert(val1, u.category, u.name, u.std_target)
+                                                            local conv_val1, conv_unit = applySmartScaling(conv_raw1, u.category, u.std_target)
+                                                            local conv_raw2 = M.convert(val2, u.category, u.name, u.std_target)
+                                                            local conv_val2 = applySmartScaling(conv_raw2, u.category, u.std_target)
+                                                            
+                                                            if conv_unit == "c" then conv_unit = "°C"
+                                                            elseif conv_unit == "f" then conv_unit = "°F" end
+                                                            
+                                                            local conv_str
+                                                            if val1 == val2 then
+                                                                conv_str = "≈" .. M.formatNumber(conv_val1, current_lang) .. " " .. M.pluralizeUnit(conv_val1, conv_unit)
+                                                            else
+                                                                conv_str = "≈" .. M.formatNumber(conv_val1, current_lang) .. "–" .. M.formatNumber(conv_val2, current_lang) .. " " .. M.pluralizeUnit(conv_val2, conv_unit)
+                                                            end
+                                                            
+                                                            local phrase_start_idx = find_phrase_start(prefix, q)
+                                                            local match_start = s
+                                                            if phrase_start_idx then
+                                                                match_start = s + phrase_start_idx - 1
+                                                            end
+                                                            table.insert(results, {
+                                                                start_pos = match_start,
+                                                                end_pos = e,
+                                                                original = text:sub(match_start, e),
+                                                                converted = conv_str,
+                                                                category = u.category,
+                                                                vague = true
+                                                            })
+                                                            break
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                            init = e + 1
+                                        end
+                                    end
+                                end
                             end
                         end
-                    end
                     end
                 end
             end

@@ -976,7 +976,26 @@ def sync():
                 "web_setup_msg": "1. 将手机/电脑连接到同一 Wi-Fi 网络。\n2. 扫描此二维码或访问：\n\n%s\n\n3. 粘贴 API 密钥并点击保存。",
                 "web_setup_no_wifi": "Wi-Fi 未连接。请连接 Wi-Fi 后使用网页配置。",
                 "web_setup_success": "已成功接收并保存 %s 的 API 密钥！",
-                "web_setup_title": "通过手机 / 电脑连接"
+                "web_setup_title": "通过手机 / 电脑连接",
+                "welcome_opt_skip_title": "暂时跳过 (仅使用离线功能)",
+                "welcome_opt_skip_desc": "无需 AI，使用本地字数统计、阅读指标及已缓存的系列信息。",
+                "ai_scan": "AI 扫描",
+                "ask_later": "稍后询问",
+                "confirm": "确认",
+                "later": "稍后",
+                "manual_pick": "手动挑选",
+                "merge_button": "合并",
+                "new_feature": "新功能",
+                "pair_rejected": "已标记此配对不是重复项。",
+                "read_more": "阅读更多",
+                "reason": "原因",
+                "reject_pair": "拒绝",
+                "review": "查看",
+                "skip": "跳过",
+                "stop": "停止",
+                "unit_action_configure": "配置设置...",
+                "unit_action_disable": "停用功能",
+                "unit_action_keep": "保持启用 (默认)"
         }
 }
     # Keys whose translation this run actually replaced. Only these may have

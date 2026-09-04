@@ -11,6 +11,7 @@ package.loaded["device"] = {
     isPocketBook = function() return false end,
     isKobo = function() return false end,
     isKoboV2 = function() return false end,
+    isTouchDevice = function() return true end,
     screen = {
         getWidth = function() return 600 end,
         getHeight = function() return 800 end,
@@ -131,6 +132,10 @@ package.loaded["ui/widget/textviewer"] = {
 package.loaded["ui/widget/menu"] = {
     new = function(a, b) return { type = "Menu", args = b or a } end
 }
+package.loaded["ui/widget/menuitem"] = {
+    onFocus = function(self) return true end,
+    onUnfocus = function(self) return true end,
+}
 package.loaded["ui/widget/imagewidget"] = {
     new = function(a, b) 
         local iw = { type = "ImageWidget", args = b or a }
@@ -213,15 +218,33 @@ package.loaded["ui/widget/container/rightcontainer"] = {
 }
 package.loaded["ui/widget/container/bottomcontainer"] = {
     new = function(a, b) 
-        local bc = { type = "BottomContainer", args = b or a }
+        local args = b or a or {}
+        local bc = { type = "BottomContainer", args = args }
+        for k, v in pairs(args) do bc[k] = v end
         bc.getSize = function() return { w = 800, h = 100 } end
+        bc.handleEvent = function(s, ev)
+            if s.propagateEvent then return s:propagateEvent(ev) end
+            for i = 1, #s do
+                if s[i] and s[i].handleEvent and s[i]:handleEvent(ev) then return true end
+            end
+            return false
+        end
         return bc
     end
 }
 package.loaded["ui/widget/overlapgroup"] = {
     new = function(a, b) 
-        local og = { type = "OverlapGroup", args = b or a }
+        local args = b or a or {}
+        local og = { type = "OverlapGroup", args = args }
+        for k, v in pairs(args) do og[k] = v end
         og.getSize = function() return { w = 800, h = 600 } end
+        og.handleEvent = function(s, ev)
+            if s.propagateEvent then return s:propagateEvent(ev) end
+            for i = 1, #s do
+                if s[i] and s[i].handleEvent and s[i]:handleEvent(ev) then return true end
+            end
+            return false
+        end
         return og
     end
 }
@@ -246,6 +269,13 @@ package.loaded["ui/widget/container/inputcontainer"] = (function()
         end
         return prototype
     end
+    klass.handleEvent = function(s, ev)
+        if s.propagateEvent and s:propagateEvent(ev) then return true end
+        for i = 1, #s do
+            if s[i] and s[i].handleEvent and s[i]:handleEvent(ev) then return true end
+        end
+        return false
+    end
     klass.new = function(self, args)
         return klass:extend(args):new()
     end
@@ -256,9 +286,6 @@ package.loaded["ui/widget/container/leftcontainer"] = {
 }
 package.loaded["ui/widget/container/rightcontainer"] = {
     new = function(a, b) return { type = "RightContainer", args = b or a } end
-}
-package.loaded["ui/widget/container/bottomcontainer"] = {
-    new = function(a, b) return { type = "BottomContainer", args = b or a } end
 }
 package.loaded["ui/widget/textboxwidget"] = {
     new = function(a, b) return { type = "TextBoxWidget", args = b or a } end
@@ -323,11 +350,14 @@ package.loaded["ffi/blitbuffer"] = {
 package.loaded["ui/font"] = {
     getFace = function() return {} end
 }
-package.loaded["ui/rendertext"] = {}
+package.loaded["ui/rendertext"] = {
+    sizeUtf8Text = function(self, ...) return { x = 50, y = 20 } end
+}
 package.loaded["ui/event"] = {
     new = function(a, b, c) 
-        if type(a) == "string" then return { name = a, args = b } end
-        return { name = b, args = c }
+        local event_name = type(a) == "string" and a or b
+        local event_args = type(a) == "string" and b or c
+        return { name = event_name, type = event_name, args = event_args }
     end
 }
 package.loaded["ui/gesturerange"] = {

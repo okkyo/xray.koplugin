@@ -29,41 +29,11 @@ function LookupManager:new(plugin)
     return o
 end
 
--- Clean and normalize text for comparison (Chinese & Multilingual Fixed)
+-- Clean and normalize text for comparison across all languages (Cyrillic, CJK, Latin, Greek, etc.)
 function LookupManager:normalize(text)
     if type(text) ~= "string" or text == "" then return "" end
-    
-    local is_english = not utils:textHasCJK(text)
-    
-    if is_english then
-        local clean = text:gsub("^[^%w]+", ""):gsub("[^%w]+$", ""):lower()
-        return clean
-    else
-        -- Use safe ASCII punctuation classes to avoid UTF-8 byte stripping
-        local clean = text:gsub("[%s%p]+$", "")
-        clean = clean:gsub("^[%s%p]+", "")
-        return clean:lower()
-    end
-end
-
--- Collect all matches from a category list using a test function.
--- Returns a list of {item, type} tables. Skips items already seen (by name).
-local function collectMatches(categories, seen, testFn)
-    local results = {}
-    for _, cat in ipairs(categories) do
-        if cat.list then
-            for _, item in ipairs(cat.list) do
-                if item.name then
-                    local norm = item.name:lower()
-                    if not seen[norm] and testFn(item.name, cat) then
-                        seen[norm] = true
-                        table.insert(results, { item = item, item_type = cat.type })
-                    end
-                end
-            end
-        end
-    end
-    return results
+    local clean = utils:trimPunctuation(text)
+    return utils:utf8Lower(clean)
 end
 
 -- Perform a robust lookup and return ALL matching candidates, prioritised by
@@ -81,34 +51,27 @@ function LookupManager:lookupAll(text)
         { list = self.plugin.terms,             type = "term"       },
     }
 
-    local seen = {}  -- tracks already-added names across passes
-
-    -- Pass 1: Exact match (using cached normalized names if available)
-    local results = collectMatches(categories, seen, function(name, cat_item)
-        local item = cat_item -- the specific item from the list
-        -- Note: collectMatches passes (item.name, cat) where cat is {list, type}
-        -- Wait, collectMatches implementation is: testFn(item.name, cat)
-        -- I need the item itself to check _norm_name.
-        -- Let's check collectMatches again.
-        return nil -- dummy
-    end)
-    -- Actually, let's just rewrite the passes for performance
-    
+    local seen = {}  -- tracks already-added items
     local final_results = {}
-    
-    local function addIfMatch(item, item_type, score)
-        local n = (item.name or ""):lower()
-        if seen[n] then return end
-        
-        local norm = item._norm_name or self:normalize(item.name)
-        
+
+    local function addIfMatch(item, item_type)
+        if not item or not item.name then return end
+        if seen[item] then return end
+
+        local norm = item._norm_name
+        if not norm then
+            norm = self:normalize(item.name)
+            item._norm_name = norm
+        end
+        if norm == "" then return end
+
         -- Exact
         if norm == query then
-            seen[n] = true
+            seen[item] = true
             table.insert(final_results, { item = item, item_type = item_type, score = 100 })
             return
         end
-        
+
         -- Lazily build _norm_aliases if not yet cached
         if item.aliases and not item._norm_aliases then
             item._norm_aliases = {}
@@ -126,13 +89,13 @@ function LookupManager:lookupAll(text)
         if item._norm_aliases then
             for _, anorm in ipairs(item._norm_aliases) do
                 if anorm == query then
-                    seen[n] = true
+                    seen[item] = true
                     table.insert(final_results, { item = item, item_type = item_type, score = 95 })
                     return
                 end
             end
         end
-        
+
         -- Contains / Contained (Pass 2 & 3 combined)
         local function checkContains(text_norm)
             if not text_norm or #text_norm < 2 then return false end
@@ -140,7 +103,7 @@ function LookupManager:lookupAll(text)
         end
 
         if checkContains(norm) then
-            seen[n] = true
+            seen[item] = true
             local contains_score = (item_type == "term") and 30 or 50
             table.insert(final_results, { item = item, item_type = item_type, score = contains_score })
             return
@@ -149,7 +112,7 @@ function LookupManager:lookupAll(text)
         if item._norm_aliases then
             for _, anorm in ipairs(item._norm_aliases) do
                 if checkContains(anorm) then
-                    seen[n] = true
+                    seen[item] = true
                     local alias_score = (item_type == "term") and 25 or 40
                     table.insert(final_results, { item = item, item_type = item_type, score = alias_score })
                     return
@@ -165,10 +128,10 @@ function LookupManager:lookupAll(text)
             end
         end
     end
-    
+
     if #final_results > 0 then
         table.sort(final_results, function(a, b) return a.score > b.score end)
-        
+
         -- If we have direct match(es) (exact or alias exact), filter out partial/fuzzy matches
         local best_score = final_results[1].score
         if best_score >= 95 then

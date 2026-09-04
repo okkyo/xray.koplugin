@@ -188,6 +188,9 @@ msgstr "Are you sure you want to clear all configured API keys and custom endpoi
 msgid "confirm_clear_single_key"
 msgstr "Clear the configured API key for %s?"
 
+msgid "current_language"
+msgstr "en"
+
 msgid "current_mode"
 msgstr "Current: "
 
@@ -383,6 +386,9 @@ msgstr "Full Book Mode"
 msgid "gemini_key_hint"
 msgstr "Enter your free Gemini key from Google AI Studio (starts with AQ. or AIzaSy...):"
 
+msgid "illustration"
+msgstr "Illustration"
+
 msgid "img_attach_button"
 msgstr "Search Images"
 
@@ -445,6 +451,9 @@ msgstr "No images found."
 
 msgid "img_no_series"
 msgstr "No series references saved.\n\nUse the ⋮ menu on any map to save it to your series references."
+
+msgid "img_no_series_detected"
+msgstr "This book is not part of a recognized series.\n\nSeries references are only available for books in a series."
 
 msgid "img_prev"
 msgstr "Previous"
@@ -938,6 +947,9 @@ msgstr "No merges performed."
 msgid "no_new_text"
 msgstr "No new text was available at your current position; X-Ray is already up to date here."
 
+msgid "no_series_detected"
+msgstr "No series detected for this book"
+
 msgid "no_series_to_clear"
 msgstr "No series detected for this book."
 
@@ -958,6 +970,9 @@ msgstr "No exact match for '%s'. Tap a related entry, or fetch it:"
 
 msgid "paste_clipboard_confirm"
 msgstr "Use the API key found in clipboard for %s?"
+
+msgid "path"
+msgstr "plugins/xray.koplugin"
 
 msgid "pending_duplicates_prompt"
 msgstr "AI found %d possible duplicate location(s) from the last fetch. Review now?"
@@ -1322,6 +1337,9 @@ msgstr "What's new:"
 msgid "updating_ai"
 msgstr "Updating X-Ray..."
 
+msgid "val"
+msgstr "???"
+
 msgid "validate_keys_title"
 msgstr "API Key Status & Validation"
 
@@ -1393,6 +1411,12 @@ msgstr "Scan a QR code to enter your key online via Cloud Relay or local Wi-Fi."
 
 msgid "welcome_opt_phone_title"
 msgstr "Set from Phone/PC (Recommended)"
+
+msgid "welcome_opt_skip_desc"
+msgstr "Use local word counts, reading metrics, and cached series info without AI."
+
+msgid "welcome_opt_skip_title"
+msgstr "Skip for Now (Offline Features Only)"
 
 msgid "welcome_select_provider"
 msgstr "Select AI Provider"

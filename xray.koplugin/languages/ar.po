@@ -249,6 +249,10 @@ msgstr "هل أنت متأكد من رغبتك في مسح جميع مفاتيح
 msgid "confirm_clear_single_key"
 msgstr "مسح مفتاح API المهيأ لـ %s؟"
 
+# en-hash: 9cfefed8fb9497baa5cd519d7d2bb5d7
+msgid "current_language"
+msgstr "ar"
+
 # en-hash: 97b9ad7336ac722cf16044cf603bfe10
 msgid "current_mode"
 msgstr "الحالي: "
@@ -509,6 +513,10 @@ msgstr "وضع الكتاب الكامل"
 msgid "gemini_key_hint"
 msgstr "أدخل مفتاح Gemini المجاني من Google AI Studio (يبدأ بـ AQ. أو AIzaSy...):"
 
+# en-hash: 33dca68e340b8d6c21472341130cf45a
+msgid "illustration"
+msgstr "رسم توضيحي"
+
 # en-hash: 8365f32698c816ead0032549239eaf01
 msgid "img_attach_button"
 msgstr "البحث عن صور"
@@ -592,6 +600,10 @@ msgstr "لم يتم العثور على صور."
 # en-hash: 74ab2b6d760dc64ea26012a4fca84490
 msgid "img_no_series"
 msgstr "لم يتم حفظ مراجع السلسلة.\n\nاستخدم القائمة ⋮ على أي خريطة لحفظها في مراجع السلسلة."
+
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "هذا الكتاب ليس جزءًا من سلسلة معروفة.\n\nتتوفر مراجع السلسلة فقط للكتب التي تنتمي إلى سلسلة."
 
 # en-hash: dd1f775e443ff3b9a89270713580a51b
 msgid "img_prev"
@@ -1249,6 +1261,10 @@ msgstr "لم يتم إجراء أي عمليات دمج."
 msgid "no_new_text"
 msgstr "لم يتوفر نص جديد في موضعك الحالي؛ X-Ray محدث بالفعل هنا."
 
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "لم يتم اكتشاف أي سلسلة لهذا الكتاب"
+
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"
 msgstr "لم يتم العثور على أي سلسلة لهذا الكتاب."
@@ -1276,6 +1292,10 @@ msgstr "لا توجد مطابقة تامة لـ '%s'. انقر على إدخا�
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"
 msgstr "هل تريد استخدام مفتاح API الموجود في الحافظة لـ %s؟"
+
+# en-hash: 607481fc96e754b33650eb171aac9447
+msgid "path"
+msgstr "plugins/xray.koplugin"
 
 # en-hash: 046763a0d64321194477604b7751c8e4
 msgid "pending_duplicates_prompt"
@@ -1761,6 +1781,10 @@ msgstr "ما الجديد:"
 msgid "updating_ai"
 msgstr "جاري تحديث بيانات X-Ray..."
 
+# en-hash: 0d1b08c34858921bc7c662b228acb7ba
+msgid "val"
+msgstr "???"
+
 # en-hash: 1739e3ae6d734407aef8af879665b8ee
 msgid "validate_keys_title"
 msgstr "حالة والتحقق من مفاتيح API"
@@ -1856,6 +1880,14 @@ msgstr "امسح رمز الاستجابة السريعة QR لإدخال مفت
 # en-hash: f5d12f602967b00beea3f12412fcb3a2
 msgid "welcome_opt_phone_title"
 msgstr "التعيين من الهاتف / الكمبيوتر (موصى به)"
+
+# en-hash: 97d815bfab1c9a82c9e305a76b4b559f
+msgid "welcome_opt_skip_desc"
+msgstr "استخدم عدد الكلمات المحلي ومقاييس القراءة ومعلومات السلسلة المخزنة مؤقتًا بدون الذكاء الاصطناعي."
+
+# en-hash: 93c52d3e72f67abf20b2ec1c235f5dc5
+msgid "welcome_opt_skip_title"
+msgstr "تخطي الآن (الميزات غير المتصلة فقط)"
 
 # en-hash: 741987eccc2e46095fdd70cf9377e31e
 msgid "welcome_select_provider"

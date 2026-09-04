@@ -466,7 +466,11 @@ function XRayPlugin:onPageUpdate(pageno)
         self.pending_return_banner = nil
         UIManager:scheduleIn(0.3, function()
             if self.destroyed or not self.ui or not self.ui.document then return end
-            self:showReturnBanner(p.return_page, p.entity, p.mentions, self.last_pageno)
+            if p.is_image and self.showImageReturnBanner then
+                self:showImageReturnBanner(p.return_page, p.image_entry, self.last_pageno)
+            elseif self.showReturnBanner then
+                self:showReturnBanner(p.return_page, p.entity, p.mentions, self.last_pageno)
+            end
         end)
     elseif not self.is_programmatic_navigation then
         if self.return_banner then
@@ -725,16 +729,64 @@ function XRayPlugin:onDispatcherRegisterActions()
             general = true,
             separator = true,
         })
+        Dispatcher:registerAction("xray_full_menu", {
+            category = "none",
+            event = "ShowXRayFullMenu",
+            title = _t(self, "menu_xray", "X-Ray: Full Menu"),
+            general = true,
+        })
         Dispatcher:registerAction("xray_characters", {
             category = "none",
             event = "ShowXRayCharacters",
             title = _t(self, "menu_characters", "X-Ray: Characters"),
             general = true,
         })
+        Dispatcher:registerAction("xray_locations", {
+            category = "none",
+            event = "ShowXRayLocations",
+            title = _t(self, "menu_locations", "X-Ray: Locations"),
+            general = true,
+        })
+        Dispatcher:registerAction("xray_terms", {
+            category = "none",
+            event = "ShowXRayTerms",
+            title = _t(self, "menu_terms", "X-Ray: Glossary & Terms"),
+            general = true,
+        })
+        Dispatcher:registerAction("xray_timeline", {
+            category = "none",
+            event = "ShowXRayTimeline",
+            title = _t(self, "menu_timeline", "X-Ray: Plot Timeline"),
+            general = true,
+        })
+        Dispatcher:registerAction("xray_historical_figures", {
+            category = "none",
+            event = "ShowXRayHistoricalFigures",
+            title = _t(self, "menu_historical_figures", "X-Ray: Historical Figures"),
+            general = true,
+        })
         Dispatcher:registerAction("xray_open_image_gallery", {
             category = "none",
             event = "ShowXRayImageGallery",
             title = _t(self, "menu_images", "X-Ray: Images & Maps"),
+            general = true,
+        })
+        Dispatcher:registerAction("xray_images", {
+            category = "none",
+            event = "ShowXRayImages",
+            title = _t(self, "menu_images", "X-Ray: Images"),
+            general = true,
+        })
+        Dispatcher:registerAction("xray_scan_units", {
+            category = "none",
+            event = "ShowXRayScanUnits",
+            title = _t(self, "menu_unit_scan", "X-Ray: Scan Units"),
+            general = true,
+        })
+        Dispatcher:registerAction("xray_toggle_unit_converter", {
+            category = "none",
+            event = "ToggleXRayUnitConverter",
+            title = _t(self, "menu_unit_toggle", "X-Ray: Toggle Unit Converter"),
             general = true,
         })
     end)
@@ -747,6 +799,50 @@ end
 
 function XRayPlugin:onShowXRayMenu()
     self:showQuickXRayMenu()
+    return true
+end
+
+function XRayPlugin:onShowXRayFullMenu()
+    self:showFullXRayMenu()
+    return true
+end
+
+function XRayPlugin:onShowXRayCharacters()
+    self:showCharacters()
+    return true
+end
+
+function XRayPlugin:onShowXRayLocations()
+    self:showLocations()
+    return true
+end
+
+function XRayPlugin:onShowXRayTerms()
+    self:showTerms()
+    return true
+end
+
+function XRayPlugin:onShowXRayTimeline()
+    self:showTimeline()
+    return true
+end
+
+function XRayPlugin:onShowXRayHistoricalFigures()
+    self:showHistoricalFigures()
+    return true
+end
+
+function XRayPlugin:onShowXRayScanUnits()
+    if self.scanBookForUnits then
+        self:scanBookForUnits()
+    end
+    return true
+end
+
+function XRayPlugin:onToggleXRayUnitConverter()
+    if self.toggleUnitConverter then
+        self:toggleUnitConverter()
+    end
     return true
 end
 
@@ -1334,7 +1430,6 @@ function XRayPlugin:showUnitStyleCard()
     local HorizontalGroup = require("ui/widget/horizontalgroup")
     local TextWidget = require("ui/widget/textwidget")
     local Button = require("ui/widget/button")
-    local CheckButton = require("ui/widget/checkbutton")
     local MovableContainer = require("ui/widget/container/movablecontainer")
     local GestureRange = require("ui/gesturerange")
     local VerticalSpan = require("ui/widget/verticalspan")
@@ -1364,13 +1459,13 @@ function XRayPlugin:showUnitStyleCard()
     local title_font_size = math.max(10, math.min(fs - 5, 15))
 
     local overlay
+    local focused_row = 1
+    local focused_col = 1
     local refresh
 
-    refresh = function()
-        if overlay then
-            UIManager:close(overlay, "ui")
-        end
+    local row_definitions = {}
 
+    refresh = function()
         local settings = self.ai_helper.settings or {}
         local underline_style = settings.unit_underline_style or "wavy"
         local underline_thickness = tonumber(settings.unit_underline_thickness) or 2
@@ -1390,27 +1485,103 @@ function XRayPlugin:showUnitStyleCard()
             refresh()
         end
 
-        local function option_row(options, current, key)
+        row_definitions = {
+            {
+                key = "unit_underline_style",
+                options = {
+                    { text = self.loc:t("unit_underline_solid") or "Solid", value = "solid" },
+                    { text = self.loc:t("unit_underline_wavy") or "Wavy", value = "wavy" }
+                },
+                current = underline_style,
+            },
+            {
+                key = "unit_underline_style",
+                options = {
+                    { text = self.loc:t("unit_underline_dotted") or "Dotted", value = "dotted" },
+                    { text = self.loc:t("unit_underline_dashed") or "Dashed", value = "dashed" }
+                },
+                current = underline_style,
+            },
+            {
+                key = "unit_underline_style",
+                options = {
+                    { text = self.loc:t("unit_underline_double") or "Double", value = "double" },
+                    { text = self.loc:t("unit_underline_invisible") or "Invisible", value = "invisible" }
+                },
+                current = underline_style,
+            },
+            {
+                key = "unit_underline_thickness",
+                options = {
+                    { text = "1px", value = 1 },
+                    { text = "2px", value = 2 },
+                    { text = "3px", value = 3 }
+                },
+                current = underline_thickness,
+            },
+            {
+                key = "unit_underline_intensity",
+                options = {
+                    { text = self.loc:t("unit_intensity_light") or "Light", value = "light" },
+                    { text = self.loc:t("unit_intensity_medium") or "Medium", value = "medium" },
+                    { text = self.loc:t("unit_intensity_dark") or "Dark", value = "dark" }
+                },
+                current = underline_intensity,
+            },
+            {
+                key = "unit_tooltip_timeout",
+                options = {
+                    { text = "2s", value = 2 },
+                    { text = "4s", value = 4 },
+                    { text = "8s", value = 8 },
+                    { text = self.loc:t("unit_timeout_never") or "Never", value = 0 }
+                },
+                current = tooltip_timeout,
+            },
+            {
+                key = "close",
+                options = {
+                    { text = self.loc:t("close") or "Close", value = "close" }
+                },
+                current = nil,
+            }
+        }
+
+        local num_rows = #row_definitions
+        if focused_row > num_rows then focused_row = num_rows end
+        if focused_row < 1 then focused_row = 1 end
+
+        local cur_row_opts = row_definitions[focused_row].options
+        if focused_col > #cur_row_opts then focused_col = #cur_row_opts end
+        if focused_col < 1 then focused_col = 1 end
+
+        local function option_row(row_idx)
+            local rdef = row_definitions[row_idx]
+            local options = rdef.options
+            local current = rdef.current
+            local key = rdef.key
+
             local row = { align = "center" }
-            for i, opt in ipairs(options) do
-                if i > 1 then
+            for col_i, opt in ipairs(options) do
+                if col_i > 1 then
                     table.insert(row, WidgetContainer:new{ dimen = Geom:new{ w = sc(12), h = 1 } })
                 end
                 local value = opt.value
                 local is_selected = (value == current)
+                local is_focused = (row_idx == focused_row and col_i == focused_col)
                 local dot_char = is_selected and "●" or "○"
                 
                 local frame = FrameContainer:new{
-                    bordersize = is_selected and xray_theme.border_btn or sc(1),
+                    bordersize = is_focused and (xray_theme.border_focus or sc(3)) or (is_selected and (xray_theme.border_btn or sc(1)) or sc(1)),
                     radius = xray_theme.radius_btn,
                     padding = sc(6),
-                    color = is_selected and xray_theme.color_border or xray_theme.color_section_rule,
-                    background = xray_theme.color_bg,
+                    color = is_focused and (xray_theme.color_focus_border or Blitbuffer.COLOR_BLACK) or (is_selected and xray_theme.color_border or xray_theme.color_section_rule),
+                    background = is_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(215)) or (is_selected and Blitbuffer.Color8(240) or xray_theme.color_bg),
                     HorizontalGroup:new{
                         align = "center",
-                        TextWidget:new{ text = dot_char, face = Font:getFace("cfont", ui_font_size) },
+                        TextWidget:new{ text = dot_char, face = Font:getFace("cfont", ui_font_size), bold = is_focused or is_selected },
                         WidgetContainer:new{ dimen = Geom:new{ w = sc(4), h = 1 } },
-                        TextWidget:new{ text = opt.text, face = Font:getFace("cfont", ui_font_size) },
+                        TextWidget:new{ text = opt.text, face = Font:getFace("cfont", ui_font_size), bold = is_focused or is_selected },
                     }
                 }
                 local item = InputContainer:new{ frame }
@@ -1423,6 +1594,8 @@ function XRayPlugin:showUnitStyleCard()
                     }
                 }
                 item.onTap = function()
+                    focused_row = row_idx
+                    focused_col = col_i
                     saveSetting(key, value)
                     return true
                 end
@@ -1458,187 +1631,124 @@ function XRayPlugin:showUnitStyleCard()
             end
         end
 
-        local face = Font:getFace("cfont", ui_font_size + 2)
+        local preview_face = Font:getFace("cfont", ui_font_size + 2)
         local sample_text = TextWidget:new{
             text = "walked 2 miles today",
-            face = face,
+            face = preview_face,
             alignment = "center",
         }
         local sample_size = sample_text:getSize()
+        local sample_w = (sample_size and sample_size.w or 200) + sc(20)
+        local sample_h = sample_size and sample_size.h or 30
 
-        local underline_color_val
-        if underline_intensity == "light" then
-            underline_color_val = Blitbuffer.Color8(200)
-        elseif underline_intensity == "dark" then
-            underline_color_val = Blitbuffer.Color8(30)
-        else
-            underline_color_val = Blitbuffer.Color8(120)
-        end
-
-        local w_walked = RenderText:sizeUtf8Text(0, 9999, face, "walked ", false, false).x
-        local w_miles = RenderText:sizeUtf8Text(0, 9999, face, "2 miles", false, false).x
-
-        local underline_widget = UnderlinePreview:new{
-            width = w_miles,
-            height = sample_size.h,
+        local preview_line = UnderlinePreview:new{
+            width = sample_w,
+            height = sample_h + sc(12),
             underline_style = underline_style,
             underline_thickness = underline_thickness,
-            underline_color_val = underline_color_val,
-            overlap_offset = { w_walked, 0 },
             plugin = self,
         }
 
-        local preview_example = OverlapGroup:new{
-            dimen = sample_size,
-            sample_text,
-            underline_widget,
-        }
-
-        local tooltip_text = "3.22 km"
-
-        local tooltip_face = Font:getFace("cfont", fs)
-        local pad_h = 28
-        local pad_v = math.floor(fs * 0.55)
-        local text_size = RenderText:sizeUtf8Text(0, 9999, tooltip_face, tooltip_text, false, false)
-        local text_w = text_size.x
-        local tooltip_max_w = dialog_w - sc(64)
-        local popup_w = math.min(tooltip_max_w, text_w + pad_h * 2)
-
-        local tb = TextWidget:new{
-            text = tooltip_text,
-            face = tooltip_face,
-        }
-
-        local border_sz = sc(2)
-        local preview_tooltip = FrameContainer:new{
+        local popup_bubble = FrameContainer:new{
+            padding = sc(4),
+            padding_h = sc(12),
+            bordersize = sc(1),
+            color = Blitbuffer.COLOR_BLACK,
             background = Blitbuffer.COLOR_WHITE,
-            bordersize = border_sz,
-            color = Blitbuffer.COLOR_DARK_GRAY,
-            radius = 0,
-            padding_top = pad_v,
-            padding_bottom = pad_v,
-            padding_left = pad_h,
-            padding_right = pad_h,
-            width = popup_w,
-            VerticalGroup:new{
-                align = "center",
-                tb
+            radius = sc(2),
+            TextWidget:new{
+                text = "3.22 km",
+                face = Font:getFace("cfont", ui_font_size),
+                alignment = "center",
             }
         }
 
-        local card_size = preview_tooltip:getSize()
-        local card_h = card_size.h
-
-        local arrow_w = sc(16)
-        local arrow_h = sc(8)
-        local _PointerArrow = self._PointerArrow
-        local preview_arrow = _PointerArrow:new{
-            width = arrow_w,
-            height = arrow_h,
-            direction = "down",
-            apex_offset = arrow_w / 2,
-            border_size = border_sz,
-            border_color = Blitbuffer.COLOR_DARK_GRAY,
-            fill_color = Blitbuffer.COLOR_WHITE,
-        }
-        preview_arrow.overlap_offset = { math.floor((popup_w - arrow_w) / 2), card_h - border_sz }
-
-        local tooltip_with_arrow = OverlapGroup:new{
-            dimen = Geom:new{ w = popup_w, h = card_h + arrow_h - border_sz },
-            preview_tooltip,
-            preview_arrow,
+        local arrow_widget = self._PointerArrow and self._PointerArrow:new{
+            point_down = true,
+            width = sc(12),
+            height = sc(6),
+            color = Blitbuffer.COLOR_BLACK,
         }
 
-        local preview_panel = FrameContainer:new{
-            padding = sc(8),
-            radius = xray_theme.radius_window,
-            bordersize = xray_theme.border_preview,
-            color = xray_theme.color_border,
-            background = Blitbuffer.COLOR_WHITE,
-            width = dialog_w - sc(32),
-            VerticalGroup:new{
-                align = "center",
-                HorizontalGroup:new{
-                    align = "center",
-                    tooltip_with_arrow
-                },
-                VerticalSpan:new{ width = sc(2) },
+        local preview_bubble_vg = VerticalGroup:new{
+            align = "center",
+            popup_bubble,
+        }
+        if arrow_widget then
+            table.insert(preview_bubble_vg, arrow_widget)
+        end
+
+        local preview_content = VerticalGroup:new{
+            align = "center",
+            preview_bubble_vg,
+            VerticalSpan:new{ width = sc(2) },
+            sample_text,
+            VerticalSpan:new{ width = sc(1) },
+            preview_line,
+        }
+
+        local preview_panel = CenterContainer:new{
+            dimen = Geom:new{ w = dialog_w - sc(28), h = sc(85) },
+            FrameContainer:new{
+                bordersize = xray_theme.border_preview,
+                color = xray_theme.color_border,
+                padding = sc(8),
+                background = Blitbuffer.COLOR_WHITE,
+                width = dialog_w - sc(28),
                 CenterContainer:new{
-                    dimen = Geom:new{ w = dialog_w - sc(48), h = sample_size.h },
-                    preview_example
+                    dimen = Geom:new{ w = dialog_w - sc(44), h = sc(72) },
+                    preview_content
                 }
             }
         }
 
         local title_label = TextWidget:new{
             text = self.loc:t("unit_style_preview_title") or "STYLE PREVIEW",
-            face = Font:getFace("infofont", title_font_size),
+            face = Font:getFace("cfont", ui_font_size - 1),
+            bold = true,
             fgcolor = Blitbuffer.COLOR_BLACK,
         }
 
-        local style_row_1 = option_row({
-            { text = self.loc:t("unit_underline_solid") or "Solid", value = "solid" },
-            { text = self.loc:t("unit_underline_wavy") or "Wavy", value = "wavy" }
-        }, underline_style, "unit_underline_style")
-
-        local style_row_2 = option_row({
-            { text = self.loc:t("unit_underline_dotted") or "Dotted", value = "dotted" },
-            { text = self.loc:t("unit_underline_dashed") or "Dashed", value = "dashed" }
-        }, underline_style, "unit_underline_style")
-
-        local style_row_3 = option_row({
-            { text = self.loc:t("unit_underline_double") or "Double", value = "double" },
-            { text = self.loc:t("unit_underline_invisible") or "Invisible", value = "invisible" }
-        }, underline_style, "unit_underline_style")
-
-        local thickness_row = option_row({
-            { text = "1px", value = 1 },
-            { text = "2px", value = 2 },
-            { text = "3px", value = 3 }
-        }, underline_thickness, "unit_underline_thickness")
-
-        local intensity_row = option_row({
-            { text = self.loc:t("unit_intensity_light") or "Light", value = "light" },
-            { text = self.loc:t("unit_intensity_medium") or "Medium", value = "medium" },
-            { text = self.loc:t("unit_intensity_dark") or "Dark", value = "dark" }
-        }, underline_intensity, "unit_underline_intensity")
-
-        local timeout_row = option_row({
-            { text = "2s", value = 2 },
-            { text = "4s", value = 4 },
-            { text = "8s", value = 8 },
-            { text = self.loc:t("unit_timeout_never") or "Never", value = 0 }
-        }, tooltip_timeout, "unit_tooltip_timeout")
+        local function label(str)
+            return TextWidget:new{
+                text = str,
+                face = Font:getFace("cfont", ui_font_size - 2),
+                bold = true,
+                fgcolor = Blitbuffer.COLOR_BLACK,
+            }
+        end
 
         local function span()
-            return VerticalSpan:new{ width = xray_theme.gap }
+            return VerticalSpan:new{ width = sc(6) }
         end
+
         local function divider()
             return LineWidget:new{
-                dimen = Geom:new{ w = dialog_w - sc(32), h = sc(1) },
+                dimen = Geom:new{ w = dialog_w - sc(28), h = xray_theme.border_line_h },
                 background = xray_theme.color_section_rule,
             }
         end
 
-        local function label(text)
-            return TextWidget:new{
-                text = text:upper(),
-                face = Font:getFace("cfont", label_font_size),
-                fgcolor = Blitbuffer.COLOR_BLACK,
-                alignment = "left",
-            }
-        end
+        local style_row_1 = option_row(1)
+        local style_row_2 = option_row(2)
+        local style_row_3 = option_row(3)
+        local thickness_row = option_row(4)
+        local intensity_row = option_row(5)
+        local timeout_row = option_row(6)
 
+        local is_close_focused = (focused_row == 7)
         local close_btn = Button:new{
-            text = "Close",
+            text = self.loc:t("close") or "Close",
             face = Font:getFace("cfont", ui_font_size),
+            bold = is_close_focused,
             width = dialog_w - sc(32),
             height = sc(42),
-            bordersize = xray_theme.border_btn,
+            bordersize = is_close_focused and (xray_theme.border_focus or sc(3)) or xray_theme.border_btn,
+            color = is_close_focused and (xray_theme.color_focus_border or Blitbuffer.COLOR_BLACK) or xray_theme.color_border,
+            background = is_close_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(215)) or nil,
             radius = xray_theme.radius_btn,
             callback = function()
-                self._styling_offset = nil
-                UIManager:close(overlay, "ui")
+                if overlay then overlay:onClose() end
             end
         }
 
@@ -1701,22 +1811,142 @@ function XRayPlugin:showUnitStyleCard()
             return res
         end
 
-        overlay = InputContainer:new{
-            key_events = {
-                Close = { { "Back" } }
-            },
-            CenterContainer:new{
-                dimen = Geom:new{ w = sw, h = sh },
-                movable
-            }
+        local main_center = CenterContainer:new{
+            dimen = Geom:new{ w = sw, h = sh },
+            movable
         }
-        function overlay:onClose()
-            self._styling_offset = nil
-            UIManager:close(overlay, "ui")
-            return true
-        end
 
-        UIManager:show(overlay, "ui")
+        if overlay then
+            overlay[1] = main_center
+            UIManager:setDirty(overlay, "ui")
+        else
+            overlay = InputContainer:new{
+                key_events = {
+                    FocusUp = {
+                        { "Up" },
+                        { "PrevPage" },
+                    },
+                    FocusDown = {
+                        { "Down" },
+                        { "NextPage" },
+                    },
+                    FocusLeft = {
+                        { "Left" },
+                    },
+                    FocusRight = {
+                        { "Right" },
+                    },
+                    Select = {
+                        { "Return" },
+                        { "KP_Enter" },
+                        { "Enter" },
+                        { "Press" },
+                        { "Select" },
+                        { "Space" },
+                    },
+                    Close = {
+                        { "Escape" },
+                        { "Back" },
+                        { "q" },
+                        { "Q" },
+                    },
+                },
+                main_center
+            }
+
+            if Device and Device.input and Device.input.group then
+                if Device.input.group.Enter then table.insert(overlay.key_events.Select, { Device.input.group.Enter }) end
+                if Device.input.group.Select then table.insert(overlay.key_events.Select, { Device.input.group.Select }) end
+                if Device.input.group.Back then table.insert(overlay.key_events.Close, { Device.input.group.Back }) end
+            end
+
+            overlay.onFocusUp = function()
+                if focused_row > 1 then
+                    focused_row = focused_row - 1
+                else
+                    focused_row = num_rows
+                end
+                local opts = row_definitions[focused_row].options
+                if focused_col > #opts then focused_col = #opts end
+                refresh()
+                return true
+            end
+
+            overlay.onFocusDown = function()
+                if focused_row < num_rows then
+                    focused_row = focused_row + 1
+                else
+                    focused_row = 1
+                end
+                local opts = row_definitions[focused_row].options
+                if focused_col > #opts then focused_col = #opts end
+                refresh()
+                return true
+            end
+
+            overlay.onFocusLeft = function()
+                local opts = row_definitions[focused_row].options
+                if focused_col > 1 then
+                    focused_col = focused_col - 1
+                else
+                    focused_col = #opts
+                end
+                refresh()
+                return true
+            end
+
+            overlay.onFocusRight = function()
+                local opts = row_definitions[focused_row].options
+                if focused_col < #opts then
+                    focused_col = focused_col + 1
+                else
+                    focused_col = 1
+                end
+                refresh()
+                return true
+            end
+
+            overlay.onSelect = function()
+                if focused_row <= 6 then
+                    local rdef = row_definitions[focused_row]
+                    local opt = rdef.options[focused_col]
+                    if opt then
+                        saveSetting(rdef.key, opt.value)
+                    end
+                else
+                    overlay:onClose()
+                end
+                return true
+            end
+
+            function overlay:onClose()
+                self._styling_offset = nil
+                UIManager:close(overlay, "ui")
+                return true
+            end
+
+            overlay.handleEvent = function(this, ev)
+                if ev.type == "Key" or ev.type == "KeyPress" or ev.type == "KeyDown" then
+                    local key = ev.key or ev.name or ev.sym
+                    if key == "Return" or key == "KP_Enter" or key == "Enter" or key == "Select" or key == "Space" or key == "Press" then
+                        return this:onSelect()
+                    elseif key == "Up" or key == "PrevPage" or key == "PageUp" then
+                        return this:onFocusUp()
+                    elseif key == "Down" or key == "NextPage" or key == "PageDown" then
+                        return this:onFocusDown()
+                    elseif key == "Left" then
+                        return this:onFocusLeft()
+                    elseif key == "Right" then
+                        return this:onFocusRight()
+                    elseif key == "Escape" or key == "Back" or key == "q" or key == "Q" then
+                        return this:onClose()
+                    end
+                end
+                return InputContainer.handleEvent(this, ev)
+            end
+
+            UIManager:show(overlay, "ui")
+        end
     end
 
     refresh()
@@ -2082,8 +2312,9 @@ function XRayPlugin:showUnitConverterNewFeatureCard()
             { text = self.loc:t("unit_action_disable") or "Disable Feature", value = "disable" },
         }
 
-        for _, choice in ipairs(choices) do
+        for idx, choice in ipairs(choices) do
             local is_selected = (choice.value == selected_action)
+            local is_focused = (idx == focused_index)
             local dot_char = is_selected and "●" or "○"
 
             local row_content = HorizontalGroup:new{ align = "center" }
@@ -2116,11 +2347,11 @@ function XRayPlugin:showUnitConverterNewFeatureCard()
             end
 
             local frame = FrameContainer:new{
-                bordersize = is_selected and xray_theme.border_btn or sc(1),
+                bordersize = is_focused and (xray_theme.border_focus or sc(2)) or (is_selected and xray_theme.border_btn or sc(1)),
                 radius = xray_theme.radius_btn,
                 padding = sc(6),
-                color = is_selected and xray_theme.color_border or xray_theme.color_section_rule,
-                background = xray_theme.color_bg,
+                color = is_focused and (xray_theme.color_focus_border or Blitbuffer.COLOR_BLACK) or (is_selected and xray_theme.color_border or xray_theme.color_section_rule),
+                background = is_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or xray_theme.color_bg,
                 width = dialog_w - sc(32),
                 row_content
             }
@@ -2142,6 +2373,7 @@ function XRayPlugin:showUnitConverterNewFeatureCard()
                 }
             }
             item.onTap = function()
+                focused_index = idx
                 selected_action = choice.value
                 renderCard()
                 return true
@@ -2158,18 +2390,25 @@ function XRayPlugin:showUnitConverterNewFeatureCard()
         })
         table.insert(content_vg, span())
 
+        local is_later_focused = (focused_index == 4)
+        local is_confirm_focused = (focused_index == 5)
+
         -- Action Buttons (Confirm & Ask Later)
         local confirm_btn = Button:new{
             text = self.loc:t("confirm") or "Confirm",
             face = Font:getFace("cfont", ui_font_size),
             width = (dialog_w - sc(40)) / 2,
             height = sc(42),
-            bordersize = xray_theme.border_btn,
+            bordersize = is_confirm_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            background = is_confirm_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
             radius = xray_theme.radius_btn,
             callback = function()
                 -- Save prompted state
                 self.ai_helper:saveSettings({ unit_new_feature_prompt_seen = true })
-                UIManager:close(overlay, "ui")
+                if overlay then
+                    UIManager:close(overlay, "ui")
+                    overlay = nil
+                end
 
                 if selected_action == "configure" then
                     self.ai_helper:saveSettings({ unit_converter_enabled = true })
@@ -2204,10 +2443,14 @@ function XRayPlugin:showUnitConverterNewFeatureCard()
             face = Font:getFace("cfont", ui_font_size),
             width = (dialog_w - sc(40)) / 2,
             height = sc(42),
-            bordersize = xray_theme.border_btn,
+            bordersize = is_later_focused and (xray_theme.border_focus or sc(2)) or xray_theme.border_btn,
+            background = is_later_focused and (xray_theme.color_focus_bg or Blitbuffer.Color8(230)) or nil,
             radius = xray_theme.radius_btn,
             callback = function()
-                UIManager:close(overlay, "ui")
+                if overlay then
+                    UIManager:close(overlay, "ui")
+                    overlay = nil
+                end
                 if self.scanBookForUnits then self:scanBookForUnits() end
             end
         }
@@ -2240,17 +2483,133 @@ function XRayPlugin:showUnitConverterNewFeatureCard()
             card
         }
 
-        overlay = InputContainer:new{
-            key_events = {
-                Close = { { "Back" } }
-            },
-            CenterContainer:new{
-                dimen = Geom:new{ w = sw, h = sh },
-                MovableContainer:new{ card_outer }
-            }
+        local main_center = CenterContainer:new{
+            dimen = Geom:new{ w = sw, h = sh },
+            MovableContainer:new{ card_outer }
         }
 
-        UIManager:show(overlay, "ui")
+        if overlay then
+            overlay[1] = main_center
+            UIManager:setDirty(overlay, "ui")
+        else
+            overlay = InputContainer:new{
+                key_events = {
+                    FocusUp = {
+                        { "Up" },
+                        { "PrevPage" },
+                    },
+                    FocusDown = {
+                        { "Down" },
+                        { "NextPage" },
+                    },
+                    FocusLeft = {
+                        { "Left" },
+                    },
+                    FocusRight = {
+                        { "Right" },
+                    },
+                    Select = {
+                        { "Return" },
+                        { "KP_Enter" },
+                        { "Enter" },
+                        { "Press" },
+                        { "Select" },
+                        { "Space" },
+                    },
+                    Close = {
+                        { "Escape" },
+                        { "Back" },
+                        { "q" },
+                        { "Q" },
+                    },
+                },
+                main_center
+            }
+
+            if Device and Device.input and Device.input.group then
+                if Device.input.group.Enter then table.insert(overlay.key_events.Select, { Device.input.group.Enter }) end
+                if Device.input.group.Select then table.insert(overlay.key_events.Select, { Device.input.group.Select }) end
+                if Device.input.group.Back then table.insert(overlay.key_events.Close, { Device.input.group.Back }) end
+            end
+
+            overlay.onFocusUp = function()
+                if focused_index > 1 then
+                    focused_index = focused_index - 1
+                else
+                    focused_index = 5
+                end
+                renderCard()
+                return true
+            end
+
+            overlay.onFocusDown = function()
+                if focused_index < 5 then
+                    focused_index = focused_index + 1
+                else
+                    focused_index = 1
+                end
+                renderCard()
+                return true
+            end
+
+            overlay.onFocusLeft = function()
+                if focused_index == 5 then
+                    focused_index = 4
+                    renderCard()
+                end
+                return true
+            end
+
+            overlay.onFocusRight = function()
+                if focused_index == 4 then
+                    focused_index = 5
+                    renderCard()
+                end
+                return true
+            end
+
+            overlay.onSelect = function()
+                if focused_index >= 1 and focused_index <= 3 then
+                    selected_action = choices[focused_index].value
+                    renderCard()
+                elseif focused_index == 4 then
+                    later_btn.callback()
+                elseif focused_index == 5 then
+                    confirm_btn.callback()
+                end
+                return true
+            end
+
+            overlay.onClose = function()
+                if overlay then
+                    UIManager:close(overlay, "ui")
+                    overlay = nil
+                end
+                return true
+            end
+
+            overlay.handleEvent = function(this, ev)
+                if ev.type == "Key" or ev.type == "KeyPress" or ev.type == "KeyDown" then
+                    local key = ev.key or ev.name or ev.sym
+                    if key == "Return" or key == "KP_Enter" or key == "Enter" or key == "Select" or key == "Space" or key == "Press" then
+                        return this:onSelect()
+                    elseif key == "Up" or key == "PrevPage" or key == "PageUp" then
+                        return this:onFocusUp()
+                    elseif key == "Down" or key == "NextPage" or key == "PageDown" then
+                        return this:onFocusDown()
+                    elseif key == "Left" then
+                        return this:onFocusLeft()
+                    elseif key == "Right" then
+                        return this:onFocusRight()
+                    elseif key == "Escape" or key == "Back" or key == "q" or key == "Q" then
+                        return this:onClose()
+                    end
+                end
+                return InputContainer.handleEvent(this, ev)
+            end
+
+            UIManager:show(overlay, "ui")
+        end
     end
 
     renderCard()

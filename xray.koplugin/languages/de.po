@@ -249,6 +249,10 @@ msgstr "Sind Sie sicher, dass Sie alle konfigurierten API-Schlüssel und benutze
 msgid "confirm_clear_single_key"
 msgstr "Den konfigurierten API-Schlüssel für %s löschen?"
 
+# en-hash: 9cfefed8fb9497baa5cd519d7d2bb5d7
+msgid "current_language"
+msgstr "de"
+
 # en-hash: 97b9ad7336ac722cf16044cf603bfe10
 msgid "current_mode"
 msgstr "Aktuell: "
@@ -509,6 +513,10 @@ msgstr "Vollständiger Buch-Modus"
 msgid "gemini_key_hint"
 msgstr "Geben Sie Ihren kostenlosen Gemini-Schlüssel aus Google AI Studio ein (beginnt mit AQ. oder AIzaSy...):"
 
+# en-hash: 33dca68e340b8d6c21472341130cf45a
+msgid "illustration"
+msgstr "Illustration"
+
 # en-hash: 8365f32698c816ead0032549239eaf01
 msgid "img_attach_button"
 msgstr "Bilder suchen"
@@ -592,6 +600,10 @@ msgstr "Keine Bilder gefunden."
 # en-hash: 74ab2b6d760dc64ea26012a4fca84490
 msgid "img_no_series"
 msgstr "Keine Serien-Referenzen gespeichert.\n\nVerwende das ⋮-Menü bei einer Karte, um sie in deinen Serien-Referenzen zu speichern."
+
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Dieses Buch ist nicht Teil einer bekannten Serie.\n\nSerienverweise sind nur für Bücher innerhalb einer Serie verfügbar."
 
 # en-hash: dd1f775e443ff3b9a89270713580a51b
 msgid "img_prev"
@@ -1249,6 +1261,10 @@ msgstr "Keine Zusammenführungen durchgeführt."
 msgid "no_new_text"
 msgstr "An deiner aktuellen Position war kein neuer Text verfügbar; X-Ray ist hier bereits aktuell."
 
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Keine Serie für dieses Buch erkannt"
+
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"
 msgstr "Keine Serie für dieses Buch erkannt."
@@ -1276,6 +1292,10 @@ msgstr "Keine genaue Übereinstimmung für „%s“. Tippen Sie auf einen verwan
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"
 msgstr "Den in der Zwischenablage gefundenen API-Schlüssel für %s verwenden?"
+
+# en-hash: 607481fc96e754b33650eb171aac9447
+msgid "path"
+msgstr "plugins/xray.koplugin"
 
 # en-hash: 046763a0d64321194477604b7751c8e4
 msgid "pending_duplicates_prompt"
@@ -1761,6 +1781,10 @@ msgstr "Was ist neu:"
 msgid "updating_ai"
 msgstr "X-Ray Daten werden aktualisiert..."
 
+# en-hash: 0d1b08c34858921bc7c662b228acb7ba
+msgid "val"
+msgstr "???"
+
 # en-hash: 1739e3ae6d734407aef8af879665b8ee
 msgid "validate_keys_title"
 msgstr "API-Schlüssel-Status & Validierung"
@@ -1856,6 +1880,14 @@ msgstr "QR-Code scannen, um Ihren Schlüssel online per Cloud Relay oder lokalem
 # en-hash: f5d12f602967b00beea3f12412fcb3a2
 msgid "welcome_opt_phone_title"
 msgstr "Vom Smartphone / PC festlegen (Empfohlen)"
+
+# en-hash: 97d815bfab1c9a82c9e305a76b4b559f
+msgid "welcome_opt_skip_desc"
+msgstr "Lokale Wortanzahl, Lesestatistiken und zwischengespeicherte Serieninfos ohne KI nutzen."
+
+# en-hash: 93c52d3e72f67abf20b2ec1c235f5dc5
+msgid "welcome_opt_skip_title"
+msgstr "Vorerst überspringen (nur Offline-Funktionen)"
 
 # en-hash: 741987eccc2e46095fdd70cf9377e31e
 msgid "welcome_select_provider"

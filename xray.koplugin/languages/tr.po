@@ -249,6 +249,10 @@ msgstr "Yapılandırılmış tüm API anahtarlarını ve özel uç noktaları te
 msgid "confirm_clear_single_key"
 msgstr "%s için yapılandırılmış API anahtarı temizlensin mi?"
 
+# en-hash: 9cfefed8fb9497baa5cd519d7d2bb5d7
+msgid "current_language"
+msgstr "tr"
+
 # en-hash: 97b9ad7336ac722cf16044cf603bfe10
 msgid "current_mode"
 msgstr "Mevcut: "
@@ -509,6 +513,10 @@ msgstr "Tam Kitap Modu"
 msgid "gemini_key_hint"
 msgstr "Google AI Studio'dan ücretsiz Gemini anahtarınızı girin (AQ. veya AIzaSy... ile başlar):"
 
+# en-hash: 33dca68e340b8d6c21472341130cf45a
+msgid "illustration"
+msgstr "İllüstrasyon"
+
 # en-hash: 8365f32698c816ead0032549239eaf01
 msgid "img_attach_button"
 msgstr "Görsel Ara"
@@ -592,6 +600,10 @@ msgstr "Resim bulunamadı."
 # en-hash: 74ab2b6d760dc64ea26012a4fca84490
 msgid "img_no_series"
 msgstr "Kaydedilmiş seri referansı yok.\n\nSeri referanslarınıza kaydetmek için herhangi bir haritada ⋮ menüsünü kullanın."
+
+# en-hash: 8df91db55dbf3ca2b7410a0e9aa875a8
+msgid "img_no_series_detected"
+msgstr "Bu kitap tanınan bir serinin parçası değil.\n\nSeri referansları yalnızca bir serideki kitaplar için geçerlidir."
 
 # en-hash: dd1f775e443ff3b9a89270713580a51b
 msgid "img_prev"
@@ -1249,6 +1261,10 @@ msgstr "Hiçbir birleştirme işlemi yapılmadı."
 msgid "no_new_text"
 msgstr "Mevcut konumunuzda yeni metin yoktu; X-Ray burada zaten güncel."
 
+# en-hash: 3ae96dc007966de2542db31b76ff72cd
+msgid "no_series_detected"
+msgstr "Bu kitap için seri tespit edilmedi"
+
 # en-hash: f90c5e84342ce9096a0f72b0fe9c5203
 msgid "no_series_to_clear"
 msgstr "Bu kitap için seri algılanmadı."
@@ -1276,6 +1292,10 @@ msgstr "'%s' için tam eşleşme bulunamadı. İlgili bir girdiye dokunun veya b
 # en-hash: b8d4677ac13de48defd22ae1a3fe2479
 msgid "paste_clipboard_confirm"
 msgstr "Panodaki API anahtarı %s için kullanılsın mı?"
+
+# en-hash: 607481fc96e754b33650eb171aac9447
+msgid "path"
+msgstr "plugins/xray.koplugin"
 
 # en-hash: 046763a0d64321194477604b7751c8e4
 msgid "pending_duplicates_prompt"
@@ -1761,6 +1781,10 @@ msgstr "Yenilikler:"
 msgid "updating_ai"
 msgstr "X-Ray verileri güncelleniyor..."
 
+# en-hash: 0d1b08c34858921bc7c662b228acb7ba
+msgid "val"
+msgstr "???"
+
 # en-hash: 1739e3ae6d734407aef8af879665b8ee
 msgid "validate_keys_title"
 msgstr "API Anahtarı Durumu ve Doğrulama"
@@ -1856,6 +1880,14 @@ msgstr "Cloud Relay veya yerel Wi-Fi ile anahtarınızı girmek için bir QR kod
 # en-hash: f5d12f602967b00beea3f12412fcb3a2
 msgid "welcome_opt_phone_title"
 msgstr "Telefondan / PC'den Ayarla (Önerilen)"
+
+# en-hash: 97d815bfab1c9a82c9e305a76b4b559f
+msgid "welcome_opt_skip_desc"
+msgstr "Yapay zeka olmadan yerel kelime sayılarını, okuma ölçümlerini ve önbelleğe alınmış seri bilgilerini kullanın."
+
+# en-hash: 93c52d3e72f67abf20b2ec1c235f5dc5
+msgid "welcome_opt_skip_title"
+msgstr "Şimdilik Atla (Yalnızca Çevrimdışı Özellikler)"
 
 # en-hash: 741987eccc2e46095fdd70cf9377e31e
 msgid "welcome_select_provider"

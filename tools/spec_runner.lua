@@ -160,7 +160,8 @@ local specs = {
     "spec/xray_imagemanager_spec.lua",
     "spec/xray_imageviewer_spec.lua",
     "spec/xray_imagesearch_spec.lua",
-    "spec/xray_localization_spec.lua"
+    "spec/xray_localization_spec.lua",
+    "spec/xray_nontouch_spec.lua"
 }
 
 if arg and arg[1] then

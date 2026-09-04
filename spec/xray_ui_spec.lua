@@ -2273,7 +2273,7 @@ describe("xray_ui", function()
     end)
 
     describe("showImageActions", function()
-        it("should render image actions dialog without crashing and show action options", function()
+        it("should render image actions dialog without crashing and without unnecessary page resolution or cache saving", function()
             local img = {
                 id = "map_01",
                 title = "Roshar Map",
@@ -2281,10 +2281,20 @@ describe("xray_ui", function()
                 is_favorite = false,
                 is_hidden = false,
             }
+            local resolve_called = false
+            local save_called = false
+            plugin.image_manager = {
+                resolveImagePage = function() resolve_called = true; return 12 end,
+            }
+            plugin.cache_manager = {
+                asyncSaveCache = function() save_called = true end,
+            }
             local ok, err = pcall(function()
                 plugin:showImageActions(img)
             end)
             assert.is_true(ok, "showImageActions failed: " .. tostring(err))
+            assert.is_false(resolve_called, "resolveImagePage should not be called when page is valid")
+            assert.is_false(save_called, "asyncSaveCache should not be called on read-only menu open")
             local last = _G.ui_tracker.last_shown
             assert.is_not_nil(last)
             assert.are.equal("InputContainer", last.type)
@@ -2328,6 +2338,118 @@ describe("xray_ui", function()
             local last = _G.ui_tracker.last_shown
             assert.is_not_nil(last)
             assert.are.equal("InputContainer", last.type)
+        end)
+    end)
+
+    describe("showImageActions", function()
+        it("should open actions overlay and handle key events and in-place toggles without crash", function()
+            local img_entry = { id = "img_test", title = "Map of Shire", page = 4, is_favorite = false }
+            plugin.book_data = { images = { img_entry } }
+            plugin.image_manager = {
+                toggleFavorite = function(self, bd, id)
+                    img_entry.is_favorite = not img_entry.is_favorite
+                    return img_entry.is_favorite
+                end,
+                toggleHideImage = function(self, bd, id)
+                    img_entry.is_hidden = not img_entry.is_hidden
+                    return img_entry.is_hidden
+                end,
+            }
+
+            local overlay = plugin:showImageActions(img_entry)
+            assert.is_not_nil(overlay)
+            assert.is_not_nil(overlay.onKeyPress)
+
+            -- Initial focus is index 1 (Favorite)
+            -- Test Return on Favorite action (idx 1)
+            local res = overlay:onKeyPress({ key = "Return" })
+            assert.is_true(res)
+            assert.is_true(img_entry.is_favorite)
+
+            -- Overlay should still be open (in-place update)
+            assert.is_not_nil(overlay[1])
+
+            -- Test Down arrow navigation to index 2 (Series)
+            res = overlay:onKeyPress({ key = "Down" })
+            assert.is_true(res)
+
+            -- Test Up arrow navigation back to index 1 (Favorite)
+            res = overlay:onKeyPress({ key = "Up" })
+            assert.is_true(res)
+
+            -- Toggle favorite back to false
+            res = overlay:onKeyPress({ key = "Return" })
+            assert.is_true(res)
+            assert.is_false(img_entry.is_favorite)
+
+            -- Test Close key (Escape)
+            res = overlay:onKeyPress({ key = "Escape" })
+            assert.is_true(res)
+        end)
+
+        it("should open rename dialog without crash", function()
+            local img_entry = { id = "img_test", title = "Map of Shire", page = 4 }
+            local renamed = false
+            plugin.image_manager = {
+                renameImage = function(self, bd, id, title)
+                    img_entry.title = title
+                    renamed = true
+                end,
+            }
+            plugin:renameImageDialog(img_entry, function()
+                renamed = true
+            end)
+            local last = _G.ui_tracker.last_shown
+            assert.is_not_nil(last)
+            assert.are.equal("InputDialog", last.type)
+        end)
+
+        it("should jump to image page via GotoPage event", function()
+            local navigated_page = nil
+            plugin.ui = {
+                handleEvent = function(self, ev)
+                    if ev and ev.name == "GotoPage" then
+                        navigated_page = (type(ev.args) == "table" and ev.args[1]) or ev.args
+                    end
+                end,
+            }
+            plugin:jumpToImagePage(42)
+            assert.are.equal(42, navigated_page)
+        end)
+
+        it("should invalidate gallery cached_pages and rebuild gallery immediately when hiding an image", function()
+            local img_entry = { id = "img_hide_test", title = "Map of Mordor", page = 10, is_hidden = false }
+            plugin.book_data = { images = { img_entry } }
+            plugin.images = { img_entry }
+            local gallery_rebuilt = false
+            plugin.image_gallery_overlay = {
+                cached_pages = { { img_entry } },
+                buildUI = function(self)
+                    gallery_rebuilt = true
+                end,
+            }
+            plugin.image_manager = {
+                toggleHideImage = function(self, bd, id)
+                    img_entry.is_hidden = true
+                    return true
+                end,
+            }
+
+            local overlay = plugin:showImageActions(img_entry)
+            assert.is_not_nil(overlay)
+
+            -- Navigate down to Hide action (index 5)
+            overlay:onKeyPress({ key = "Down" }) -- to index 1
+            overlay:onKeyPress({ key = "Down" }) -- to index 2
+            overlay:onKeyPress({ key = "Down" }) -- to index 3
+            overlay:onKeyPress({ key = "Down" }) -- to index 4
+            overlay:onKeyPress({ key = "Down" }) -- to index 5 (Hide)
+            overlay:onKeyPress({ key = "Return" })
+
+            assert.is_true(img_entry.is_hidden)
+            assert.is_true(plugin.images[1].is_hidden)
+            assert.is_nil(plugin.image_gallery_overlay.cached_pages)
+            assert.is_true(gallery_rebuilt)
         end)
     end)
 end)
