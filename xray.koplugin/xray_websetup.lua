@@ -204,7 +204,7 @@ function WebSetup:startCloudRelay(ai_helper, loc, ui_callback)
             local ok, online = pcall(function() return NetworkMgr:isOnline() end)
             if ok and online == false then
                 UIManager:show(InfoMessage:new{
-                    text = (loc and loc:t("web_setup_no_wifi")) or "Wi-Fi is disconnected. Please connect to Wi-Fi first.",
+                    text = (loc and loc:t("web_setup_no_wifi")) or "Wi-Fi is disconnected. Please connect to Wi-Fi to use Web Setup.",
                     timeout = 5
                 })
                 return false
@@ -780,7 +780,7 @@ function WebSetup:startLocalServer(ai_helper, loc, ui_callback)
             local ok, online = pcall(function() return NetworkMgr:isOnline() end)
             if ok and online == false then
                 UIManager:show(InfoMessage:new{
-                    text = (loc and loc:t("web_setup_no_wifi")) or "Wi-Fi is disconnected. Please connect to Wi-Fi first.",
+                    text = (loc and loc:t("web_setup_no_wifi")) or "Wi-Fi is disconnected. Please connect to Wi-Fi to use Web Setup.",
                     timeout = 5
                 })
                 return false
@@ -920,7 +920,7 @@ function WebSetup:startLocalServer(ai_helper, loc, ui_callback)
             buttons = {
                 {
                     {
-                        text = (loc and loc:t("menu_setup_cloud")) or "Cloud Relay (Recommended)",
+                        text = (loc and loc:t("menu_setup_cloud")) or "Cloud Relay (Recommended — works anywhere)",
                         callback = function()
                             self:stop()
                             self:startCloudRelay(ai_helper, loc, ui_callback)

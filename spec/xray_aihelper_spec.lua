@@ -758,6 +758,53 @@ describe("AIHelper", function()
     end)
 
     describe("persistent config backup and restoration", function()
+        -- AIHelper.path defaults to ".", so these tests wrote xray_config.lua
+        -- and xray_key.txt straight into the repo root and left them behind.
+        -- Point the module at a scratch directory instead.
+        local saved_path, saved_settings_dir, tmp_dir
+
+        -- The backup store lives under <settings dir>/xray. The mocked lfs
+        -- cannot create that directory, so without a real one saveStoredConfig
+        -- is a silent no-op and every "Store 2" assertion below passes
+        -- vacuously. Point the settings dir at the scratch directory too, so
+        -- the store is real, private to each test, and removed afterwards
+        -- instead of living on under /tmp/koreader.
+        local DataStorage = package.loaded["datastorage"]
+
+        -- busted may run on Linux, under WSL, or on native Windows LuaJIT,
+        -- whose cmd.exe has neither `mkdir -p` nor `rm -rf`.
+        local is_windows = package.config:sub(1, 1) == "\\"
+        local function mkdir_p(dir)
+            if is_windows then
+                os.execute('mkdir "' .. (dir:gsub("/", "\\")) .. '" >nul 2>&1')
+            else
+                os.execute("mkdir -p '" .. dir .. "'")
+            end
+        end
+        local function rm_rf(dir)
+            if is_windows then
+                os.execute('rmdir /s /q "' .. (dir:gsub("/", "\\")) .. '" >nul 2>&1')
+            else
+                os.execute("rm -rf '" .. dir .. "'")
+            end
+        end
+
+        before_each(function()
+            saved_path = AIHelper.path
+            saved_settings_dir = DataStorage.getSettingsDir
+            tmp_dir = spec_tmpname()
+            os.remove(tmp_dir)
+            mkdir_p(tmp_dir .. "/xray")
+            AIHelper.path = tmp_dir
+            DataStorage.getSettingsDir = function() return tmp_dir end
+        end)
+
+        after_each(function()
+            AIHelper.path = saved_path
+            DataStorage.getSettingsDir = saved_settings_dir
+            if tmp_dir then rm_rf(tmp_dir) end
+        end)
+
         it("should back up config keys to stored config and restore missing keys to config file", function()
             local stored_content = nil
             local config_file_written = nil
@@ -846,27 +893,48 @@ custom1_model = google/gemini-2.5-flash
         it("clears all API keys correctly across all 3 stores", function()
             AIHelper:setAPIKey("gemini", "my_gemini_key")
             AIHelper:setAPIKey("chatgpt", "my_chatgpt_key")
-            AIHelper:saveStoredConfig({ gemini_api_key = "backup_gemini", chatgpt_api_key = "backup_chatgpt" })
-            AIHelper:writeConfigToFile({ gemini_api_key = "config_gemini", chatgpt_api_key = "config_chatgpt" })
+            -- Image search keys share the file and the backup store, so they
+            -- must be wiped too or loadConfig copies them straight back.
+            AIHelper:saveStoredConfig({ gemini_api_key = "backup_gemini", chatgpt_api_key = "backup_chatgpt",
+                brave_api_key = "backup_brave" })
+            AIHelper:writeConfigToFile({ gemini_api_key = "config_gemini", chatgpt_api_key = "config_chatgpt",
+                brave_api_key = "config_brave" })
             
             AIHelper:clearAllAPIKeys()
             
-            -- Store 1: UI settings
+            -- Store 1: UI settings / in-memory state
             assert.are.equal("", AIHelper.settings.gemini_api_key or "")
             assert.are.equal("", AIHelper.settings.chatgpt_api_key or "")
             assert.is_true(not AIHelper.settings.gemini_use_ui_key)
             assert.is_true(not AIHelper.settings.chatgpt_use_ui_key)
+            assert.are.equal("", AIHelper.brave_api_key or "")
 
             -- Store 2: Persistent backup store
             local stored = AIHelper:loadStoredConfig()
             assert.are.equal("", stored.gemini_api_key or "")
             assert.are.equal("", stored.chatgpt_api_key or "")
+            assert.are.equal("", stored.brave_api_key or "")
 
             -- Store 3: xray_config.lua
             local ok, cfg = pcall(dofile, AIHelper.path .. "/xray_config.lua")
             assert.is_true(ok)
             assert.are.equal("", cfg.gemini_api_key or "")
             assert.are.equal("", cfg.chatgpt_api_key or "")
+            assert.are.equal("", cfg.brave_api_key or "")
+        end)
+
+        it("restores an image search key from the backup store into an empty config file", function()
+            -- A plugin update overwrites xray_config.lua with blanks. The
+            -- backup store must bring image search keys back like AI keys.
+            AIHelper:saveStoredConfig({ serpapi_api_key = "backup_serpapi" })
+            AIHelper:writeConfigToFile({ serpapi_api_key = "" })
+
+            AIHelper:loadConfig()
+
+            assert.are.equal("backup_serpapi", AIHelper.serpapi_api_key)
+            local ok, cfg = pcall(dofile, AIHelper.path .. "/xray_config.lua")
+            assert.is_true(ok)
+            assert.are.equal("backup_serpapi", cfg.serpapi_api_key)
         end)
 
         it("clears a single provider key correctly across all 3 stores", function()

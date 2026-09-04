@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Language-Team: Japanese\n"
+"Language-Team: 日本語\n"
 "Language: ja\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -197,7 +197,7 @@ msgstr "貼り付け"
 msgid "cache_cleared"
 msgstr "キャッシュをクリアしました！\n\n新しくデータを取得するには以下を実行してください:\nメニュー → X-Ray → AIデータを取得"
 
-# en-hash: 2e361c4db7a5480c21b02780ed4e9e0b
+# en-hash: 1edc355371d87a94d024eebfed9f8815
 msgid "cache_save_failed"
 msgstr "✗ キャッシュの保存に失敗しました。"
 
@@ -248,10 +248,6 @@ msgstr "設定されているすべてのAPIキーおよびカスタムエンド
 # en-hash: dd6eee404e54eafd92e56d09cb4848f3
 msgid "confirm_clear_single_key"
 msgstr "%s の設定済みAPIキーを削除しますか？"
-
-# en-hash: 9cfefed8fb9497baa5cd519d7d2bb5d7
-msgid "current_language"
-msgstr "ja"
 
 # en-hash: 97b9ad7336ac722cf16044cf603bfe10
 msgid "current_mode"
@@ -483,11 +479,11 @@ msgstr "取得に成功しました"
 
 # en-hash: 572e520194e629b3b906bb5b3e5bce2d
 msgid "fetching_ai"
-msgstr "X-Rayを取得中..."
+msgstr "%s から取得中..."
 
 # en-hash: 2b05ded75b73f463504a742fe3492e55
 msgid "fetching_author"
-msgstr "著者情報を取得中..."
+msgstr "%s から作者情報を取得中..."
 
 # en-hash: 403bf4429b560eb3652c17997d655811
 msgid "fetching_series_context"
@@ -533,13 +529,33 @@ msgstr "画像をダウンロード中..."
 msgid "img_error"
 msgstr "検索に失敗しました: %s"
 
+# en-hash: fe63191987f62b9e4806e376671ed335
+msgid "img_extract_failed"
+msgstr "画像ファイルを抽出できませんでした。"
+
+# en-hash: a557254d6ea7fb31d1776d65e97f9a43
+msgid "img_key_brave"
+msgstr "Brave Search キー"
+
 # en-hash: 2bcf4d0012d8fec18f5b97a1f307c958
 msgid "img_key_saved"
 msgstr "保存しました。"
 
+# en-hash: 6fa56c2b1cb703d54c4b8b0e4440cf16
+msgid "img_key_serpapi"
+msgstr "SerpApi キー"
+
 # en-hash: 6ad9a851e6b0ab3cb2f3b75e87cd234a
-msgid "img_key_title"
+msgid "img_key_tavily"
 msgstr "Tavily API キー"
+
+# en-hash: 6c625a44b20a366fb63ef60e096e759a
+msgid "img_loading_more"
+msgstr "画像をさらに読み込み中..."
+
+# en-hash: fd2941cfb27f0d8ab5a606e86d757e8a
+msgid "img_minimized_hint"
+msgstr "'%s' を最小化しました。再開するには「画像とマップ」を再度開いてください。"
 
 # en-hash: d3da97e2d9aee5c8fbe03156ad051c99
 msgid "img_more"
@@ -549,6 +565,22 @@ msgstr "その他"
 msgid "img_next"
 msgstr "次へ"
 
+# en-hash: 30936c8b483b8b104a4ad7821ce2262b
+msgid "img_no_favorites"
+msgstr "お気に入りはまだありません。\n\n画像の ⋮ メニューからお気に入りに追加できます。"
+
+# en-hash: c3e4c8dd2122260b0c4e14d6509e62ca
+msgid "img_no_hidden"
+msgstr "非表示の画像はありません。\n\nギャラリー内の画像にある ⋮ メニューから、装飾イラストやドロップキャップを非表示にできます。"
+
+# en-hash: 95407637295cd7c30378be19be6e36cb
+msgid "img_no_images"
+msgstr "このタブ/フィルターに画像が見つかりません。\n\n本から画像を抽出またはスキャン中..."
+
+# en-hash: a0c513c130fac7b4559f145cd9352091
+msgid "img_no_key"
+msgstr "まず画像検索の設定で画像検索キーを追加してください。"
+
 # en-hash: b79b9ffffededdcf093dc9f81e0a4412
 msgid "img_no_preview"
 msgstr "(プレビューなし)"
@@ -556,6 +588,10 @@ msgstr "(プレビューなし)"
 # en-hash: 5db1e02d891c15e428428c0e6e83c363
 msgid "img_no_results"
 msgstr "画像が見つかりません。"
+
+# en-hash: 74ab2b6d760dc64ea26012a4fca84490
+msgid "img_no_series"
+msgstr "保存されたシリーズ参照はありません。\n\n地図の ⋮ メニューからシリーズ参照に保存できます。"
 
 # en-hash: dd1f775e443ff3b9a89270713580a51b
 msgid "img_prev"
@@ -565,9 +601,33 @@ msgstr "前へ"
 msgid "img_processing"
 msgstr "画像を処理中..."
 
-# en-hash: 67a68190ce74fbbee740d8c7d03e360c
+# en-hash: a2c65774cce0bdcd3ad1e08086e2ea40
+msgid "img_provider_about"
+msgstr "[B]自動[/B]は、キーを持つ最初のプロバイダーを SerpApi、Brave Search、Tavily の順に使用します。\n\n選択したプロバイダーが最初に試行されます。失敗するか何も見つからない場合は、同じ順序で他のプロバイダーが試行され、応答したプロバイダー名が通知されます。\n\nキーのないプロバイダーはスキップされます。"
+
+# en-hash: ae0482189aa02d8b159c077edf8ca8c6
+msgid "img_provider_auto"
+msgstr "自動 (順序内の最初のキー)"
+
+# en-hash: 56039cb24bf2fecba0a4aa7947d0e720
+msgid "img_provider_desc"
+msgstr "画像検索を実行するプロバイダーを選択:"
+
+# en-hash: 11943975b2ef7d14f6c41bfeafc3a795
+msgid "img_provider_fallback"
+msgstr "%s が利用できません。%s の結果を表示しています。"
+
+# en-hash: b82a86548d797c4682913295fc676ac9
 msgid "img_provider_hint"
-msgstr "デフォルト: DuckDuckGo (キーは不要です)。"
+msgstr "順番に試行されます。少なくとも1つのキーが必要です。"
+
+# en-hash: edc912fec23be8b7c8b6d318899d8d0d
+msgid "img_provider_no_key"
+msgstr "%s (キーなし)"
+
+# en-hash: 01fd162e98f5553ab970a30e3a0efd2a
+msgid "img_provider_setting"
+msgstr "画像検索プロバイダー"
 
 # en-hash: fc35ec973f5b3a16f0d4b009834f39a6
 msgid "img_remove"
@@ -581,9 +641,17 @@ msgstr "添付された画像を削除しますか？"
 msgid "img_removed"
 msgstr "画像を削除しました。"
 
+# en-hash: 2bea7b6d66811b50767c7b22f81fb2c2
+msgid "img_rename_title"
+msgstr "画像ラベルの名前を変更"
+
 # en-hash: 6fe2ab43d39c389ef5f665a86121f95c
 msgid "img_result_count"
 msgstr "%1$d / %2$d 件"
+
+# en-hash: 393c3f5ea8ad35c02691d507bdbb31b0
+msgid "img_reveal"
+msgstr "表示"
 
 # en-hash: c3612962736fa980b8a853fbc9fa981c
 msgid "img_saved"
@@ -605,13 +673,41 @@ msgstr "画像を検索"
 msgid "img_searching"
 msgstr "画像を検索中..."
 
+# en-hash: e14cbcb87dce9e2354fdf7db62b93a9c
+msgid "img_show_first"
+msgstr "最初の画像に戻る"
+
+# en-hash: e0bcbbbd7e4041eb19382d32dd0c47a6
+msgid "img_show_more"
+msgstr "もっと画像を表示"
+
 # en-hash: 772eeb0a8a4e1193a21b9d2631e4a508
 msgid "img_source_suffix"
 msgstr "  (%s)"
 
-# en-hash: e3cea90d4e14007d88412e5a300c97ff
-msgid "img_tavily_fallback"
-msgstr "Tavilyを利用できません。DuckDuckGoの結果を表示しています。"
+# en-hash: 646ef4f9024779f1a04ee945deffb8d5
+msgid "img_spoiler_confirm"
+msgstr "この画像は%dページに掲載されています（現在の読書進捗より先です）。画像を表示しますか？"
+
+# en-hash: d0f2e5376298c880665077b565ffd7dd
+msgid "img_spoiler_locked"
+msgstr "ロック済み"
+
+# en-hash: b1c94ca2fbc3e78fc30069c8d0f01680
+msgid "img_tab_all"
+msgstr "すべて"
+
+# en-hash: d78986947356ddd37b43d57df289dee9
+msgid "img_tab_favorites"
+msgstr "お気に入り"
+
+# en-hash: 9d948e617b083222afc868add2f50ec2
+msgid "img_tab_series"
+msgstr "シリーズ"
+
+# en-hash: be53a0541a6d36f6ecb879fa2c584b08
+msgid "img_untitled"
+msgstr "画像"
 
 # en-hash: c54c117a6b6dfeed9d6276e093a6aa15
 msgid "img_use_this"
@@ -620,49 +716,6 @@ msgstr "この画像を使用"
 # en-hash: c4f1dea83d1eb17400190339311b3482
 msgid "img_view"
 msgstr "画像を表示"
-
-msgid "img_extract_failed"
-msgstr "画像ファイルを抽出できませんでした。"
-
-msgid "img_minimized_hint"
-msgstr "縮小画像のヒント"
-
-msgid "img_no_favorites"
-msgstr "お気に入りはまだありません。\n\n画像の ⋮ メニューからお気に入りに追加できます。"
-
-msgid "img_no_hidden"
-msgstr "非表示の画像はありません。\n\nギャラリー内の画像にある ⋮ メニューから、装飾イラストやドロップキャップを非表示にできます。"
-
-msgid "img_no_images"
-msgstr "このタブ/フィルターに画像が見つかりません。\n\n本から画像を抽出またはスキャン中..."
-
-msgid "img_no_series"
-msgstr "保存されたシリーズ参照はありません。\n\n地図の ⋮ メニューからシリーズ参照に保存できます。"
-
-msgid "img_rename_title"
-msgstr "画像ラベルの名前を変更"
-
-msgid "img_reveal"
-msgstr "表示"
-
-msgid "img_spoiler_confirm"
-msgstr "この画像は%dページに掲載されています（現在の読書進捗より先です）。画像を表示しますか？"
-
-msgid "img_spoiler_locked"
-msgstr "ロック済み"
-
-msgid "img_tab_all"
-msgstr "すべて"
-
-msgid "img_tab_favorites"
-msgstr "お気に入り"
-
-msgid "img_tab_series"
-msgstr "シリーズ"
-
-msgid "img_untitled"
-msgstr "画像"
-
 
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
@@ -956,9 +1009,9 @@ msgstr "歴史上の人物"
 msgid "menu_image_search"
 msgstr "画像検索"
 
+# en-hash: 073096c9e6fbe0599a7c64e0e7a665cb
 msgid "menu_images"
 msgstr "画像と地図"
-
 
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
@@ -1224,10 +1277,6 @@ msgstr "「%s」に完全一致する項目はありません。関連する項�
 msgid "paste_clipboard_confirm"
 msgstr "クリップボードのAPIキーを %s に使用しますか？"
 
-# en-hash: 607481fc96e754b33650eb171aac9447
-msgid "path"
-msgstr "plugins/xray.koplugin"
-
 # en-hash: 046763a0d64321194477604b7751c8e4
 msgid "pending_duplicates_prompt"
 msgstr "前回の取得で%d件の重複の可能性がある場所が見つかりました。確認しますか？"
@@ -1236,6 +1285,7 @@ msgstr "前回の取得で%d件の重複の可能性がある場所が見つか�
 msgid "plugin_description"
 msgstr "Amazon KindleのX-Rayのように、AIを活用した読書分析で読書体験を向上させます！"
 
+# en-hash: 14230d11143a03f4330c6433d5032a9d
 msgid "prev"
 msgstr "前へ"
 
@@ -1379,9 +1429,9 @@ msgstr "ネタバレ設定"
 msgid "stop"
 msgstr "停止"
 
-# en-hash: d725036d492c380f06f4eb32f5704bc9
+# en-hash: d7c6deb856024d209d52d833b9f4c95d
 msgid "term_not_found"
-msgstr "用語が見つかりません。"
+msgstr "'%s' に一致する用語が見つかりません"
 
 # en-hash: 1ecbe04157c9f7433d24d17cf5e70564
 msgid "testing_api_keys"
@@ -1707,13 +1757,9 @@ msgstr "X-Rayは最新です (%s)。"
 msgid "updater_whats_new"
 msgstr "新機能:"
 
-# en-hash: 362b2e695aa7299e20bb0d9ce320f58d
+# en-hash: 46667b51ced49ca8828f897cf83e89b8
 msgid "updating_ai"
 msgstr "X-Rayを更新中..."
-
-# en-hash: 0d1b08c34858921bc7c662b228acb7ba
-msgid "val"
-msgstr "???"
 
 # en-hash: 1739e3ae6d734407aef8af879665b8ee
 msgid "validate_keys_title"

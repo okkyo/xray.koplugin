@@ -114,7 +114,16 @@ package.loaded["ui/widget/buttondialog"] = {
     end
 }
 package.loaded["ui/widget/confirmbox"] = {
-    new = function(a, b) return { type = "ConfirmBox", args = b or a } end
+    new = function(a, b)
+        local args = b or a
+        -- Mirror the real widget: KOReader's ConfirmBox always builds an
+        -- IconWidget from `icon` and concatenates it into a path, so a boolean
+        -- (icon = false) crashes with "attempt to concatenate field 'icon'".
+        -- There is no icon-off switch; leave `icon` unset for the default.
+        assert(args == nil or args.icon ~= false,
+            "ConfirmBox: icon = false crashes KOReader; omit icon instead")
+        return { type = "ConfirmBox", args = args }
+    end
 }
 package.loaded["ui/widget/textviewer"] = {
     new = function(a, b) return { type = "TextViewer", args = b or a } end
@@ -329,8 +338,24 @@ package.loaded["gettext"] = {
     getLanguage = function() return "en" end
 }
 package.loaded["ui/trapper"] = {
-    dismissableRunInSubprocess = function(_, _, f) return true, f() end
+    -- Real signature: Trapper:dismissableRunInSubprocess(task, trap_widget).
+    -- The task is the FIRST argument after self; the second is the widget or
+    -- string shown while it runs. Run the task synchronously and report it
+    -- as completed. No `wrap` here: specs that need the subprocess path set
+    -- it themselves (see xray_ui_spec).
+    dismissableRunInSubprocess = function(_, task) return true, task() end
 }
+
+-- Temp file name that is writable on every platform busted runs on. Native
+-- Windows LuaJIT's os.tmpname() returns a name in the drive root ("\sXXXX."),
+-- where a non-admin write fails, so move it under %TEMP% there.
+function _G.spec_tmpname()
+    local name = os.tmpname()
+    if package.config:sub(1, 1) == "\\" and not name:find("[\\/].+[\\/]") then
+        name = (os.getenv("TEMP") or os.getenv("TMP") or ".") .. name
+    end
+    return name
+end
 package.loaded["xray_logger"] = {
     log = function(...) end,
 }

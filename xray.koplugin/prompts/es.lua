@@ -41,7 +41,7 @@ Paso 1. Mira ÚNICAMENTE el bloque "CHAPTER SAMPLES". Identifica los capítulos 
 Paso 2. EXCLUYE todo el material inicial y final no narrativo (ej., Portada, Página de título, Derechos de autor, Índice, Dedicatoria, Agradecimientos, También de).
 Paso 3. Para cada capítulo narrativo, comenzando desde el primero, crea EXACTAMENTE UN objeto de evento en la matriz `timeline`.
 Paso 4. El campo `chapter` DEBE coincidir exactamente con el encabezado del capítulo en la muestra. (Mapéalos estrictamente en orden secuencial).
-Paso 5. Resume ese capítulo específico en el campo `event` {TIMELINE_DETAIL_GUIDANCE} (MÁX {MAX_TIMELINE_EVENT} caracteres). NO agrupes capítulos.
+Paso 5. Resume ese capítulo específico en el campo `event`. {TIMELINE_DETAIL_GUIDANCE} Escribe entre {MIN_TIMELINE_EVENT} y {MAX_TIMELINE_EVENT} caracteres. NO escribas un resumen más corto a menos que el capítulo casi no tenga contenido. NO agrupes capítulos.
 Paso 6. SIN SPOILERS: Detente exactamente en la marca del %d%%. No incluyas eventos más allá de este progreso.
 
 ALGORITMO PARA PERSONAJES Y FIGURAS HISTÓRICAS:
@@ -219,6 +219,21 @@ If `is_valid` is false:
 {
   "is_valid": false,
   "error_message": "Breve explicación de por qué esto no es un personaje ni un lugar."
+}]],
+
+    -- Book Type Detection
+    book_type_detect = [[Título del libro: %s
+Autor: %s
+Serie: %s
+Descripción del archivo/Metadatos de tema: %s
+
+TAREA: Clasifica este libro en exactamente UNO de estos tipos de libros según sus metadatos y señales de género:
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+Devuelve ÚNICAMENTE un JSON válido:
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
 }]],
 
     -- Multi-Book Series Context Prompts

@@ -39,9 +39,17 @@ return {
     custom2_format = "",   -- optional: "openai" or "anthropic" (default: auto-detected from endpoint)
 
     -- Image Search (optional): attach a picture to a character/location/etc.
-    -- By default this uses DuckDuckGo image search, which needs NO key.
-    -- Add a Tavily key to use Tavily instead (often more relevant results).
-    --   Tavily key (free tier): https://app.tavily.com/
-    -- Leave empty to keep the no-key DuckDuckGo default.
+    -- Set at least one key. Providers are tried in this order, skipping any
+    -- key left empty:
+    --   1. SerpApi       https://serpapi.com/           (free tier available)
+    --   2. Brave Search  https://brave.com/search/api/  (free tier available;
+    --                    check that your plan covers the Image Search endpoint)
+    --   3. Tavily        https://app.tavily.com/        (free tier available)
+    -- SerpApi and Brave return small thumbnails, so the picker loads much
+    -- faster than with Tavily. With all three empty, image search is off.
+    -- To put one provider first, open X-Ray > Image Search > Image Search
+    -- Provider in the reader menu. The others stay behind it as fallbacks.
+    serpapi_api_key = "",
+    brave_api_key = "",
     tavily_api_key = "",
 }

@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Language-Team: Fr\n"
+"Language-Team: Français\n"
 "Language: fr\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -197,7 +197,7 @@ msgstr "Coller"
 msgid "cache_cleared"
 msgstr "Cache vidé !\n\nVous pouvez maintenant récupérer de nouvelles données :\nMenu → X-Ray → Récupérer les données IA"
 
-# en-hash: 2e361c4db7a5480c21b02780ed4e9e0b
+# en-hash: 1edc355371d87a94d024eebfed9f8815
 msgid "cache_save_failed"
 msgstr "Échec de l'enregistrement dans le cache"
 
@@ -248,10 +248,6 @@ msgstr "Êtes-vous sûr de vouloir effacer toutes les clés API et points de ter
 # en-hash: dd6eee404e54eafd92e56d09cb4848f3
 msgid "confirm_clear_single_key"
 msgstr "Effacer la clé API configurée pour %s ?"
-
-# en-hash: 9cfefed8fb9497baa5cd519d7d2bb5d7
-msgid "current_language"
-msgstr "fr"
 
 # en-hash: 97b9ad7336ac722cf16044cf603bfe10
 msgid "current_mode"
@@ -483,7 +479,7 @@ msgstr "Récupération réussie"
 
 # en-hash: 572e520194e629b3b906bb5b3e5bce2d
 msgid "fetching_ai"
-msgstr "Récupération de X-Ray..."
+msgstr "Récupération depuis %s..."
 
 # en-hash: 2b05ded75b73f463504a742fe3492e55
 msgid "fetching_author"
@@ -533,13 +529,33 @@ msgstr "Téléchargement de l'image..."
 msgid "img_error"
 msgstr "Échec de la recherche : %s"
 
+# en-hash: fe63191987f62b9e4806e376671ed335
+msgid "img_extract_failed"
+msgstr "Impossible d'extraire le fichier image."
+
+# en-hash: a557254d6ea7fb31d1776d65e97f9a43
+msgid "img_key_brave"
+msgstr "Clé Brave Search"
+
 # en-hash: 2bcf4d0012d8fec18f5b97a1f307c958
 msgid "img_key_saved"
 msgstr "Enregistré."
 
+# en-hash: 6fa56c2b1cb703d54c4b8b0e4440cf16
+msgid "img_key_serpapi"
+msgstr "Clé SerpApi"
+
 # en-hash: 6ad9a851e6b0ab3cb2f3b75e87cd234a
-msgid "img_key_title"
+msgid "img_key_tavily"
 msgstr "Clé API Tavily"
+
+# en-hash: 6c625a44b20a366fb63ef60e096e759a
+msgid "img_loading_more"
+msgstr "Chargement d'autres images..."
+
+# en-hash: fd2941cfb27f0d8ab5a606e86d757e8a
+msgid "img_minimized_hint"
+msgstr "'%s' réduit. Rouvrez « Images et cartes » pour reprendre."
 
 # en-hash: d3da97e2d9aee5c8fbe03156ad051c99
 msgid "img_more"
@@ -549,6 +565,22 @@ msgstr "Plus"
 msgid "img_next"
 msgstr "Suivant"
 
+# en-hash: 30936c8b483b8b104a4ad7821ce2262b
+msgid "img_no_favorites"
+msgstr "Pas encore de favoris.\n\nUtilisez le menu ⋮ sur n'importe quelle image pour l'ajouter à vos favoris."
+
+# en-hash: c3e4c8dd2122260b0c4e14d6509e62ca
+msgid "img_no_hidden"
+msgstr "Aucune image masquée.\n\nUtilisez le menu ⋮ sur n'importe quelle image de la galerie pour masquer les illustrations décoratives ou les lettrines."
+
+# en-hash: 95407637295cd7c30378be19be6e36cb
+msgid "img_no_images"
+msgstr "Aucune image trouvée pour cet onglet/filtre.\n\nExtraction ou analyse des images du livre..."
+
+# en-hash: a0c513c130fac7b4559f145cd9352091
+msgid "img_no_key"
+msgstr "Ajoutez d'abord une clé de recherche d'images dans les paramètres de recherche d'images."
+
 # en-hash: b79b9ffffededdcf093dc9f81e0a4412
 msgid "img_no_preview"
 msgstr "(Aucun aperçu disponible)"
@@ -556,6 +588,10 @@ msgstr "(Aucun aperçu disponible)"
 # en-hash: 5db1e02d891c15e428428c0e6e83c363
 msgid "img_no_results"
 msgstr "Aucune image trouvée."
+
+# en-hash: 74ab2b6d760dc64ea26012a4fca84490
+msgid "img_no_series"
+msgstr "Aucune référence de série enregistrée.\n\nUtilisez le menu ⋮ sur n'importe quelle carte pour l'enregistrer dans vos références de série."
 
 # en-hash: dd1f775e443ff3b9a89270713580a51b
 msgid "img_prev"
@@ -565,9 +601,33 @@ msgstr "Précédent"
 msgid "img_processing"
 msgstr "Traitement de l'image..."
 
-# en-hash: 67a68190ce74fbbee740d8c7d03e360c
+# en-hash: a2c65774cce0bdcd3ad1e08086e2ea40
+msgid "img_provider_about"
+msgstr "[B]Auto[/B] utilise le premier fournisseur disposant d'une clé, dans l'ordre suivant : SerpApi, Brave Search, Tavily.\n\nLe fournisseur choisi est testé en premier. En cas d'échec ou si rien n'est trouvé, les autres sont testés dans le même ordre, et une notification indique quel fournisseur a répondu.\n\nUn fournisseur sans clé est ignoré."
+
+# en-hash: ae0482189aa02d8b159c077edf8ca8c6
+msgid "img_provider_auto"
+msgstr "Auto (première clé dans l'ordre)"
+
+# en-hash: 56039cb24bf2fecba0a4aa7947d0e720
+msgid "img_provider_desc"
+msgstr "Sélectionnez le fournisseur pour la recherche d'images :"
+
+# en-hash: 11943975b2ef7d14f6c41bfeafc3a795
+msgid "img_provider_fallback"
+msgstr "%s indisponible. Affichage des résultats %s."
+
+# en-hash: b82a86548d797c4682913295fc676ac9
 msgid "img_provider_hint"
-msgstr "Par défaut : DuckDuckGo (aucune clé requise)."
+msgstr "Essayés dans l'ordre. Au moins une clé est requise."
+
+# en-hash: edc912fec23be8b7c8b6d318899d8d0d
+msgid "img_provider_no_key"
+msgstr "%s (pas de clé)"
+
+# en-hash: 01fd162e98f5553ab970a30e3a0efd2a
+msgid "img_provider_setting"
+msgstr "Fournisseur de recherche d'images"
 
 # en-hash: fc35ec973f5b3a16f0d4b009834f39a6
 msgid "img_remove"
@@ -581,9 +641,17 @@ msgstr "Supprimer l'image jointe ?"
 msgid "img_removed"
 msgstr "Image supprimée."
 
+# en-hash: 2bea7b6d66811b50767c7b22f81fb2c2
+msgid "img_rename_title"
+msgstr "Renommer l'étiquette de l'image"
+
 # en-hash: 6fe2ab43d39c389ef5f665a86121f95c
 msgid "img_result_count"
 msgstr "Résultat %1$d sur %2$d"
+
+# en-hash: 393c3f5ea8ad35c02691d507bdbb31b0
+msgid "img_reveal"
+msgstr "Révéler"
 
 # en-hash: c3612962736fa980b8a853fbc9fa981c
 msgid "img_saved"
@@ -605,13 +673,41 @@ msgstr "Rechercher une image"
 msgid "img_searching"
 msgstr "Recherche d'images..."
 
+# en-hash: e14cbcb87dce9e2354fdf7db62b93a9c
+msgid "img_show_first"
+msgstr "Retour à la première image"
+
+# en-hash: e0bcbbbd7e4041eb19382d32dd0c47a6
+msgid "img_show_more"
+msgstr "Afficher plus d'images"
+
 # en-hash: 772eeb0a8a4e1193a21b9d2631e4a508
 msgid "img_source_suffix"
 msgstr "  (%s)"
 
-# en-hash: e3cea90d4e14007d88412e5a300c97ff
-msgid "img_tavily_fallback"
-msgstr "Tavily indisponible. Affichage des résultats DuckDuckGo."
+# en-hash: 646ef4f9024779f1a04ee945deffb8d5
+msgid "img_spoiler_confirm"
+msgstr "Cette image apparaît à la page %d (au-delà de votre lecture actuelle). Révéler l'image ?"
+
+# en-hash: d0f2e5376298c880665077b565ffd7dd
+msgid "img_spoiler_locked"
+msgstr "Verrouillé"
+
+# en-hash: b1c94ca2fbc3e78fc30069c8d0f01680
+msgid "img_tab_all"
+msgstr "Toutes"
+
+# en-hash: d78986947356ddd37b43d57df289dee9
+msgid "img_tab_favorites"
+msgstr "Favoris"
+
+# en-hash: 9d948e617b083222afc868add2f50ec2
+msgid "img_tab_series"
+msgstr "Séries"
+
+# en-hash: be53a0541a6d36f6ecb879fa2c584b08
+msgid "img_untitled"
+msgstr "Image"
 
 # en-hash: c54c117a6b6dfeed9d6276e093a6aa15
 msgid "img_use_this"
@@ -620,49 +716,6 @@ msgstr "Utiliser cette image"
 # en-hash: c4f1dea83d1eb17400190339311b3482
 msgid "img_view"
 msgstr "Afficher l'image"
-
-msgid "img_extract_failed"
-msgstr "Impossible d'extraire le fichier image."
-
-msgid "img_minimized_hint"
-msgstr "Indice d'image minimisée"
-
-msgid "img_no_favorites"
-msgstr "Pas encore de favoris.\n\nUtilisez le menu ⋮ sur n'importe quelle image pour l'ajouter à vos favoris."
-
-msgid "img_no_hidden"
-msgstr "Aucune image masquée.\n\nUtilisez le menu ⋮ sur n'importe quelle image de la galerie pour masquer les illustrations décoratives ou les lettrines."
-
-msgid "img_no_images"
-msgstr "Aucune image trouvée pour cet onglet/filtre.\n\nExtraction ou analyse des images du livre..."
-
-msgid "img_no_series"
-msgstr "Aucune référence de série enregistrée.\n\nUtilisez le menu ⋮ sur n'importe quelle carte pour l'enregistrer dans vos références de série."
-
-msgid "img_rename_title"
-msgstr "Renommer l'étiquette de l'image"
-
-msgid "img_reveal"
-msgstr "Révéler"
-
-msgid "img_spoiler_confirm"
-msgstr "Cette image apparaît à la page %d (au-delà de votre lecture actuelle). Révéler l'image ?"
-
-msgid "img_spoiler_locked"
-msgstr "Verrouillé"
-
-msgid "img_tab_all"
-msgstr "Toutes"
-
-msgid "img_tab_favorites"
-msgstr "Favoris"
-
-msgid "img_tab_series"
-msgstr "Séries"
-
-msgid "img_untitled"
-msgstr "Image"
-
 
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
@@ -956,9 +1009,9 @@ msgstr "Figures Historiques"
 msgid "menu_image_search"
 msgstr "Recherche d'images"
 
+# en-hash: 073096c9e6fbe0599a7c64e0e7a665cb
 msgid "menu_images"
 msgstr "Images et cartes"
-
 
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
@@ -1224,10 +1277,6 @@ msgstr "Aucune correspondance exacte pour '%s'. Appuyez sur une entrée associé
 msgid "paste_clipboard_confirm"
 msgstr "Utiliser la clé API trouvée dans le presse-papiers pour %s ?"
 
-# en-hash: 607481fc96e754b33650eb171aac9447
-msgid "path"
-msgstr "plugins/xray.koplugin"
-
 # en-hash: 046763a0d64321194477604b7751c8e4
 msgid "pending_duplicates_prompt"
 msgstr "L'IA a trouvé %d doublon(s) potentiel(s) lors de la dernière analyse. Examiner maintenant ?"
@@ -1236,6 +1285,7 @@ msgstr "L'IA a trouvé %d doublon(s) potentiel(s) lors de la dernière analyse. 
 msgid "plugin_description"
 msgstr "Transformez votre expérience de lecture avec l'analyse de livre assistée par l'IA, tout comme Amazon Kindle X-Ray !"
 
+# en-hash: 14230d11143a03f4330c6433d5032a9d
 msgid "prev"
 msgstr "Préc."
 
@@ -1379,7 +1429,7 @@ msgstr "Préférence Spoiler"
 msgid "stop"
 msgstr "Arrêter"
 
-# en-hash: d725036d492c380f06f4eb32f5704bc9
+# en-hash: d7c6deb856024d209d52d833b9f4c95d
 msgid "term_not_found"
 msgstr "Aucun terme trouvé correspondant à '%s'"
 
@@ -1707,13 +1757,9 @@ msgstr "X-Ray est à jour (%s)."
 msgid "updater_whats_new"
 msgstr "Quoi de neuf :"
 
-# en-hash: 362b2e695aa7299e20bb0d9ce320f58d
+# en-hash: 46667b51ced49ca8828f897cf83e89b8
 msgid "updating_ai"
 msgstr "Mise à jour des données X-Ray..."
-
-# en-hash: 0d1b08c34858921bc7c662b228acb7ba
-msgid "val"
-msgstr "???"
 
 # en-hash: 1739e3ae6d734407aef8af879665b8ee
 msgid "validate_keys_title"

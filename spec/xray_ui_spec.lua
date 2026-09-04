@@ -1645,7 +1645,14 @@ describe("xray_ui", function()
         end)
 
         describe("showImageAttachFlow", function()
+            after_each(function()
+                plugin.ai_helper.serpapi_api_key = ""
+                plugin.ai_helper.brave_api_key = ""
+                plugin.ai_helper.tavily_api_key = ""
+            end)
+
             it("opens a search dialog prefilled with the entity name", function()
+                plugin.ai_helper.serpapi_api_key = "serp-KEY"
                 plugin.book_type = "non_fiction"   -- do not append the book title
                 plugin:showImageAttachFlow({ name = "Frodo" }, "character")
                 local dlg = _G.ui_tracker.last_shown
@@ -1657,20 +1664,42 @@ describe("xray_ui", function()
                 plugin:showImageAttachFlow(nil, "character")
                 assert.is_nil(_G.ui_tracker.last_shown)
             end)
+
+            -- The card button and the Change row stay visible with no key, so
+            -- this notice is the only thing telling the user what to do.
+            it("says where to add a key instead of asking for a search term", function()
+                plugin.ai_helper.serpapi_api_key = ""
+                plugin.ai_helper.brave_api_key = ""
+                plugin.ai_helper.tavily_api_key = ""
+                plugin:showImageAttachFlow({ name = "Frodo" }, "character")
+                local dlg = _G.ui_tracker.last_shown
+                assert.are.equal("InfoMessage", dlg.type)
+                assert.is_truthy(dlg.args.text:find("img_no_key", 1, true))
+            end)
         end)
 
         describe("_runImageSearch", function()
+            local function clearImageKeys()
+                plugin.ai_helper.serpapi_api_key = ""
+                plugin.ai_helper.brave_api_key = ""
+                plugin.ai_helper.tavily_api_key = ""
+            end
+
             it("shows a candidate picker when the search returns results", function()
+                clearImageKeys()
+                plugin.ai_helper.serpapi_api_key = "serp-KEY"
                 ImageSearch.searchAndFetchThumbs = function()
-                    return { { full = "http://x/a.jpg", title = "A" } }, "duckduckgo"
+                    return { { full = "http://x/a.jpg" } }, "serpapi"
                 end
                 plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
                 assert.are.equal("ButtonDialog", _G.ui_tracker.last_shown.type)
             end)
 
             it("shows an error notice when the search fails", function()
+                clearImageKeys()
+                plugin.ai_helper.serpapi_api_key = "serp-KEY"
                 ImageSearch.searchAndFetchThumbs = function()
-                    return nil, "duckduckgo", "HTTP 500"
+                    return nil, "serpapi", "HTTP 500"
                 end
                 plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
                 local msgs = shownOfType("InfoMessage")
@@ -1678,28 +1707,375 @@ describe("xray_ui", function()
                 assert.is_truthy(msgs[#msgs].args.text:find("img_error", 1, true))
             end)
 
-            it("warns when a configured Tavily key fell back to DuckDuckGo", function()
+            it("warns when a configured SerpApi key fell back to Tavily", function()
+                clearImageKeys()
+                plugin.ai_helper.serpapi_api_key = "serp-KEY"
                 plugin.ai_helper.tavily_api_key = "tvly-KEY"
                 ImageSearch.searchAndFetchThumbs = function()
-                    return { { full = "http://x/a.jpg", title = "A" } }, "duckduckgo"
+                    return { { full = "http://x/a.jpg" } }, "tavily"
                 end
                 plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
                 local warned = false
                 for _, w in ipairs(shownOfType("InfoMessage")) do
-                    if w.args.text:find("img_tavily_fallback", 1, true) then warned = true end
+                    if w.args.text:find("img_provider_fallback", 1, true) then warned = true end
                 end
                 assert.is_true(warned)
             end)
 
-            it("does not warn about fallback when no Tavily key is set", function()
-                plugin.ai_helper.tavily_api_key = ""
+            it("warns when a configured SerpApi key fell back to Brave", function()
+                clearImageKeys()
+                plugin.ai_helper.serpapi_api_key = "serp-KEY"
+                plugin.ai_helper.brave_api_key = "brave-KEY"
                 ImageSearch.searchAndFetchThumbs = function()
-                    return { { full = "http://x/a.jpg", title = "A" } }, "duckduckgo"
+                    return { { full = "http://x/a.jpg" } }, "brave"
+                end
+                plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                local warned = false
+                for _, w in ipairs(shownOfType("InfoMessage")) do
+                    if w.args.text:find("img_provider_fallback", 1, true) then warned = true end
+                end
+                assert.is_true(warned)
+            end)
+
+            it("does not warn when the top configured provider served the search", function()
+                clearImageKeys()
+                plugin.ai_helper.serpapi_api_key = "serp-KEY"
+                ImageSearch.searchAndFetchThumbs = function()
+                    return { { full = "http://x/a.jpg" } }, "serpapi"
                 end
                 plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
                 for _, w in ipairs(shownOfType("InfoMessage")) do
-                    assert.is_falsy(w.args.text:find("img_tavily_fallback", 1, true))
+                    assert.is_falsy(w.args.text:find("img_provider_fallback", 1, true))
                 end
+            end)
+
+            it("refuses to search and asks for a key when none is set", function()
+                clearImageKeys()
+                ImageSearch.searchAndFetchThumbs = function()
+                    error("must not search without a key")
+                end
+                plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                local asked = false
+                for _, w in ipairs(shownOfType("InfoMessage")) do
+                    if w.args.text:find("img_no_key", 1, true) then asked = true end
+                end
+                assert.is_true(asked)
+            end)
+
+            it("passes every configured key through to the search", function()
+                clearImageKeys()
+                plugin.ai_helper.serpapi_api_key = "serp-KEY"
+                plugin.ai_helper.brave_api_key = "brave-KEY"
+                plugin.ai_helper.tavily_api_key = "tvly-KEY"
+                local seen
+                ImageSearch.searchAndFetchThumbs = function(_, keys)
+                    seen = keys
+                    return { { full = "http://x/a.jpg", title = "A" } }, "serpapi"
+                end
+                plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                assert.are.equal("serp-KEY", seen.serpapi)
+                assert.are.equal("brave-KEY", seen.brave)
+                assert.are.equal("tvly-KEY", seen.tavily)
+            end)
+
+            describe("provider pick", function()
+                before_each(function()
+                    clearImageKeys()
+                    plugin.ai_helper.serpapi_api_key = "serp-KEY"
+                    plugin.ai_helper.tavily_api_key = "tvly-KEY"
+                    plugin.ai_helper.settings = plugin.ai_helper.settings or {}
+                end)
+                after_each(function()
+                    plugin.ai_helper.settings.image_search_provider = nil
+                end)
+
+                it("passes the picked provider through to the search", function()
+                    plugin.ai_helper.settings.image_search_provider = "tavily"
+                    local seen
+                    ImageSearch.searchAndFetchThumbs = function(_, _, _, pick)
+                        seen = pick
+                        return { { full = "http://x/a.jpg" } }, "tavily"
+                    end
+                    plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                    assert.are.equal("tavily", seen)
+                    -- The picked provider answered, so there is no fallback notice.
+                    assert.are.equal(0, #shownOfType("InfoMessage"))
+                    assert.are.equal("ButtonDialog", _G.ui_tracker.last_shown.type)
+                end)
+
+                it("passes auto when nothing is picked or the pick is unknown", function()
+                    local seen
+                    ImageSearch.searchAndFetchThumbs = function(_, _, _, pick)
+                        seen = pick
+                        return { { full = "http://x/a.jpg" } }, "serpapi"
+                    end
+                    plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                    assert.are.equal(ImageSearch.AUTO_PROVIDER, seen)
+
+                    plugin.ai_helper.settings.image_search_provider = "bing"
+                    plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                    assert.are.equal(ImageSearch.AUTO_PROVIDER, seen)
+                end)
+
+                it("names the provider that answered when the pick fell back", function()
+                    plugin.ai_helper.settings.image_search_provider = "tavily"
+                    ImageSearch.searchAndFetchThumbs = function()
+                        return { { full = "http://x/a.jpg" } }, "serpapi"
+                    end
+                    plugin:_runImageSearch({ name = "Frodo" }, "character", "Frodo")
+                    local notices = shownOfType("InfoMessage")
+                    assert.are.equal(1, #notices)
+                    assert.is_truthy(notices[1].args.text:find("img_provider_fallback", 1, true))
+                    assert.is_truthy(notices[1].args.text:find("Tavily", 1, true))
+                    assert.is_truthy(notices[1].args.text:find("SerpApi", 1, true))
+                end)
+            end)
+        end)
+
+        describe("provider setting", function()
+            local card = require("xray_settings_card")
+            local saved_show, saved_save
+
+            local function clearImageKeys()
+                plugin.ai_helper.serpapi_api_key = ""
+                plugin.ai_helper.brave_api_key = ""
+                plugin.ai_helper.tavily_api_key = ""
+            end
+
+            before_each(function()
+                saved_show, saved_save = card.show, plugin.ai_helper.saveSettings
+                plugin.ai_helper.settings = plugin.ai_helper.settings or {}
+                clearImageKeys()
+            end)
+            after_each(function()
+                card.show, plugin.ai_helper.saveSettings = saved_show, saved_save
+                plugin.ai_helper.settings.image_search_provider = nil
+                clearImageKeys()
+            end)
+
+            it("reads auto when nothing is stored or the stored pick is unknown", function()
+                assert.are.equal("auto", plugin:_imageSearchProviderSetting())
+                plugin.ai_helper.settings.image_search_provider = "bing"
+                assert.are.equal("auto", plugin:_imageSearchProviderSetting())
+                plugin.ai_helper.settings.image_search_provider = "brave"
+                assert.are.equal("brave", plugin:_imageSearchProviderSetting())
+            end)
+
+            it("shows the pick as the first row of the Image Search menu", function()
+                plugin.ai_helper.settings.image_search_provider = "brave"
+                local items = plugin:getImageSearchKeySubMenu()
+                assert.is_truthy(items[1].text:find("Brave Search", 1, true))
+                assert.is_truthy(items[1].text_func():find("Brave Search", 1, true))
+                -- The key rows and their hint still follow.
+                assert.is_false(items[2].enabled)
+                assert.are.equal(2 + #ImageSearch.PROVIDERS, #items)
+            end)
+
+            it("opens the settings card from that row", function()
+                local args
+                card.show = function(_, a) args = a end
+                plugin:getImageSearchKeySubMenu()[1].callback()
+                assert.is_table(args)
+                assert.is_truthy(args.about_text)
+            end)
+
+            it("lists Auto first, then every provider, marking those with no key", function()
+                plugin.ai_helper.serpapi_api_key = "serp-KEY"
+                local args
+                card.show = function(_, a) args = a end
+                plugin:showImageProviderSettings()
+                assert.are.equal(1 + #ImageSearch.PROVIDERS, #args.options)
+                assert.are.equal(ImageSearch.AUTO_PROVIDER, args.options[1].value)
+                assert.are.equal("serpapi", args.options[2].value)
+                assert.are.equal("SerpApi", args.options[2].text)
+                assert.are.equal("brave", args.options[3].value)
+                assert.is_truthy(args.options[3].text:find("img_provider_no_key", 1, true))
+                assert.is_truthy(args.options[3].text:find("Brave Search", 1, true))
+                assert.are.equal(ImageSearch.AUTO_PROVIDER, args.get_current_func())
+            end)
+
+            it("saves the pick through the AI helper settings", function()
+                local saved
+                plugin.ai_helper.saveSettings = function(_, t) saved = t end
+                card.show = function(_, a) a.save_func("tavily") end
+                plugin:showImageProviderSettings()
+                assert.are.same({ image_search_provider = "tavily" }, saved)
+            end)
+        end)
+
+        describe("image search button visibility", function()
+            local function setKeys(serp, brave, tavily)
+                plugin.ai_helper.serpapi_api_key = serp or ""
+                plugin.ai_helper.brave_api_key = brave or ""
+                plugin.ai_helper.tavily_api_key = tavily or ""
+            end
+
+            -- A card's button list always ends with the Close row; the image row
+            -- is inserted just above it.
+            local function closeOnlyButtons()
+                return { { { text = "Close" } } }
+            end
+
+            local function rowButton(rows, text)
+                for _, row in ipairs(rows) do
+                    for _, btn in ipairs(row) do
+                        if btn.text == text then return btn end
+                    end
+                end
+                return nil
+            end
+
+            local function hasButton(rows, text)
+                return rowButton(rows, text) ~= nil
+            end
+
+            after_each(function() setKeys() end)
+
+            it("offers Search Images when a provider key is set", function()
+                setKeys("serp-KEY")
+                local buttons = closeOnlyButtons()
+                plugin:_addImageButton(buttons, { name = "Frodo" }, "character")
+                assert.is_true(hasButton(buttons, plugin.loc:t("img_attach_button")))
+            end)
+
+            it("offers Search Images when only the last provider has a key", function()
+                setKeys(nil, nil, "tvly-KEY")
+                local buttons = closeOnlyButtons()
+                plugin:_addImageButton(buttons, { name = "Frodo" }, "character")
+                assert.is_true(hasButton(buttons, plugin.loc:t("img_attach_button")))
+            end)
+
+            -- The button is the feature's only affordance. Hiding it with no
+            -- key made image search vanish silently after an upgrade; keep it
+            -- and let showImageAttachFlow explain.
+            it("still offers Search Images when no provider key is set", function()
+                setKeys()
+                local buttons = closeOnlyButtons()
+                plugin:_addImageButton(buttons, { name = "Frodo" }, "character")
+                assert.is_true(hasButton(buttons, plugin.loc:t("img_attach_button")))
+            end)
+
+            -- Regression: the callback closed the entity card BEFORE checking
+            -- for a key. With no key the flow only shows a notice, so the tap
+            -- destroyed the card the user was reading and replaced it with
+            -- nothing -- several full refreshes away on slow e-ink.
+            it("keeps the entity card open when Search Images is tapped with no key", function()
+                setKeys()
+                local buttons = closeOnlyButtons()
+                plugin:_addImageButton(buttons, { name = "Frodo" }, "character")
+                local card = { type = "ButtonDialog" }
+                plugin.active_details_dialog = card
+                rowButton(buttons, plugin.loc:t("img_attach_button")).callback()
+                assert.are.equal(card, plugin.active_details_dialog)
+                assert.are.equal("InfoMessage", _G.ui_tracker.last_shown.type)
+            end)
+
+            it("closes the entity card when Search Images is tapped with a key", function()
+                setKeys("serp-KEY")
+                local buttons = closeOnlyButtons()
+                plugin:_addImageButton(buttons, { name = "Frodo" }, "character")
+                plugin.active_details_dialog = { type = "ButtonDialog" }
+                rowButton(buttons, plugin.loc:t("img_attach_button")).callback()
+                assert.is_nil(plugin.active_details_dialog)
+            end)
+
+            it("keeps Change Image in the thumbnail menu when a key is set", function()
+                setKeys("serp-KEY")
+                plugin:_showImageActionMenu({ name = "Frodo" }, "character", function() end)
+                local dlg = _G.ui_tracker.last_shown
+                assert.are.equal("ButtonDialog", dlg.type)
+                assert.is_not_nil(findButton(dlg, plugin.loc:t("img_change_button")))
+            end)
+
+            it("keeps Change Image, View and Remove with no key", function()
+                setKeys()
+                plugin:_showImageActionMenu({ name = "Frodo" }, "character", function() end)
+                local dlg = _G.ui_tracker.last_shown
+                assert.is_not_nil(findButton(dlg, plugin.loc:t("img_change_button")))
+                assert.is_not_nil(findButton(dlg, plugin.loc:t("img_view")))
+                assert.is_not_nil(findButton(dlg, plugin.loc:t("img_remove")))
+            end)
+
+            -- Regression: this ConfirmBox once passed icon = false, which crashes
+            -- KOReader's IconWidget. The ConfirmBox mock rejects that, so this
+            -- test fails if the flag comes back.
+            it("asks for confirmation before removing and then removes", function()
+                local removed
+                plugin._removeEntityImage = function(_, entity, etype) removed = { entity, etype } end
+                local frodo = { name = "Frodo" }
+                plugin:_showImageActionMenu(frodo, "character", function() end)
+                findButton(_G.ui_tracker.last_shown, plugin.loc:t("img_remove")).callback()
+                local confirm = _G.ui_tracker.last_shown
+                assert.are.equal("ConfirmBox", confirm.type)
+                assert.is_nil(removed)
+                confirm.args.ok_callback()
+                assert.are.same({ frodo, "character" }, removed)
+            end)
+
+            -- Same regression as the card button, through the thumbnail menu.
+            it("keeps the entity card open when Change Image is tapped with no key", function()
+                setKeys()
+                local card = { type = "ButtonDialog" }
+                plugin.active_details_dialog = card
+                plugin:_showImageActionMenu({ name = "Frodo" }, "character", function() end)
+                findButton(_G.ui_tracker.last_shown, plugin.loc:t("img_change_button")).callback()
+                assert.are.equal(card, plugin.active_details_dialog)
+                assert.are.equal("InfoMessage", _G.ui_tracker.last_shown.type)
+            end)
+        end)
+
+        describe("getImageSearchKeySubMenu", function()
+            local ImageSearch = require("xray_imagesearch")
+
+            after_each(function()
+                plugin.ai_helper.serpapi_api_key = ""
+                plugin.ai_helper.brave_api_key = ""
+                plugin.ai_helper.tavily_api_key = ""
+            end)
+
+            -- The provider pick row comes first, then the non-tappable hint;
+            -- the key rows follow the hint.
+            local function keyRows()
+                local rows = plugin:getImageSearchKeySubMenu()
+                local out, past_hint = {}, false
+                for _, row in ipairs(rows) do
+                    if past_hint then
+                        out[#out + 1] = row
+                    elseif row.enabled == false then
+                        past_hint = true
+                    end
+                end
+                return out
+            end
+
+            it("lists one row per provider, in search order", function()
+                local rows = keyRows()
+                assert.are.equal(#ImageSearch.PROVIDERS, #rows)
+                for i, p in ipairs(ImageSearch.PROVIDERS) do
+                    local title = plugin.loc:t(p.loc_key) or (p.brand .. " Key")
+                    assert.is_truthy(rows[i].text:find(title, 1, true))
+                end
+            end)
+
+            it("saves each row's input into that provider's own config field", function()
+                for i, p in ipairs(ImageSearch.PROVIDERS) do
+                    local seen
+                    local saved_prompt = plugin._promptImageSearchValue
+                    plugin._promptImageSearchValue = function(_, field) seen = field end
+                    keyRows()[i].callback()
+                    plugin._promptImageSearchValue = saved_prompt
+                    assert.are.equal(p.config_field, seen)
+                end
+            end)
+
+            it("shows (None) for an unset key and only the last 4 characters of a set one", function()
+                plugin.ai_helper.serpapi_api_key = ""
+                assert.is_truthy(keyRows()[1].text:find("(None)", 1, true))
+                plugin.ai_helper.serpapi_api_key = "serp-KEY-1234567890"
+                local text = keyRows()[1].text_func()
+                assert.is_truthy(text:find("...7890", 1, true))
+                assert.is_nil(text:find("serp-K", 1, true))
+                assert.is_nil(text:find("123456", 1, true))
             end)
         end)
 
@@ -1711,7 +2087,7 @@ describe("xray_ui", function()
                     { full = "http://x/a.jpg", title = "A" },
                     { full = "http://x/b.jpg", title = "B" },
                 }
-                plugin:_showImageCandidates({ name = "Frodo" }, "character", results, "duckduckgo")
+                plugin:_showImageCandidates({ name = "Frodo" }, "character", results, "serpapi")
                 local dlg = plugin._img_candidates_dialog
                 assert.is_not_nil(dlg)
                 local use = findButton(dlg, plugin.loc:t("img_use_this"))
@@ -1725,10 +2101,140 @@ describe("xray_ui", function()
                     { full = "http://x/a.jpg", title = "A" },
                     { full = "http://x/b.jpg", title = "B" },
                 }
-                plugin:_showImageCandidates({ name = "Frodo" }, "character", results, "duckduckgo")
+                plugin:_showImageCandidates({ name = "Frodo" }, "character", results, "serpapi")
                 local dlg = plugin._img_candidates_dialog
                 assert.is_not_nil(findButton(dlg, plugin.loc:t("img_next")))
                 assert.is_nil(findButton(dlg, plugin.loc:t("img_prev")))
+            end)
+
+            describe("thumbnail pages", function()
+                local saved_fetch, page_calls
+                local function sevenResults()
+                    local results = {}
+                    for i = 1, 7 do
+                        results[i] = { full = "http://x/" .. i .. ".jpg", thumb = "http://t/" .. i .. ".jpg" }
+                        if i <= ImageSearch.THUMB_PAGE then results[i].local_thumb = "/tmp/t" .. i end
+                    end
+                    return results
+                end
+                local function tap(text)
+                    local btn = findButton(plugin._img_candidates_dialog, plugin.loc:t(text))
+                    assert.is_not_nil(btn, "button missing: " .. text)
+                    btn.callback()
+                end
+
+                before_each(function()
+                    saved_fetch = ImageSearch.fetchThumbPage
+                    page_calls = {}
+                    ImageSearch.fetchThumbPage = function(results, first, last)
+                        page_calls[#page_calls + 1] = { first, last }
+                        local paths = {}
+                        for i = first, math.min(last, #results) do paths[i] = "/tmp/t" .. i end
+                        return paths
+                    end
+                end)
+                after_each(function()
+                    ImageSearch.fetchThumbPage = saved_fetch
+                end)
+
+                it("offers Show more instead of Next on the last loaded entry", function()
+                    plugin:_showImageCandidates({ name = "Frodo" }, "character", sevenResults(), "serpapi")
+                    for _ = 2, ImageSearch.THUMB_PAGE do tap("img_next") end
+                    local dlg = plugin._img_candidates_dialog
+                    assert.is_nil(findButton(dlg, plugin.loc:t("img_next")))
+                    assert.is_not_nil(findButton(dlg, plugin.loc:t("img_show_more")))
+                    assert.is_nil(findButton(dlg, plugin.loc:t("img_show_first")))
+                end)
+
+                it("fetches the next page on Show more and moves to its first entry", function()
+                    local results = sevenResults()
+                    plugin:_showImageCandidates({ name = "Frodo" }, "character", results, "serpapi")
+                    for _ = 2, ImageSearch.THUMB_PAGE do tap("img_next") end
+                    tap("img_show_more")
+                    assert.are.same({ { 6, 7 } }, page_calls)
+                    assert.are.equal("/tmp/t6", results[6].local_thumb)
+                    -- Now on entry 6: Previous walks back, Next reaches 7.
+                    local dlg = plugin._img_candidates_dialog
+                    assert.is_not_nil(findButton(dlg, plugin.loc:t("img_prev")))
+                    assert.is_not_nil(findButton(dlg, plugin.loc:t("img_next")))
+                    assert.is_nil(findButton(dlg, plugin.loc:t("img_show_more")))
+                end)
+
+                it("offers a jump back to the first image on the very last entry", function()
+                    plugin:_showImageCandidates({ name = "Frodo" }, "character", sevenResults(), "serpapi")
+                    for _ = 2, ImageSearch.THUMB_PAGE do tap("img_next") end
+                    tap("img_show_more")
+                    tap("img_next")
+                    local dlg = plugin._img_candidates_dialog
+                    assert.is_nil(findButton(dlg, plugin.loc:t("img_next")))
+                    assert.is_nil(findButton(dlg, plugin.loc:t("img_show_more")))
+                    tap("img_show_first")
+                    dlg = plugin._img_candidates_dialog
+                    assert.is_nil(findButton(dlg, plugin.loc:t("img_prev")))
+                    assert.is_not_nil(findButton(dlg, plugin.loc:t("img_next")))
+                end)
+
+                it("does not offer Show more when every result is already loaded", function()
+                    local results = sevenResults()
+                    results[6], results[7] = nil, nil
+                    plugin:_showImageCandidates({ name = "Frodo" }, "character", results, "serpapi")
+                    for _ = 2, ImageSearch.THUMB_PAGE do tap("img_next") end
+                    local dlg = plugin._img_candidates_dialog
+                    assert.is_nil(findButton(dlg, plugin.loc:t("img_show_more")))
+                    assert.is_not_nil(findButton(dlg, plugin.loc:t("img_show_first")))
+                    assert.are.same({}, page_calls)
+                end)
+
+                describe("with Trapper present", function()
+                    -- The shared mock has no `wrap`, so the tests above take
+                    -- the degraded blocking path. Give it one here so the
+                    -- subprocess path and its cancel handling run as well.
+                    local Trapper = package.loaded["ui/trapper"]
+                    local saved_run, cancel_next
+
+                    before_each(function()
+                        cancel_next = false
+                        saved_run = Trapper.dismissableRunInSubprocess
+                        Trapper.wrap = function(_, fn) return fn() end
+                        Trapper.dismissableRunInSubprocess = function(_, task)
+                            if cancel_next then return false end
+                            return true, task()
+                        end
+                    end)
+                    after_each(function()
+                        Trapper.wrap = nil
+                        Trapper.dismissableRunInSubprocess = saved_run
+                    end)
+
+                    it("applies the page and moves to its first entry when the fetch completes", function()
+                        local results = sevenResults()
+                        plugin:_showImageCandidates({ name = "Frodo" }, "character", results, "serpapi")
+                        for _ = 2, ImageSearch.THUMB_PAGE do tap("img_next") end
+                        tap("img_show_more")
+                        assert.are.same({ { 6, 7 } }, page_calls)
+                        assert.are.equal("/tmp/t6", results[6].local_thumb)
+                        local dlg = plugin._img_candidates_dialog
+                        assert.is_not_nil(findButton(dlg, plugin.loc:t("img_prev")))
+                        assert.is_nil(findButton(dlg, plugin.loc:t("img_show_more")))
+                    end)
+
+                    it("reopens the entry the user was on when the fetch is cancelled", function()
+                        local results = sevenResults()
+                        plugin:_showImageCandidates({ name = "Frodo" }, "character", results, "serpapi")
+                        for _ = 2, ImageSearch.THUMB_PAGE do tap("img_next") end
+                        cancel_next = true
+                        tap("img_show_more")
+                        -- Nothing was applied: entries past the first page stay unloaded...
+                        assert.is_nil(results[6].local_thumb)
+                        -- ...and the dialog is back on the last loaded entry,
+                        -- still offering Show more and Previous, not Next.
+                        local dlg = plugin._img_candidates_dialog
+                        assert.is_not_nil(dlg)
+                        assert.is_not_nil(findButton(dlg, plugin.loc:t("img_show_more")))
+                        assert.is_not_nil(findButton(dlg, plugin.loc:t("img_prev")))
+                        assert.is_nil(findButton(dlg, plugin.loc:t("img_next")))
+                    end)
+                end)
             end)
         end)
 

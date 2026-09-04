@@ -49,20 +49,24 @@ function Localization:parsePO(filepath)
                     translations[msgid] = msgstr
                 end
                 
-                msgid = line:match('^msgid%s+"(.-)"')
+                -- Greedy, anchored at the last quote on the line. A lazy
+                -- "(.-)" stops at the first \" inside the value and truncates
+                -- it -- every Italian string with an embedded quote came out
+                -- cut off at the first one.
+                msgid = line:match('^msgid%s+"(.*)"%s*$')
                 msgstr = nil
                 in_msgid = true
                 in_msgstr = false
             
             -- Start of msgstr
             elseif line:match('^msgstr%s+"') then
-                msgstr = line:match('^msgstr%s+"(.-)"')
+                msgstr = line:match('^msgstr%s+"(.*)"%s*$')
                 in_msgid = false
                 in_msgstr = true
             
             -- Continuation line
             elseif line:match('^"') then
-                local continuation = line:match('^"(.-)"')
+                local continuation = line:match('^"(.*)"%s*$')
                 if in_msgid and msgid then
                     msgid = msgid .. continuation
                 elseif in_msgstr and msgstr then
@@ -80,13 +84,17 @@ function Localization:parsePO(filepath)
     
     file:close()
     
-    -- Process escape sequences
+    -- Process escape sequences.
+    -- One pass over each escape pair, not four passes over the whole string:
+    -- a chain of gsubs decodes the output of the previous gsub, so an escaped
+    -- backslash ("\\\\n" on disk, meaning backslash + the letter n) would come
+    -- out as a backslash and a real newline. Must stay the exact inverse of
+    -- po_escape in tools/sync_translations.py.
+    local ESCAPES = { n = "\n", t = "\t", ['"'] = '"', ["\\"] = "\\" }
     for key, value in pairs(translations) do
-        value = value:gsub("\\n", "\n")
-        value = value:gsub("\\t", "\t")
-        value = value:gsub('\\"', '"')
-        value = value:gsub("\\\\", "\\")
-        translations[key] = value
+        translations[key] = value:gsub("\\(.)", function(c)
+            return ESCAPES[c]
+        end)
     end
     
     return translations
@@ -206,10 +214,10 @@ function Localization:t(key, ...)
         local fallbacks = {
             msg_suggest_lang = "This book is in %s. Switch X-Ray language to match?",
             cache_saved = "[Saved]",
-            cache_save_failed = "[Save failed]",
+            cache_save_failed = "✗ Cache failed.",
             ai_fetch_complete = "Fetched from %s\n\nBook: %s\nAuthor: %s\n\nCharacters: %d | Locations: %d | Themes: %d | Events: %d | History: %d\n\n%s\n\n%s",
             fetching_ai = "Fetching from %s...",
-            updating_ai = "Updating X-Ray Data...",
+            updating_ai = "Updating X-Ray...",
             fetching_author = "Fetching author info from %s...",
             menu_update_xray = "Update X-Ray Data (Merge)",
             menu_fetch_more_chars = "Fetch More Characters",
@@ -516,12 +524,15 @@ function Localization:t(key, ...)
             img_downloading = "Downloading image...",
             img_processing = "Processing image...",
             img_download_failed = "Could not download image.",
-            img_tavily_fallback = "Tavily unavailable. Showing DuckDuckGo results.",
+            img_provider_fallback = "%s unavailable. Showing %s results.",
             img_saved = "Image attached.",
             img_removed = "Image removed.",
             img_error = "Search failed: %s",
-            img_provider_hint = "Default: DuckDuckGo (no key needed).",
-            img_key_title = "Tavily API Key",
+            img_provider_hint = "Tried in order. At least one key is required.",
+            img_no_key = "Add an image search key in the Image Search settings first.",
+            img_key_serpapi = "SerpApi Key",
+            img_key_brave = "Brave Search Key",
+            img_key_tavily = "Tavily API Key",
             img_key_saved = "Saved.",
         }
         translation = fallbacks[key] or key

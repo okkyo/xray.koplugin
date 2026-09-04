@@ -713,7 +713,7 @@ function M:showLanguageSelection()
         })
     end
     
-    local dialog_title = (self.loc and self.loc:t("menu_language")) or "Language Selection"
+    local dialog_title = (self.loc and self.loc:t("menu_language")) or "Language"
     self.ldlg = self:newMenu("ldlg", {
         title = dialog_title,
         item_table = items,
@@ -1925,8 +1925,12 @@ function M:showTermSearch()
                    UIManager:close(input_dialog)
                    if search_text and #search_text > 0 then 
                        local found = self:findTermByName(search_text)
-                        if found then self:showTermDetails(found, { source = "menu" }) 
-                       else UIManager:show(InfoMessage:new{ text = self.loc:t("term_not_found", search_text) or "Term not found.", timeout = 3 }) end 
+                        if found then self:showTermDetails(found, { source = "menu" })
+                       -- The inline default keeps a raw %s on purpose: it is the
+                       -- English source that sync_translations.py writes to en.po
+                       -- (the inline default wins over the table). It never shows,
+                       -- because loc:t() always returns a string.
+                       else UIManager:show(InfoMessage:new{ text = self.loc:t("term_not_found", search_text) or "No term found matching '%s'", timeout = 3 }) end
                    end 
                end 
              }}
@@ -3007,7 +3011,7 @@ function XRayLogViewer:_rebuild()
 
     -- Title
     local title_face = Font:getFace("cfont", 22)
-    local title_text = string.format("%s (%d/%d)", (self.ui_instance and self.ui_instance.loc:t("menu_view_log")) or "X-Ray Log", current_page, total_pages)
+    local title_text = string.format("%s (%d/%d)", (self.ui_instance and self.ui_instance.loc:t("menu_view_log")) or "View Log", current_page, total_pages)
     local title_widget = TextBoxWidget:new{
         text = title_text,
         face = title_face,
@@ -5758,9 +5762,9 @@ end
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Attach an image to an entity (character/location/historical figure/term)
 --
--- Search: Tavily (image mode) when a Tavily API key is set, else DuckDuckGo
--- image search (no key). The chosen image is stored inside the book's .sdr
--- sidecar so it travels with the book. See xray_imagesearch.lua.
+-- Search: SerpApi, then Brave Search, then Tavily -- whichever has a key, in
+-- that order. At least one key is required. The chosen image is stored inside
+-- the book's .sdr sidecar so it travels with the book. See xray_imagesearch.lua.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Map an entity type to the book_data list key and the show* card method.
@@ -5906,11 +5910,17 @@ function M:_showImageActionMenu(entity, entity_type, open_viewer)
                     open_viewer()
                 end,
             }},
+            -- Change runs a new search, which needs a provider key. The row
+            -- stays visible with no key: showImageAttachFlow then says where to
+            -- add one, instead of the feature disappearing without a word.
             {{
                 text = self.loc:t("img_change_button") or "Change Image",
                 callback = function()
                     UIManager:close(dlg)
-                    if self.active_details_dialog then
+                    -- Close the card only when a search will really start. With
+                    -- no key the flow just shows a notice, so closing first
+                    -- would take away the card and put nothing in its place.
+                    if self:_hasImageSearchKey() and self.active_details_dialog then
                         UIManager:close(self.active_details_dialog)
                         self.active_details_dialog = nil
                     end
@@ -5921,14 +5931,13 @@ function M:_showImageActionMenu(entity, entity_type, open_viewer)
                 text = self.loc:t("img_remove") or "Remove Image",
                 callback = function()
                     UIManager:close(dlg)
-                    -- Deleting the sidecar image is destructive and a mis-tap on
-                    -- slow e-ink is easy; confirm before removing.
+                    -- Deleting the sidecar image is destructive and a mis-tap
+                    -- on slow e-ink is easy; confirm before removing.
                     local ConfirmBox = require("ui/widget/confirmbox")
                     UIManager:show(ConfirmBox:new{
                         text = self.loc:t("img_remove_confirm")
                             or "Remove the attached image?",
                         ok_text = self.loc:t("img_remove") or "Remove Image",
-                        icon = false,
                         ok_callback = function()
                             self:_removeEntityImage(entity, entity_type)
                         end,
@@ -5981,7 +5990,9 @@ end
 -- Insert the "Search Images" attach button on its own row just above the final
 -- Close row, but only when no image is attached yet. Once an image exists,
 -- management moves to the thumbnail tap-menu (see _showImageActionMenu), keeping
--- the card clean.
+-- the card clean. The button stays visible with no provider key: it is the only
+-- affordance the feature has, and showImageAttachFlow tells the user where to
+-- add a key. Hiding it would make image search vanish with no explanation.
 function M:_addImageButton(buttons, entity, entity_type)
     if self:_entityImagePath(entity) ~= nil then return end
     -- #buttons is the Close row; insert before it so Close stays last.
@@ -5989,7 +6000,11 @@ function M:_addImageButton(buttons, entity, entity_type)
         {
             text = self.loc:t("img_attach_button") or "Search Images",
             callback = function()
-                if self.active_details_dialog then
+                -- Close the card only when a search will really start. With no
+                -- key the flow just shows a notice, so closing first would
+                -- destroy the card the user was reading and put nothing in its
+                -- place.
+                if self:_hasImageSearchKey() and self.active_details_dialog then
                     UIManager:close(self.active_details_dialog)
                     self.active_details_dialog = nil
                 end
@@ -6118,8 +6133,23 @@ function M:_bookTitleForImage()
     return nil
 end
 
+-- Notice shown when no image-search provider has a key. Names where to add one.
+function M:_showNoImageKeyNotice()
+    UIManager:show(InfoMessage:new{
+        text = self.loc:t("img_no_key")
+            or "Add an image search key in the Image Search settings first.",
+        timeout = 5,
+    })
+end
+
 function M:showImageAttachFlow(entity, entity_type)
     if not entity then return end
+    -- Every provider needs a key. Check first, so the user is not asked for a
+    -- search term and then refused.
+    if not self:_hasImageSearchKey() then
+        self:_showNoImageKeyNotice()
+        return
+    end
     local InputDialog = require("ui/widget/inputdialog")
     local prefill = tostring(entity.name or "")
     if prefill ~= "" and self:_isFictionForImage() then
@@ -6158,13 +6188,34 @@ end
 -- Run the search (in a dismissable subprocess when Trapper is available).
 function M:_runImageSearch(entity, entity_type, query)
     local ImageSearch = require(plugin_path .. "xray_imagesearch")
-    -- Tavily key drives the primary provider; empty means DuckDuckGo (no key).
-    local tavily_key = (self.ai_helper and self.ai_helper.tavily_api_key) or ""
+    -- Provider order is SerpApi, then Brave, then Tavily, unless the user
+    -- picked one in the settings, which moves that provider to the front.
+    -- Each is skipped when its key is empty.
+    local keys = self:_imageSearchKeys()
+    local pick = self:_imageSearchProviderSetting()
+    -- The provider the user expects to serve this search, so the code below can
+    -- tell whether it fell back to a lower-priority one. Nil means no key at
+    -- all, and every provider needs one, so there is nothing to search with.
+    local preferred = ImageSearch.preferredProvider(keys, pick)
+    if not preferred then
+        self:_showNoImageKeyNotice()
+        return
+    end
     local tmp_dir = ImageSearch.getTempDir()
 
     local function finish(results, source, err)
         if not results then
-            local msg = self.loc:t("img_error", tostring(err or "unknown")) or ("Search failed: " .. tostring(err))
+            -- ERR_NO_KEY cannot reach here: _runImageSearch returned above when
+            -- no key was set. Every other error is a provider string and stays
+            -- inside the generic wrapper.
+            local detail = tostring(err or "unknown")
+            -- Name the provider that failed. After a fallback the failure can
+            -- come from a lower provider than the one the user expects, and
+            -- a bare "Unauthorized" would point them at the wrong key.
+            if source then
+                detail = (ImageSearch.brandFor(source) or source) .. ": " .. detail
+            end
+            local msg = self.loc:t("img_error", detail) or ("Search failed: " .. detail)
             UIManager:show(InfoMessage:new{ text = msg, timeout = 4 })
             return
         end
@@ -6172,13 +6223,15 @@ function M:_runImageSearch(entity, entity_type, query)
             UIManager:show(InfoMessage:new{ text = self.loc:t("img_no_results") or "No images found.", timeout = 3 })
             return
         end
-        -- A configured Tavily key that came back as DuckDuckGo means Tavily
-        -- failed or was empty and the search fell back. Tell the user, so a
-        -- broken paid key does not look like it is silently working.
-        if source == "duckduckgo" and #tavily_key > 0 then
+        -- A source other than the user's top configured provider means that
+        -- provider failed or came back empty and the search fell back. Tell the
+        -- user, so a broken paid key does not look like it is silently working.
+        if preferred and source and source ~= preferred then
+            local want = ImageSearch.brandFor(preferred) or preferred
+            local got = ImageSearch.brandFor(source) or source
             UIManager:show(InfoMessage:new{
-                text = self.loc:t("img_tavily_fallback")
-                    or "Tavily unavailable. Showing DuckDuckGo results.",
+                text = self.loc:t("img_provider_fallback", want, got)
+                    or (want .. " unavailable. Showing " .. got .. " results."),
                 timeout = 3,
             })
         end
@@ -6192,7 +6245,7 @@ function M:_runImageSearch(entity, entity_type, query)
             UIManager:show(progress)
             UIManager:forceRePaint()
             local completed, results, source, err = Trapper:dismissableRunInSubprocess(function()
-                return ImageSearch.searchAndFetchThumbs(query, tavily_key, tmp_dir)
+                return ImageSearch.searchAndFetchThumbs(query, keys, tmp_dir, pick)
             end, progress)
             UIManager:close(progress)
             if not completed then return end
@@ -6202,12 +6255,17 @@ function M:_runImageSearch(entity, entity_type, query)
         -- Best-effort fallback: Trapper is effectively always present in KOReader.
         -- Without it, the thumbnail downloads run on the UI thread with no cancel
         -- (a brief freeze on slow e-ink). Acceptable only as a degraded path.
-        local results, source, err = ImageSearch.searchAndFetchThumbs(query, tavily_key, tmp_dir)
+        local results, source, err = ImageSearch.searchAndFetchThumbs(query, keys, tmp_dir, pick)
         finish(results, source, err)
     end
 end
 
 -- Show search results one at a time with Previous/Next/Use This Image.
+-- Thumbnails arrive one page at a time: the search brings the first
+-- ImageSearch.THUMB_PAGE, and the last loaded entry offers "Show more images",
+-- which fetches the next page in a cancellable subprocess. Loaded thumbnails
+-- stay on disk, so Previous walks back across pages with no network. The very
+-- last entry offers a jump back to the first.
 function M:_showImageCandidates(entity, entity_type, results, source)
     local ImageSearch = require(plugin_path .. "xray_imagesearch")
     local dialog_width = math.floor(math.min(Screen:getWidth(), Screen:getHeight()) * 0.9)
@@ -6217,10 +6275,50 @@ function M:_showImageCandidates(entity, entity_type, results, source)
     local content_width = dialog_width - dialog_hpadding
     local preview_edge = math.floor(math.min(Screen:getWidth(), Screen:getHeight()) * 0.6)
     local total = #results
+    -- Index of the last entry whose thumbnail has been fetched (or attempted).
+    -- Entries past it exist but are not shown until the next page is loaded.
+    local page = ImageSearch.THUMB_PAGE or total
+    local loaded = math.min(page, total)
+    local tmp_dir = ImageSearch.getTempDir()
+    local render
 
-    local function render(index)
+    -- Fetch the next page of thumbnails, then show its first entry. On cancel,
+    -- reopen the entry the user was on.
+    local function loadMore(index)
+        local first = loaded + 1
+        local last = math.min(loaded + page, total)
+        local function apply(paths)
+            for i, p in pairs(paths or {}) do
+                if results[i] then results[i].local_thumb = p end
+            end
+            loaded = last
+            render(first)
+        end
+        local ok_tr, Trapper = pcall(require, "ui/trapper")
+        if ok_tr and Trapper and Trapper.wrap then
+            Trapper:wrap(function()
+                local progress = InfoMessage:new{ text = self.loc:t("img_loading_more") or "Loading more images..." }
+                UIManager:show(progress)
+                UIManager:forceRePaint()
+                local completed, paths = Trapper:dismissableRunInSubprocess(function()
+                    return ImageSearch.fetchThumbPage(results, first, last, tmp_dir)
+                end, progress)
+                UIManager:close(progress)
+                if not completed then
+                    render(index)
+                    return
+                end
+                apply(paths)
+            end)
+        else
+            -- Degraded path (Trapper absent): downloads block the UI thread.
+            apply(ImageSearch.fetchThumbPage(results, first, last, tmp_dir))
+        end
+    end
+
+    render = function(index)
         if index < 1 then index = 1 end
-        if index > total then index = total end
+        if index > loaded then index = loaded end
         local cand = results[index]
 
         local vg_components = { align = "center" }
@@ -6235,18 +6333,13 @@ function M:_showImageCandidates(entity, entity_type, results, source)
             })
         end
         table.insert(vg_components, VerticalSpan:new{ width = (Size.padding and Size.padding.default) or 8 })
-        -- Truncate on a character boundary (UTF-8 safe), not a byte offset, so a
-        -- non-Latin title does not end in a broken glyph.
-        local caption, caption_cut = _getTruncatedText(tostring(cand.title or ""), 90)
-        if caption_cut then caption = caption .. "..." end
-        local source_brand = (source == "tavily" and "Tavily")
-            or (source == "duckduckgo" and "DuckDuckGo") or nil
+        -- Provider captions are not kept, so the label is only the position in
+        -- the result list plus the provider that served it.
+        local source_brand = ImageSearch.brandFor(source)
         local source_label = source_brand
             and (self.loc:t("img_source_suffix", source_brand) or ("  (" .. source_brand .. ")"))
             or ""
-        caption = self.loc:t("img_result_count", index, total)
-            .. source_label
-            .. (#caption > 0 and ("\n" .. caption) or "")
+        local caption = self.loc:t("img_result_count", index, total) .. source_label
         table.insert(vg_components, TextBoxWidget:new{
             text = caption,
             face = Font:getFace("cfont", 14),
@@ -6265,12 +6358,30 @@ function M:_showImageCandidates(entity, entity_type, results, source)
                 end,
             })
         end
-        if index < total then
+        if index < loaded then
             table.insert(nav_row, {
                 text = self.loc:t("img_next") or "Next",
                 callback = function()
                     if self._img_candidates_dialog then UIManager:close(self._img_candidates_dialog) end
                     render(index + 1)
+                end,
+            })
+        elseif loaded < total then
+            -- Last loaded entry, more results exist: fetch the next page.
+            table.insert(nav_row, {
+                text = self.loc:t("img_show_more") or "Show more images",
+                callback = function()
+                    if self._img_candidates_dialog then UIManager:close(self._img_candidates_dialog) end
+                    loadMore(index)
+                end,
+            })
+        elseif total > 1 then
+            -- Very last entry: offer a jump back to the start.
+            table.insert(nav_row, {
+                text = self.loc:t("img_show_first") or "Back to first image",
+                callback = function()
+                    if self._img_candidates_dialog then UIManager:close(self._img_candidates_dialog) end
+                    render(1)
                 end,
             })
         end
@@ -6396,29 +6507,134 @@ function M:_attachChosenImage(entity, entity_type, full_url)
     end
 end
 
--- Image-search settings submenu. DuckDuckGo works with no key; an optional
--- Tavily key switches the primary provider to Tavily (better relevance).
-function M:getImageSearchKeySubMenu()
-    local function keyStatus()
-        local k = (self.ai_helper and self.ai_helper.tavily_api_key) or ""
-        local v = (#k > 0) and "tvly-..." or "(None)"
-        return (self.loc:t("img_key_title") or "Tavily API Key") .. ": " .. v
+-- Image-search providers, in the order xray_imagesearch tries them. The list
+-- lives in xray_imagesearch.PROVIDERS and is read from there, so the UI and the
+-- search module cannot drift on order, provider names, or config field names.
+-- Every call site below runs from a tap callback, never during a card draw, so
+-- the require costs nothing on e-ink.
+local function _imageSearchProviders()
+    return require(plugin_path .. "xray_imagesearch").PROVIDERS
+end
+
+-- Collect the configured image-search keys in the shape xray_imagesearch wants.
+function M:_imageSearchKeys()
+    local keys = {}
+    for _, p in ipairs(_imageSearchProviders()) do
+        keys[p.name] = (self.ai_helper and self.ai_helper[p.config_field]) or ""
     end
-    return {
+    return keys
+end
+
+-- True when at least one provider key is set. Every provider needs a key, so a
+-- false here means image search cannot run and the user must add a key first.
+-- Same test the search itself applies, so the two cannot disagree.
+function M:_hasImageSearchKey()
+    local ImageSearch = require(plugin_path .. "xray_imagesearch")
+    return ImageSearch.preferredProvider(self:_imageSearchKeys()) ~= nil
+end
+
+-- The user's provider pick from the settings: a provider name, or "auto" for
+-- the fixed PROVIDERS order. An unknown stored value (a provider removed in an
+-- update) reads as "auto", so a stale setting can never turn image search off.
+function M:_imageSearchProviderSetting()
+    local ImageSearch = require(plugin_path .. "xray_imagesearch")
+    local v = self.ai_helper and self.ai_helper.settings
+        and self.ai_helper.settings.image_search_provider
+    if ImageSearch.isProviderName(v) then return v end
+    return ImageSearch.AUTO_PROVIDER
+end
+
+-- Menu label for the current provider pick: the brand, or the Auto label.
+function M:_imageSearchProviderLabel()
+    local ImageSearch = require(plugin_path .. "xray_imagesearch")
+    local pick = self:_imageSearchProviderSetting()
+    if pick == ImageSearch.AUTO_PROVIDER then
+        return self.loc:t("img_provider_auto") or "Auto (first key in order)"
+    end
+    return ImageSearch.brandFor(pick) or pick
+end
+
+-- Settings card to pick the image-search provider. "Auto" is the fixed order;
+-- a named provider goes first and the others stay behind it as fallbacks. A
+-- provider with no key is listed but marked, since the search skips it.
+function M:showImageProviderSettings()
+    local ImageSearch = require(plugin_path .. "xray_imagesearch")
+    local options = {
         {
-            -- Non-tappable hint explaining the no-key default.
-            text = self.loc:t("img_provider_hint")
-                or "Default: DuckDuckGo (no key needed).",
-            enabled = false,
-        },
-        {
-            text = keyStatus(), text_func = keyStatus, keep_menu_open = true,
-            callback = function()
-                self:_promptImageSearchValue("tavily_api_key",
-                    self.loc:t("img_key_title") or "Tavily API Key")
-            end,
+            text = self.loc:t("img_provider_auto") or "Auto (first key in order)",
+            value = ImageSearch.AUTO_PROVIDER,
         },
     }
+    -- "%s (no key)": the brand goes in the placeholder. A translation that
+    -- lost the placeholder would make every keyless row read the same, so in
+    -- that case the brand is put in front of the text instead.
+    local no_key_fmt = self.loc:t("img_provider_no_key") or "%s (no key)"
+    for _, p in ipairs(_imageSearchProviders()) do
+        local k = self.ai_helper and self.ai_helper[p.config_field]
+        local has_key = type(k) == "string" and #k > 0
+        local label = p.brand
+        if not has_key then
+            label = no_key_fmt:find("%%s") and no_key_fmt:format(p.brand)
+                or (p.brand .. " " .. no_key_fmt)
+        end
+        table.insert(options, { text = label, value = p.name })
+    end
+    XRaySettingsCard.show(self, {
+        title = self.loc:t("img_provider_setting") or "Image Search Provider",
+        description = self.loc:t("img_provider_desc")
+            or "Select which provider runs an image search:",
+        options = options,
+        get_current_func = function() return self:_imageSearchProviderSetting() end,
+        save_func = function(val)
+            if self.ai_helper then
+                self.ai_helper:saveSettings({ image_search_provider = val })
+            end
+            UIManager:setDirty(nil, "ui")
+        end,
+        about_text = self.loc:t("img_provider_about")
+            or "[B]Auto[/B] uses the first provider that has a key, in the order SerpApi, Brave Search, Tavily.\n\nA chosen provider is tried first. When it fails or finds nothing, the others are tried in that same order, and a notice names the provider that answered.\n\nA provider with no key is skipped.",
+    })
+end
+
+-- Image-search settings submenu: the provider pick, then one key row per
+-- provider in priority order. At least one key is required for image search
+-- to work at all.
+function M:getImageSearchKeySubMenu()
+    local function pickStatus()
+        return (self.loc:t("img_provider_setting") or "Image Search Provider")
+            .. ": " .. self:_imageSearchProviderLabel()
+    end
+    local items = {
+        {
+            text = pickStatus(), text_func = pickStatus, keep_menu_open = true,
+            callback = function() self:showImageProviderSettings() end,
+            separator = true,
+        },
+        {
+            -- Non-tappable hint explaining the order and that one key is required.
+            text = self.loc:t("img_provider_hint")
+                or "Tried in order. At least one key is required.",
+            enabled = false,
+        },
+    }
+    for _, p in ipairs(_imageSearchProviders()) do
+        local title = self.loc:t(p.loc_key) or (p.brand .. " Key")
+        local function keyStatus()
+            local k = (self.ai_helper and self.ai_helper[p.config_field]) or ""
+            -- Show only the last 4 characters. SerpApi keys have no vendor
+            -- prefix, so a leading prefix would be pure secret material. A key
+            -- of 4 characters or fewer would print whole, so show only "...".
+            local tail = (#k > 4) and ("..." .. k:sub(-4)) or "..."
+            return title .. ": " .. ((#k > 0) and tail or "(None)")
+        end
+        table.insert(items, {
+            text = keyStatus(), text_func = keyStatus, keep_menu_open = true,
+            callback = function()
+                self:_promptImageSearchValue(p.config_field, title)
+            end,
+        })
+    end
+    return items
 end
 
 function M:_promptImageSearchValue(config_key, title)

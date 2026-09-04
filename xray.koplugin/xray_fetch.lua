@@ -1348,7 +1348,7 @@ function M:continueWithFetch(reading_percent, is_update, last_fetch_page, is_sil
         local ButtonDialog = require("ui/widget/buttondialog")
         local fetch_text = is_update
             and (self.loc:t("updating_ai", self.ai_provider or "AI") or "Updating X-Ray...")
-            or  (self.loc:t("fetching_ai",  self.ai_provider or "AI") or "Fetching X-Ray...")
+            or  (self.loc:t("fetching_ai",  self.ai_provider or "AI") or ("Fetching from %s..."):format(self.ai_provider or "AI"))
         wait_msg = ButtonDialog:new{
             title = fetch_text,
             text  = title .. "\n\n" .. (self.loc:t("fetching_wait") or "This may take a moment.\nTap Cancel to stop."),
@@ -2518,7 +2518,7 @@ function M:fetchAuthorInfo()
     end
 
     wait_msg = ButtonDialog:new{
-        title = (self.loc:t("fetching_author", "AI") or "Fetching Author...") .. "\n\n" .. title .. " - " .. author,
+        title = (self.loc:t("fetching_author", "AI") or ("Fetching author info from %s..."):format("AI")) .. "\n\n" .. title .. " - " .. author,
         buttons = {{{
             text = self.loc:t("cancel") or "Cancel",
             callback = function()

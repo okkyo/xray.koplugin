@@ -1335,7 +1335,7 @@ function AIHelper:loadConfig()
         "custom1_api_key", "custom1_endpoint", "custom1_model", "custom1_format",
         "custom2_api_key", "custom2_endpoint", "custom2_model", "custom2_format",
         "gemini_primary_model", "gemini_secondary_model", "chatgpt_model", "default_provider",
-        "tavily_api_key"
+        "serpapi_api_key", "brave_api_key", "tavily_api_key"
     }
 
     -- 1. Restore missing / empty keys in config file if present in persistent stored config (e.g. after plugin update)
@@ -1377,7 +1377,10 @@ function AIHelper:loadConfig()
         if config.deepseek_api_key then self.providers.deepseek.api_key = config.deepseek_api_key; self.config_keys.deepseek = config.deepseek_api_key end
         if config.claude_api_key then self.providers.claude.api_key = config.claude_api_key; self.config_keys.claude = config.claude_api_key end
         if config.default_provider then self.default_provider = config.default_provider end
-        -- Image search: optional Tavily key. Empty means DuckDuckGo (no key).
+        -- Image search keys. Tried in order: SerpApi, then Brave, then Tavily.
+        -- Each needs a key; with all three empty, image search cannot run.
+        self.serpapi_api_key = config.serpapi_api_key or ""
+        self.brave_api_key = config.brave_api_key or ""
         self.tavily_api_key = config.tavily_api_key or ""
 
         for _, slot in ipairs({"custom1", "custom2"}) do
@@ -2827,6 +2830,12 @@ function AIHelper:clearAllAPIKeys()
         custom2_endpoint = "",
         custom2_model = "",
         custom2_format = "",
+        -- Image search keys live in the same file. Without these the keys stay
+        -- on disk and loadConfig copies them straight back into the backup
+        -- store, so "clear all keys" would leave them active.
+        serpapi_api_key = "",
+        brave_api_key = "",
+        tavily_api_key = "",
     }
     self:writeConfigToFile(empty_config)
 

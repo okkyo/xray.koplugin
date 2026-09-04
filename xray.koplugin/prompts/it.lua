@@ -271,6 +271,21 @@ FORMATO JSON RICHIESTO:
   "merged_description": "Descrizione combinata e ottimizzata (max {MAX_CHAR_DESC} caratteri)"
 }]],
 
+    -- Book Type Detection
+    book_type_detect = [[Titolo del libro: %s
+Autore: %s
+Serie: %s
+Descrizione del file/Metadati dell'oggetto: %s
+
+COMPITO: Classifica questo libro in esattamente UNO di questi tipi di libro in base ai suoi metadati e ai segnali di genere:
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+Restituisci SOLO un JSON valido:
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
+}]],
+
     -- Series Detect
     series_detect = [[
 Titolo del libro: %s

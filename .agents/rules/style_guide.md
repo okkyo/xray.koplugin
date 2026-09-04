@@ -246,7 +246,7 @@ Welcome cards (for onboarding users without configured keys) and feature announc
 ## 7. Typography & Copywriting Rules
 
 - **No spaces around slashes (`/`)**: Never place spaces around forward slashes in UI text, labels, menu items, dialog headers, or button titles. Write `Phone/PC`, `and/or`, `DeepSeek/Claude`, `Scan/Rescan`, `Fetch/Refresh`, `Unknown/Other`, NOT `Phone / PC`, `DeepSeek / Claude`, or `Fetch / Refresh`.
-- **No default/theme icons on ConfirmBox**: Always explicitly specify `icon = false` when instantiating `ConfirmBox:new{ ... }` to prevent KOReader default icons or third-party theme icon packs (such as ZenUI) from injecting unwanted icons into confirmation dialogs.
+- **Never pass `icon = false` to ConfirmBox**: KOReader's `ConfirmBox` has no icon-off switch. It always builds an `IconWidget` from `icon` and concatenates it into a file path, so a boolean crashes the reader (`iconwidget.lua: attempt to concatenate field 'icon'`, verified on v2026.07.1). Leave `icon` unset and accept the default question icon. When a dialog must have no icon at all, use a `ButtonDialog` with a `title` instead.
 
 
 

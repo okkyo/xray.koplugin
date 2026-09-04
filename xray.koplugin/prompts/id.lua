@@ -70,7 +70,7 @@ Langkah 1. Lihat HANYA blok "CHAPTER SAMPLES". Identifikasi bab-bab naratif.
 Langkah 2. KECUALIKAN semua materi depan dan belakang non-naratif (misalnya, Sampul, Halaman Judul, Hak Cipta, Daftar Isi, Dedikasi, Ucapan Terima Kasih, Juga Oleh).
 Langkah 3. Untuk setiap bab naratif, dimulai dari yang pertama, buat TEPAT SATU objek acara di array `timeline`.
 Langkah 4. Bidang `chapter` HARUS sama persis dengan header bab dalam sampel. (Petakan secara ketat dalam urutan berurutan).
-Langkah 5. Ringkas bab spesifik tersebut di bidang `event` {TIMELINE_DETAIL_GUIDANCE} (MAKS {MAX_TIMELINE_EVENT} karakter). JANGAN kelompokkan bab.
+Langkah 5. Ringkas bab spesifik tersebut di bidang `event`. {TIMELINE_DETAIL_GUIDANCE} Tulis antara {MIN_TIMELINE_EVENT} dan {MAX_TIMELINE_EVENT} karakter. JANGAN menulis ringkasan yang lebih pendek kecuali bab tersebut hampir tidak memiliki konten. JANGAN kelompokkan bab.
 Langkah 6. BEBAS SPOILER: Berhenti tepat di tanda %d%%. Jangan sertakan peristiwa setelah kemajuan ini.
 
 ALGORITMA UNTUK KARAKTER & TOKOH SEJARAH:
@@ -260,6 +260,21 @@ Deskripsi Sekunder: %s
 FORMAT JSON YANG DIPERLUKAN:
 {
   "merged_description": "Deskripsi gabungan dan terpoles (Maks {MAX_CHAR_DESC} karakter)"
+}]],
+
+    -- Book Type Detection
+    book_type_detect = [[Judul Buku: %s
+Penulis: %s
+Seri: %s
+Deskripsi File/Metadata Subjek: %s
+
+TUGAS: Klasifikasikan buku ini ke dalam TEPAT SATU dari jenis buku berikut berdasarkan metadata dan sinyal genrenya:
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+Kembalikan HANYA JSON yang valid:
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
 }]],
 
     -- Multi-Book Series Context Prompts

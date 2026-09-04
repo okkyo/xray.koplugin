@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Language-Team: Ru\n"
+"Language-Team: Русский\n"
 "Language: ru\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -197,7 +197,7 @@ msgstr "Вставить"
 msgid "cache_cleared"
 msgstr "Кэш очищен!\n\nТеперь вы можете получить новые данные:\nМеню → X-Ray → Получить данные ИИ"
 
-# en-hash: 2e361c4db7a5480c21b02780ed4e9e0b
+# en-hash: 1edc355371d87a94d024eebfed9f8815
 msgid "cache_save_failed"
 msgstr "Не удалось сохранить кэш"
 
@@ -248,10 +248,6 @@ msgstr "Вы уверены, что хотите удалить все наст�
 # en-hash: dd6eee404e54eafd92e56d09cb4848f3
 msgid "confirm_clear_single_key"
 msgstr "Удалить настроенный ключ API для %s?"
-
-# en-hash: 9cfefed8fb9497baa5cd519d7d2bb5d7
-msgid "current_language"
-msgstr "ru"
 
 # en-hash: 97b9ad7336ac722cf16044cf603bfe10
 msgid "current_mode"
@@ -483,7 +479,7 @@ msgstr "Данные успешно получены"
 
 # en-hash: 572e520194e629b3b906bb5b3e5bce2d
 msgid "fetching_ai"
-msgstr "Получение X-Ray..."
+msgstr "Получение из %s..."
 
 # en-hash: 2b05ded75b73f463504a742fe3492e55
 msgid "fetching_author"
@@ -533,13 +529,33 @@ msgstr "Загрузка изображения..."
 msgid "img_error"
 msgstr "Ошибка поиска: %s"
 
+# en-hash: fe63191987f62b9e4806e376671ed335
+msgid "img_extract_failed"
+msgstr "Не удалось извлечь файл изображения."
+
+# en-hash: a557254d6ea7fb31d1776d65e97f9a43
+msgid "img_key_brave"
+msgstr "Ключ Brave Search"
+
 # en-hash: 2bcf4d0012d8fec18f5b97a1f307c958
 msgid "img_key_saved"
 msgstr "Сохранено."
 
+# en-hash: 6fa56c2b1cb703d54c4b8b0e4440cf16
+msgid "img_key_serpapi"
+msgstr "Ключ SerpApi"
+
 # en-hash: 6ad9a851e6b0ab3cb2f3b75e87cd234a
-msgid "img_key_title"
+msgid "img_key_tavily"
 msgstr "Ключ API Tavily"
+
+# en-hash: 6c625a44b20a366fb63ef60e096e759a
+msgid "img_loading_more"
+msgstr "Загрузка дополнительных изображений..."
+
+# en-hash: fd2941cfb27f0d8ab5a606e86d757e8a
+msgid "img_minimized_hint"
+msgstr "Свернуто «%s». Откройте «Изображения и карты» повторно, чтобы продолжить."
 
 # en-hash: d3da97e2d9aee5c8fbe03156ad051c99
 msgid "img_more"
@@ -549,6 +565,22 @@ msgstr "Ещё"
 msgid "img_next"
 msgstr "След."
 
+# en-hash: 30936c8b483b8b104a4ad7821ce2262b
+msgid "img_no_favorites"
+msgstr "Избранных изображений пока нет.\n\nИспользуйте меню ⋮ на любом изображении, чтобы добавить его в избранное."
+
+# en-hash: c3e4c8dd2122260b0c4e14d6509e62ca
+msgid "img_no_hidden"
+msgstr "Нет скрытых изображений.\n\nИспользуйте меню ⋮ на любом изображении в галерее, чтобы скрыть декоративные иллюстрации или буквицы."
+
+# en-hash: 95407637295cd7c30378be19be6e36cb
+msgid "img_no_images"
+msgstr "Изображения для этой вкладки/фильтра не найдены.\n\nИзвлечение или сканирование изображений из книги..."
+
+# en-hash: a0c513c130fac7b4559f145cd9352091
+msgid "img_no_key"
+msgstr "Сначала добавьте ключ поиска изображений в настройках поиска изображений."
+
 # en-hash: b79b9ffffededdcf093dc9f81e0a4412
 msgid "img_no_preview"
 msgstr "(Предпросмотр недоступен)"
@@ -556,6 +588,10 @@ msgstr "(Предпросмотр недоступен)"
 # en-hash: 5db1e02d891c15e428428c0e6e83c363
 msgid "img_no_results"
 msgstr "Изображения не найдены."
+
+# en-hash: 74ab2b6d760dc64ea26012a4fca84490
+msgid "img_no_series"
+msgstr "Нет сохраненных материалов серии.\n\nИспользуйте меню ⋮ на любой карте, чтобы сохранить ее в справочных материалах серии."
 
 # en-hash: dd1f775e443ff3b9a89270713580a51b
 msgid "img_prev"
@@ -565,9 +601,33 @@ msgstr "Пред."
 msgid "img_processing"
 msgstr "Обработка изображения..."
 
-# en-hash: 67a68190ce74fbbee740d8c7d03e360c
+# en-hash: a2c65774cce0bdcd3ad1e08086e2ea40
+msgid "img_provider_about"
+msgstr "[B]Авто[/B] использует первого провайдера с ключом в порядке: SerpApi, Brave Search, Tavily.\n\nСначала проверяется выбранный провайдер. Если он не срабатывает или ничего не находит, остальные проверяются в том же порядке, а в уведомлении указывается ответивший провайдер.\n\nПровайдер без ключа пропускается."
+
+# en-hash: ae0482189aa02d8b159c077edf8ca8c6
+msgid "img_provider_auto"
+msgstr "Авто (первый ключ по порядку)"
+
+# en-hash: 56039cb24bf2fecba0a4aa7947d0e720
+msgid "img_provider_desc"
+msgstr "Выберите провайдера для поиска изображений:"
+
+# en-hash: 11943975b2ef7d14f6c41bfeafc3a795
+msgid "img_provider_fallback"
+msgstr "%s недоступно. Показаны результаты %s."
+
+# en-hash: b82a86548d797c4682913295fc676ac9
 msgid "img_provider_hint"
-msgstr "По умолчанию: DuckDuckGo (ключ не требуется)."
+msgstr "Проверяются по порядку. Требуется хотя бы один ключ."
+
+# en-hash: edc912fec23be8b7c8b6d318899d8d0d
+msgid "img_provider_no_key"
+msgstr "%s (нет ключа)"
+
+# en-hash: 01fd162e98f5553ab970a30e3a0efd2a
+msgid "img_provider_setting"
+msgstr "Провайдер поиска изображений"
 
 # en-hash: fc35ec973f5b3a16f0d4b009834f39a6
 msgid "img_remove"
@@ -581,9 +641,17 @@ msgstr "Удалить прикрепленное изображение?"
 msgid "img_removed"
 msgstr "Изображение удалено."
 
+# en-hash: 2bea7b6d66811b50767c7b22f81fb2c2
+msgid "img_rename_title"
+msgstr "Изменить метку изображения"
+
 # en-hash: 6fe2ab43d39c389ef5f665a86121f95c
 msgid "img_result_count"
 msgstr "Результат %1$d из %2$d"
+
+# en-hash: 393c3f5ea8ad35c02691d507bdbb31b0
+msgid "img_reveal"
+msgstr "Показать"
 
 # en-hash: c3612962736fa980b8a853fbc9fa981c
 msgid "img_saved"
@@ -605,13 +673,41 @@ msgstr "Поиск изображения"
 msgid "img_searching"
 msgstr "Поиск изображений..."
 
+# en-hash: e14cbcb87dce9e2354fdf7db62b93a9c
+msgid "img_show_first"
+msgstr "Вернуться к первому изображению"
+
+# en-hash: e0bcbbbd7e4041eb19382d32dd0c47a6
+msgid "img_show_more"
+msgstr "Показать больше изображений"
+
 # en-hash: 772eeb0a8a4e1193a21b9d2631e4a508
 msgid "img_source_suffix"
 msgstr "  (%s)"
 
-# en-hash: e3cea90d4e14007d88412e5a300c97ff
-msgid "img_tavily_fallback"
-msgstr "Tavily недоступен. Показаны результаты DuckDuckGo."
+# en-hash: 646ef4f9024779f1a04ee945deffb8d5
+msgid "img_spoiler_confirm"
+msgstr "Это изображение находится на странице %d (дальше вашего текущего прогресса). Показать изображение?"
+
+# en-hash: d0f2e5376298c880665077b565ffd7dd
+msgid "img_spoiler_locked"
+msgstr "Заблокировано"
+
+# en-hash: b1c94ca2fbc3e78fc30069c8d0f01680
+msgid "img_tab_all"
+msgstr "Все"
+
+# en-hash: d78986947356ddd37b43d57df289dee9
+msgid "img_tab_favorites"
+msgstr "Избранное"
+
+# en-hash: 9d948e617b083222afc868add2f50ec2
+msgid "img_tab_series"
+msgstr "Серии"
+
+# en-hash: be53a0541a6d36f6ecb879fa2c584b08
+msgid "img_untitled"
+msgstr "Изображение"
 
 # en-hash: c54c117a6b6dfeed9d6276e093a6aa15
 msgid "img_use_this"
@@ -620,49 +716,6 @@ msgstr "Использовать это"
 # en-hash: c4f1dea83d1eb17400190339311b3482
 msgid "img_view"
 msgstr "Просмотреть изображение"
-
-msgid "img_extract_failed"
-msgstr "Не удалось извлечь файл изображения."
-
-msgid "img_minimized_hint"
-msgstr "Подсказка о свернутом изображении"
-
-msgid "img_no_favorites"
-msgstr "Избранных изображений пока нет.\n\nИспользуйте меню ⋮ на любом изображении, чтобы добавить его в избранное."
-
-msgid "img_no_hidden"
-msgstr "Нет скрытых изображений.\n\nИспользуйте меню ⋮ на любом изображении в галерее, чтобы скрыть декоративные иллюстрации или буквицы."
-
-msgid "img_no_images"
-msgstr "Изображения для этой вкладки/фильтра не найдены.\n\nИзвлечение или сканирование изображений из книги..."
-
-msgid "img_no_series"
-msgstr "Нет сохраненных материалов серии.\n\nИспользуйте меню ⋮ на любой карте, чтобы сохранить ее в справочных материалах серии."
-
-msgid "img_rename_title"
-msgstr "Изменить метку изображения"
-
-msgid "img_reveal"
-msgstr "Показать"
-
-msgid "img_spoiler_confirm"
-msgstr "Это изображение находится на странице %d (дальше вашего текущего прогресса). Показать изображение?"
-
-msgid "img_spoiler_locked"
-msgstr "Заблокировано"
-
-msgid "img_tab_all"
-msgstr "Все"
-
-msgid "img_tab_favorites"
-msgstr "Избранное"
-
-msgid "img_tab_series"
-msgstr "Серии"
-
-msgid "img_untitled"
-msgstr "Изображение"
-
 
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
@@ -956,9 +1009,9 @@ msgstr "Исторические личности"
 msgid "menu_image_search"
 msgstr "Поиск картинок"
 
+# en-hash: 073096c9e6fbe0599a7c64e0e7a665cb
 msgid "menu_images"
 msgstr "Изображения и карты"
-
 
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
@@ -1224,10 +1277,6 @@ msgstr "Нет точного совпадения для «%s». Нажмите
 msgid "paste_clipboard_confirm"
 msgstr "Использовать ключ API из буфера обмена для %s?"
 
-# en-hash: 607481fc96e754b33650eb171aac9447
-msgid "path"
-msgstr "plugins/xray.koplugin"
-
 # en-hash: 046763a0d64321194477604b7751c8e4
 msgid "pending_duplicates_prompt"
 msgstr "ИИ обнаружил %d потенциальных дубликатов с момента последнего сканирования. Проверить сейчас?"
@@ -1236,6 +1285,7 @@ msgstr "ИИ обнаружил %d потенциальных дубликато
 msgid "plugin_description"
 msgstr "Улучшите чтение с помощью анализа книг на базе ИИ, как в Kindle X-Ray!"
 
+# en-hash: 14230d11143a03f4330c6433d5032a9d
 msgid "prev"
 msgstr "Пред."
 
@@ -1379,7 +1429,7 @@ msgstr "Настройки спойлеров"
 msgid "stop"
 msgstr "Stop"
 
-# en-hash: d725036d492c380f06f4eb32f5704bc9
+# en-hash: d7c6deb856024d209d52d833b9f4c95d
 msgid "term_not_found"
 msgstr "Термин, соответствующий '%s', не найден"
 
@@ -1707,13 +1757,9 @@ msgstr "Установлена последняя версия X-Ray (%s)."
 msgid "updater_whats_new"
 msgstr "Что нового:"
 
-# en-hash: 362b2e695aa7299e20bb0d9ce320f58d
+# en-hash: 46667b51ced49ca8828f897cf83e89b8
 msgid "updating_ai"
 msgstr "Обновление данных X-Ray..."
-
-# en-hash: 0d1b08c34858921bc7c662b228acb7ba
-msgid "val"
-msgstr "???"
 
 # en-hash: 1739e3ae6d734407aef8af879665b8ee
 msgid "validate_keys_title"

@@ -42,7 +42,7 @@ A fejezetek kihagyásának vagy az események hallucinálásának elkerülése �
 2. lépés: ZÁRJON KI minden nem narratív előszót és utószót (pl. Borító, Címlap, Szerzői jogok, Tartalomjegyzék, Ajánlás, Köszönetnyilvánítás, Egyéb művek).
 3. lépés: Minden egyes narratív fejezethez, a legelsőtől kezdve, hozzon létre PONTOSAN EGY eseményobjektumot a `timeline` tömbben.
 4. lépés: A `chapter` mezőnek pontosan meg kell egyeznie a mintában szereplő fejezetcímmel. (Szigorúan egymás utáni sorrendben képezze le őket).
-5. lépés: Összegezze azt a konkrét fejezetet az `event` mezőben {TIMELINE_DETAIL_GUIDANCE} (MAX {MAX_TIMELINE_EVENT} karakter). NE csoportosítson fejezeteket.
+5. lépés: Összegezze azt a konkrét fejezetet az `event` mezőben. {TIMELINE_DETAIL_GUIDANCE} {MIN_TIMELINE_EVENT} és {MAX_TIMELINE_EVENT} karakter közötti hosszúságú legyen. NE írjon rövidebb összefoglalót, hacsak a fejezetnek nincs szinte semmi tartalma. NE csoportosítson fejezeteket.
 6. lépés: SPOILERMENTESSÉG: Álljon meg pontosan a(z) %d%%-os jelnél. Ne tartalmazzon eseményeket ezen olvasási haladás után.
 
 ALGORITMUS SZEREPLŐKHÖZ ÉS TÖRTÉNELMI ALAKOKHOZ:
@@ -200,6 +200,21 @@ Másodlagos leírás: %s
 ELVÁRT JSON FORMÁTUM:
 {
   "merged_description": "Összevont és csiszolt leírás (Max {MAX_CHAR_DESC} karakter)"
+}]],
+
+    -- Book Type Detection
+    book_type_detect = [[Könyv címe: %s
+Szerző: %s
+Sorozat: %s
+Fájlleírás / Tárgymutató metaadatok: %s
+
+FELADAT: Sorold be ezt a könyvet pontosan EGYbe az alábbi könyvtípusok közül a metaadatai és a műfaji jelek alapján:
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+Kizárólag érvényes JSON-t adj vissza:
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
 }]],
 
     -- Multi-Book Series Context Prompts

@@ -77,11 +77,23 @@ def check_translations():
                     matches = re.finditer(r'loc:t\([\"\']([^\"\']*)[\"\']', content)
                     for m in matches:
                         used_keys.add(m.group(1))
-                    # Find fallbacks in localization_xray.lua
+                    # Provider table fields read as loc:t(p.loc_key). Must stay
+                    # in step with LOC_FIELD_RE in tools/sync_translations.py.
+                    for m in re.finditer(r'\bloc_key\s*=\s*[\"\']([^\"\']+)[\"\']', content):
+                        used_keys.add(m.group(1))
+                    # Find fallbacks in localization_xray.lua.
+                    # Read the hardcoded fallback table only. Scanning the whole
+                    # file matched every `name = "value"` assignment in it and
+                    # invented keys out of module fields and locals (`path`,
+                    # `current_language`, `val`), which then read as missing in
+                    # every language. Must stay in step with the same block in
+                    # tools/sync_translations.py.
                     if 'localization_xray.lua' in file:
-                        fb_matches = re.finditer(r'(\w+)\s*=\s*\"', content)
-                        for m in fb_matches:
-                            used_keys.add(m.group(1))
+                        blk = re.search(r'local fallbacks = \{(.*?)\n\s*\}', content, re.DOTALL)
+                        if blk:
+                            fb_matches = re.finditer(r'(\w+)\s*=\s*\"', blk.group(1))
+                            for m in fb_matches:
+                                used_keys.add(m.group(1))
 
     print(f"Detected {len(used_keys)} keys in source code.")
 

@@ -1211,8 +1211,8 @@ function XRayPlugin:getSubMenuItems()
             },
             {
                 -- Image Search is not AI-related, so it sits beside the other
-                -- feature settings, not under the AI key menu. A Tavily key is
-                -- optional here (DuckDuckGo is the no-key default).
+                -- feature settings, not under the AI key menu. It needs at least
+                -- one of its own provider keys.
                 text = self.loc:t("menu_image_search") or "Image Search",
                 keep_menu_open = true,
                 sub_item_table_func = function() return self:getImageSearchKeySubMenu() end,

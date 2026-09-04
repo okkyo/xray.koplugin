@@ -122,7 +122,7 @@ Registering a new language touches three tables — two `LANGUAGE_NAMES` tables 
 - **UI must follow `.agents/rules/style_guide.md`** — double-border card nesting,
   `sc()`-scaled tokens from `xray_theme`, no raw emoji (e-ink renders them
   inconsistently), no spaces around slashes in copy (`Fetch/Refresh`), and
-  `icon = false` on every `ConfirmBox`.
+  never `icon = false` on a `ConfirmBox` (it crashes KOReader; see the style guide).
 - **Add tests for new logic** in `spec/`. The `spec/spec_helper.lua` mocks the
   KOReader environment (device, screen, `lfs`, docsettings); reuse those mocks.
 - **Release notes**: no emoji, end-user-friendly, not robotic — see

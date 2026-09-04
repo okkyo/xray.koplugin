@@ -274,6 +274,21 @@ AIの回答が途切れるのを防ぐため、用語の定義は{MAX_TERM_DEF}�
   "merged_description": "統合および推敲された説明（最大{MAX_CHAR_DESC}文字）"
 }]],
 
+    -- Book Type Detection
+    book_type_detect = [[書籍タイトル: %s
+著者: %s
+シリーズ: %s
+ファイルの説明/サブジェクトメタデータ: %s
+
+タスク: メタデータとジャンルのシグナルに基づいて、この書籍を次の書籍タイプのいずれか1つに正確に分類してください:
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+有効なJSONのみを返してください:
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
+}]],
+
     -- Series Detect
     series_detect = [[
 書籍タイトル: %s

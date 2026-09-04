@@ -41,7 +41,7 @@ return {
 步骤 2：排除所有非叙事性的前言和后记（例如：封面、扉页、版权页、目录、献词、致谢等）。
 步骤 3：针对每个叙事性章节，从第一章开始，在 `timeline` 数组中创建一个对应的事件对象。
 步骤 4：`chapter` 字段必须与样本中的章节标题完全匹配。（按顺序严格映射）。
-步骤 5：在 `event` 字段中总结该特定章节{TIMELINE_DETAIL_GUIDANCE} （最多 {MAX_TIMELINE_EVENT} 个字符）。不要合并章节。
+步骤 5：在 `event` 字段中总结该特定章节{TIMELINE_DETAIL_GUIDANCE} 字符数在 {MIN_TIMELINE_EVENT} 到 {MAX_TIMELINE_EVENT} 之间。除非该章节几乎没有内容，否则请勿缩短摘要。切勿合并章节。
 步骤 6：严禁剧透：严格停止在 %d%% 进度处。不要包含超过此进度的事件。
 
 角色与历史人物算法：
@@ -219,6 +219,21 @@ If `is_valid` is false:
 {
   "is_valid": false,
   "error_message": "简要说明为什么这不是人物或地点。"
+}]],
+
+    -- Book Type Detection
+    book_type_detect = [[图书标题：%s
+作者：%s
+系列：%s
+文件描述/主题元数据：%s
+
+任务：根据其元数据和体裁信号，将这本书精确分类为以下图书类型之一：
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+仅返回有效的 JSON：
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
 }]],
 
     -- Multi-Book Series Context Prompts

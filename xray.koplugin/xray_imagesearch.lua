@@ -5,12 +5,26 @@ Searches the web for an image of an X-Ray entity (character, location,
 historical figure, glossary term) and downloads the chosen image into the
 book's ".sdr" sidecar so it travels with the book.
 
-Primary source : Tavily Search API (include_images). Needs one config value,
-                 tavily_api_key (Bearer token). Used only when the key is set.
-Fallback source: DuckDuckGo image search (no key). This is a two-step scrape:
-                 fetch a page to read the "vqd" token, then call i.js for JSON.
-                 It is the default when no Tavily key is set, and the fallback
-                 when a Tavily search fails or returns nothing.
+Every provider needs a key. By default ("auto") they are tried in this fixed
+order, skipping any whose key is empty; the search fails if none has a key:
+
+  1. SerpApi         serpapi_api_key  -- Google Images Light engine.
+  2. Brave Search    brave_api_key    -- Brave image index.
+  3. Tavily          tavily_api_key   -- web search with include_images.
+
+The user can pick one provider in the Image Search settings. The pick moves
+that provider to the front of the order; the others keep their place behind it
+as fallbacks (see providerOrder), so a broken key still yields an image and the
+UI can say which provider really answered.
+
+The first provider that returns at least one image wins. SerpApi and Brave
+each return a small thumbnail URL that is separate from the full-size image,
+so the picker downloads only thumbnails. Tavily returns one URL per image, so
+its "thumbnail" is a full-size file that must be shrunk on the device; that is
+why it sits below the other two.
+
+No provider caption is kept. The picker shows only the position and the source
+name, so parsers return image URLs and nothing else.
 
 Network I/O in this module is meant to run inside a KOReader Trapper
 subprocess (see xray_ui: showImageAttachFlow), so the UI thread never blocks
@@ -28,12 +42,28 @@ if not json_ok or type(json) ~= "table" then
     json_ok, json = pcall(require, "rapidjson")
 end
 
--- Optional logger. Guarded so the pure helpers still load under the test
--- harness, which does not always provide KOReader's logger.
-local log_ok, logger = pcall(require, "logger")
-if not log_ok then logger = nil end
+-- Per-provider result caps. The picker is a one-at-a-time carousel with
+-- Previous/Next. Thumbnails are downloaded THUMB_PAGE at a time (the first page
+-- with the search, later pages when the user asks for more), so a longer list
+-- costs nothing before the picker opens. Tavily is capped lower: it charges
+-- credits per search, returns no separate thumbnail, and every image it gives
+-- back must be downloaded at full size and shrunk.
+local MAX_RESULTS_SERPAPI = 15
+local MAX_RESULTS_BRAVE   = 15
+local MAX_RESULTS_TAVILY  = 5
 
-local MAX_RESULTS = 6
+-- Picker cap. The largest provider cap; each provider list is already cut to
+-- its own cap, so this only backstops a provider that ignores the limit.
+local MAX_RESULTS = math.max(MAX_RESULTS_SERPAPI, MAX_RESULTS_BRAVE, MAX_RESULTS_TAVILY)
+
+-- Thumbnails downloaded per page. Five small downloads is the wait before the
+-- picker opens on a 2012 Kindle; each later page is one more cancellable wait
+-- that the user chose by tapping "Show more images".
+local THUMB_PAGE = 5
+
+-- Extra entries to request from a provider that honours a result count, to
+-- cover the ones the parser discards for having no usable http(s) image URL.
+local BRAVE_COUNT_HEADROOM = 2
 
 -- Cap on a downloaded image. A large image decodes to a bitmap many times its
 -- file size and can exhaust memory on old e-ink hardware (2012 Kindle reference).
@@ -94,102 +124,194 @@ function ImageSearch.extFromUrl(url)
     return "jpg"
 end
 
--- Tavily Search API endpoint. A single POST with a Bearer token; asking for
--- images returns a top-level `images` list of query-related image URLs.
-ImageSearch.TAVILY_URL = "https://api.tavily.com/search"
-
--- Build the JSON request body for a Tavily image search. "basic" depth costs
--- 1 credit; descriptions give each image a caption for the picker.
-function ImageSearch.buildTavilyBody(query, num)
-    if not json_ok then return nil end
-    return json.encode({
-        query = tostring(query or ""),
-        search_depth = "basic",
-        include_images = true,
-        include_image_descriptions = true,
-        max_results = num or MAX_RESULTS,
-    })
+-- Accept only an http(s) URL. A provider can put a "data:" URI, a relative
+-- path, or an empty string where an image URL is expected; the downloader
+-- speaks HTTP only, so anything else must be discarded, not stored.
+local function _httpUrl(v)
+    if type(v) ~= "string" then return nil end
+    if v:match("^https?://") then return v end
+    return nil
 end
 
--- Parse a Tavily response body. The `images` field is either a list of URL
--- strings or, with descriptions on, a list of { url, description } objects.
--- Returns a list of { full=<url>, thumb=<url>, title=<str> } or nil, err.
-function ImageSearch.parseTavily(body)
+-- ---------------------------------------------------------------------------
+-- Provider: SerpApi (Google Images Light)
+-- ---------------------------------------------------------------------------
+
+-- SerpApi endpoint. One GET; the key travels in the query string, so there is
+-- no auth header. Never log this URL -- it carries the key.
+ImageSearch.SERPAPI_URL = "https://serpapi.com/search"
+
+-- Build the SerpApi request URL. "google_images_light" is SerpApi's fast
+-- Google Images engine: the same JSON shape as "google_images" but without the
+-- extra-rich blocks.
+-- NOTE: SerpApi has no parameter that asks for fewer results (pagination is
+-- `start`, an offset with no per-page count), so one request always returns a
+-- long list and a large body. json.decode still builds the whole ~100-entry table, so the cost
+-- of the large body is paid; parseSerpApi's MAX_RESULTS stop only avoids
+-- copying the entries the picker will never show. This all runs inside the
+-- dismissable search subprocess, so it costs latency, not a UI freeze.
+function ImageSearch.buildSerpApiUrl(query, api_key)
+    return ImageSearch.SERPAPI_URL
+        .. "?engine=google_images_light"
+        .. "&q=" .. ImageSearch.urlencode(query)
+        .. "&api_key=" .. ImageSearch.urlencode(api_key)
+end
+
+-- Parse a SerpApi Google Images response body. Each `images_results` entry has
+-- a small `thumbnail` (and a SerpApi-cached `serpapi_thumbnail`) that is
+-- separate from the full-size `original`, so the picker never downloads a
+-- full-size file. Captions are not kept.
+-- Returns a list of { full=<url>, thumb=<url> } or nil, err.
+function ImageSearch.parseSerpApi(body)
     if not json_ok then return nil, "json module unavailable" end
     local ok, data = pcall(json.decode, body)
     if not ok or type(data) ~= "table" then return nil, "parse error" end
-    local detail = ImageSearch._errorDetail(body)
-    if detail then return nil, detail end
-    local out = {}
-    for _, item in ipairs(data.images or {}) do
-        local url, title
-        if type(item) == "string" then
-            url = item
-        elseif type(item) == "table" then
-            url = item.url
-            title = item.description
+    local detail = ImageSearch._errorDetailFromData(data)
+    if detail then
+        -- SerpApi answers a query with no images as HTTP 200 plus an `error`
+        -- string ("Google hasn't returned any results for this query.") and no
+        -- images_results key. That is an empty search, not a provider failure:
+        -- reporting it as one would burn a call on the next provider and show
+        -- "Search failed" instead of "No images found".
+        local meta = data.search_metadata
+        local succeeded = type(meta) == "table" and meta.status == "Success"
+        if succeeded or detail:lower():find("hasn.t returned any results") then
+            return {}
         end
-        if type(url) == "string" and #url > 0 then
-            -- Tavily gives one URL per image (no separate thumbnail), so the
-            -- same URL serves both the preview and the full download.
-            out[#out + 1] = { full = url, thumb = url, title = title or "" }
+        return nil, detail
+    end
+    -- A genuine empty search still returns an "images_results" array. A missing
+    -- key means SerpApi changed its response shape; report that as a provider
+    -- error so the picker does not show it as "no images".
+    if type(data.images_results) ~= "table" then
+        return nil, "unexpected SerpApi response"
+    end
+    local out = {}
+    for _, item in ipairs(data.images_results) do
+        if type(item) == "table" then
+            local full = _httpUrl(item.original)
+            if full then
+                out[#out + 1] = {
+                    full  = full,
+                    thumb = _httpUrl(item.thumbnail) or _httpUrl(item.serpapi_thumbnail) or full,
+                }
+                -- SerpApi sends ~100 entries, so stop at the provider cap
+                -- instead of building a table that is thrown away.
+                if #out >= MAX_RESULTS_SERPAPI then break end
+            end
         end
     end
     return out
 end
 
--- DuckDuckGo image search is an unofficial two-step flow:
---   1. GET the search page and read a per-session "vqd" token from it.
---   2. GET i.js with that token to receive results as JSON.
--- It needs a browser-like User-Agent and a duckduckgo.com Referer, or the
--- endpoint answers 403. See DDG_HEADERS below.
--- DURABILITY: this is the no-key default path, so every user without a Tavily
--- key depends on it. DDG can change the token shape, the i.js endpoint, or the
--- required headers with no notice; a break shows as "could not read
--- DuckDuckGo token" (extractVqd miss) or an empty result set. If that happens,
--- re-check the vqd patterns (extractVqd), the URLs, and DDG_HEADERS first.
-function ImageSearch.buildDdgTokenUrl(query)
-    return "https://duckduckgo.com/?q=" .. ImageSearch.urlencode(query)
-        .. "&iax=images&ia=images"
+-- ---------------------------------------------------------------------------
+-- Provider: Brave Image Search
+-- ---------------------------------------------------------------------------
+
+-- Brave endpoint. One GET with an X-Subscription-Token header.
+ImageSearch.BRAVE_URL = "https://api.search.brave.com/res/v1/images/search"
+
+-- Build the Brave request URL. Brave accepts `count`, so keep the response body
+-- small -- this matters on slow e-ink hardware. Ask for a little more than the
+-- picker shows: parseBrave discards any entry with no http(s) image URL, so an
+-- exact count can leave the picker short.
+-- Safe search is left at Brave's default ("strict"). Add "&safesearch=off" here
+-- if strict filtering hides too many legitimate results.
+function ImageSearch.buildBraveUrl(query, count)
+    return ImageSearch.BRAVE_URL
+        .. "?q=" .. ImageSearch.urlencode(query)
+        .. "&count=" .. tostring(count or (MAX_RESULTS_BRAVE + BRAVE_COUNT_HEADROOM))
 end
 
--- Pull the vqd token out of the DDG search page. The token has appeared in a
--- few shapes over time (quoted, and as vqd=NN-... inside a URL), so try each.
-function ImageSearch.extractVqd(body)
-    if type(body) ~= "string" then return nil end
-    local vqd = body:match("vqd=['\"]([^'\"]+)['\"]")
-        or body:match('"vqd":"([^"]+)"')
-        or body:match("vqd=([%d%-]+)&")
-    return vqd
-end
-
-function ImageSearch.buildDdgSearchUrl(query, vqd)
-    return "https://duckduckgo.com/i.js?l=us-en&o=json&f=,,,&p=1"
-        .. "&q=" .. ImageSearch.urlencode(query)
-        .. "&vqd=" .. ImageSearch.urlencode(vqd)
-end
-
--- Parse a DuckDuckGo i.js response body.
--- Returns a list of { full=<url>, thumb=<url>, title=<str> } or nil, err.
-function ImageSearch.parseDdg(body)
+-- Parse a Brave Image Search response body. Each `results` entry carries a
+-- proxied `thumbnail.src` (resized to 500 px wide) that is separate from the
+-- full-size `properties.url`, so the picker never downloads a full-size file.
+-- Note: the entry's own `url` is the SOURCE PAGE, not an image. Never use it.
+-- Captions are not kept.
+-- Returns a list of { full=<url>, thumb=<url> } or nil, err.
+function ImageSearch.parseBrave(body)
     if not json_ok then return nil, "json module unavailable" end
     local ok, data = pcall(json.decode, body)
     if not ok or type(data) ~= "table" then return nil, "parse error" end
-    -- A genuine empty search returns a "results" array (possibly empty). A
-    -- missing "results" key means DuckDuckGo changed its response shape; report
-    -- that as a provider error, so the picker does not show it as "no images".
+    local detail = ImageSearch._errorDetailFromData(data)
+    if detail then return nil, detail end
     if type(data.results) ~= "table" then
-        return nil, "unexpected DuckDuckGo response"
+        return nil, "unexpected Brave response"
     end
     local out = {}
     for _, item in ipairs(data.results) do
-        local full = item.image
-        if type(full) == "string" and #full > 0 then
-            out[#out + 1] = {
-                full  = full,
-                thumb = (type(item.thumbnail) == "string" and item.thumbnail) or full,
-                title = item.title or item.source or "",
-            }
+        if type(item) == "table" then
+            local props = (type(item.properties) == "table") and item.properties or {}
+            local thumb_obj = (type(item.thumbnail) == "table") and item.thumbnail or {}
+            local thumb = _httpUrl(thumb_obj.src)
+            -- Prefer the original; a proxied 500 px thumbnail is still usable
+            -- as the stored image when Brave gives no original.
+            local full = _httpUrl(props.url) or thumb
+            if full then
+                out[#out + 1] = {
+                    full  = full,
+                    thumb = thumb or full,
+                }
+                -- Brave is asked for `count` results, but do not depend on it
+                -- honouring the request; stop at the provider cap.
+                if #out >= MAX_RESULTS_BRAVE then break end
+            end
+        end
+    end
+    return out
+end
+
+-- ---------------------------------------------------------------------------
+-- Provider: Tavily
+-- ---------------------------------------------------------------------------
+
+-- Tavily Search API endpoint. A single POST with a Bearer token; asking for
+-- images returns a top-level `images` list of query-related image URLs.
+ImageSearch.TAVILY_URL = "https://api.tavily.com/search"
+
+-- Tavily depth. "fast" and "basic" both cost 1 credit, but Tavily documents
+-- "fast" as lower latency. Tavily is the slowest provider here, so use "fast".
+-- Image descriptions are also off in buildTavilyBody: they run a captioner over
+-- every image, and the picker shows no captions.
+local TAVILY_SEARCH_DEPTH = "fast"
+
+-- Build the JSON request body for a Tavily image search.
+function ImageSearch.buildTavilyBody(query, num)
+    if not json_ok then return nil end
+    return json.encode({
+        query = tostring(query or ""),
+        search_depth = TAVILY_SEARCH_DEPTH,
+        include_images = true,
+        include_image_descriptions = false,
+        max_results = num or MAX_RESULTS_TAVILY,
+    })
+end
+
+-- Parse a Tavily response body. The `images` field is a list of URL strings.
+-- Tavily can also send { url, description } objects when descriptions are
+-- asked for; that shape is still accepted, but the description is discarded.
+-- Returns a list of { full=<url>, thumb=<url> } or nil, err.
+function ImageSearch.parseTavily(body)
+    if not json_ok then return nil, "json module unavailable" end
+    local ok, data = pcall(json.decode, body)
+    if not ok or type(data) ~= "table" then return nil, "parse error" end
+    local detail = ImageSearch._errorDetailFromData(data)
+    if detail then return nil, detail end
+    local out = {}
+    for _, item in ipairs(data.images or {}) do
+        local url
+        if type(item) == "string" then
+            url = _httpUrl(item)
+        elseif type(item) == "table" then
+            url = _httpUrl(item.url)
+        end
+        if url then
+            -- Tavily gives one URL per image (no separate thumbnail), so the
+            -- same URL serves both the preview and the full download.
+            out[#out + 1] = { full = url, thumb = url }
+            -- `max_results` bounds Tavily's search hits, not the image list it
+            -- derives from them, so cap the list here as well.
+            if #out >= MAX_RESULTS_TAVILY then break end
         end
     end
     return out
@@ -297,19 +419,10 @@ local function _httpLib(_url)
     return require("socket/http")
 end
 
--- A browser-like User-Agent. DuckDuckGo rejects unknown agents, and many image
--- hosts (fan wikis, CDNs) hotlink-block non-browser agents on download.
+-- A browser-like User-Agent, used only when downloading an image file. Many
+-- image hosts (fan wikis, CDNs) hotlink-block non-browser agents on download.
 local BROWSER_UA =
     "Mozilla/5.0 (X11; Linux x86_64; rv:115.0) Gecko/20100101 Firefox/115.0"
-
--- Headers the DuckDuckGo endpoints expect. Without a browser agent and a
--- duckduckgo.com Referer, both the token page and i.js answer 403.
-ImageSearch.DDG_HEADERS = {
-    ["User-Agent"]      = BROWSER_UA,
-    ["Accept"]          = "application/json, text/javascript, */*; q=0.01",
-    ["Accept-Language"] = "en-US,en;q=0.5",
-    ["Referer"]         = "https://duckduckgo.com/",
-}
 
 -- Trim a string to at most max_bytes, but never in the middle of a UTF-8
 -- character, so a non-Latin error message does not end in a broken glyph.
@@ -330,16 +443,18 @@ end
 -- can instead say WHY (key invalid, quota exceeded). Handles the shapes seen
 -- from both providers:
 --   Google-style : { "error": { "message": "..." } }
+--   Brave-style  : { "error": { "detail": "...", "code": "..." } } (sent with
+--                  HTTP 422, not 401, for a bad subscription token)
 --   Tavily-style : { "detail": "..." } or { "detail": { "error": "..." } }
---                  or a top-level { "error": "..." } string.
+--   SerpApi-style: a top-level { "error": "..." } string.
 -- Returns a trimmed string or nil when the body carries no error message.
-function ImageSearch._errorDetail(body)
-    if type(body) ~= "string" or #body == 0 or not json_ok then return nil end
-    local ok, data = pcall(json.decode, body)
-    if not ok or type(data) ~= "table" then return nil end
+-- Takes an ALREADY-DECODED table. The parsers decode the body once and call
+-- this, so a large SerpApi body is never decoded twice.
+function ImageSearch._errorDetailFromData(data)
+    if type(data) ~= "table" then return nil end
     local msg
     if type(data.error) == "table" then
-        msg = data.error.message
+        msg = data.error.message or data.error.detail
     elseif type(data.error) == "string" then
         msg = data.error
     elseif type(data.detail) == "string" then
@@ -352,7 +467,20 @@ function ImageSearch._errorDetail(body)
     return msg
 end
 
-function ImageSearch.httpGetString(url, timeout, extra_headers)
+-- Body-level wrapper for callers that hold a raw response string (the HTTP
+-- helpers, which never decode it themselves).
+function ImageSearch._errorDetail(body)
+    if type(body) ~= "string" or #body == 0 or not json_ok then return nil end
+    local ok, data = pcall(json.decode, body)
+    if not ok then return nil end
+    return ImageSearch._errorDetailFromData(data)
+end
+
+-- GET a URL and return the body, or nil plus an error string.
+-- follow_redirect defaults to true. Pass false when the URL itself is a secret:
+-- luasocket replays the WHOLE url (query string included) to the redirect
+-- target, and an https -> http redirect would send it in cleartext.
+function ImageSearch.httpGetString(url, timeout, extra_headers, follow_redirect)
     local ok_su, socketutil = pcall(require, "socketutil")
     local ltn12  = require("ltn12")
     local socket = require("socket")
@@ -375,7 +503,7 @@ function ImageSearch.httpGetString(url, timeout, extra_headers)
         method  = "GET",
         headers = headers,
         sink     = ltn12.sink.table(chunks),
-        redirect = true,
+        redirect = (follow_redirect ~= false),
     }))
 
     if ok_su then socketutil:reset_timeout() end
@@ -501,54 +629,202 @@ end
 -- High-level operations (run inside a Trapper subprocess)
 -- ---------------------------------------------------------------------------
 
+-- Per-provider request timeout, in seconds. The first (highest-priority)
+-- provider gets the full budget; a later one in the chain gets less, so two
+-- hung providers cannot hold the reader for minutes before the third is tried.
+-- A provider marked `slow` in PROVIDERS keeps the full budget wherever it sits
+-- in the chain, because the short budget would time out a working key.
+-- socketutil doubles each value for the total timeout.
+ImageSearch.TIMEOUT_FIRST = 20
+ImageSearch.TIMEOUT_NEXT  = 10
+
+-- SerpApi provider: one GET, key in the query string. Returns results or nil, err.
+-- Redirects are NOT followed here: the URL carries the key, and luasocket would
+-- replay it in full to whatever host the redirect names. SerpApi answers
+-- /search directly, so nothing is lost.
+function ImageSearch.searchSerpApi(query, api_key, timeout)
+    local resp, err = ImageSearch.httpGetString(
+        ImageSearch.buildSerpApiUrl(query, api_key), timeout or ImageSearch.TIMEOUT_FIRST,
+        nil, false)
+    if not resp then return nil, err end
+    return ImageSearch.parseSerpApi(resp)
+end
+
+-- Brave provider: one GET with a subscription-token header. Returns results
+-- or nil, err.
+-- Redirects are NOT followed here, for the same reason as SerpApi: luasocket
+-- rebuilds the request with the original headers, so an off-host redirect would
+-- receive the subscription token. Brave answers the endpoint directly.
+function ImageSearch.searchBrave(query, api_key, timeout)
+    local resp, err = ImageSearch.httpGetString(
+        ImageSearch.buildBraveUrl(query), timeout or ImageSearch.TIMEOUT_FIRST, {
+        ["X-Subscription-Token"] = tostring(api_key),
+        ["Accept"]               = "application/json",
+    }, false)
+    if not resp then return nil, err end
+    return ImageSearch.parseBrave(resp)
+end
+
 -- Tavily provider: one POST with a Bearer token. Returns results or nil, err.
-function ImageSearch.searchTavily(query, api_key)
+function ImageSearch.searchTavily(query, api_key, timeout)
     local body = ImageSearch.buildTavilyBody(query)
     if not body then return nil, "json module unavailable" end
     local resp, err = ImageSearch.httpPostString(ImageSearch.TAVILY_URL, body, {
         ["Authorization"] = "Bearer " .. tostring(api_key),
-    }, 20)
+    }, timeout or ImageSearch.TIMEOUT_FIRST)
     if not resp then return nil, err end
     return ImageSearch.parseTavily(resp)
 end
 
--- DuckDuckGo provider: read the vqd token, then fetch i.js JSON. Both requests
--- use the browser-like DDG headers. Returns results or nil, err.
-function ImageSearch.searchDdg(query)
-    local token_body, err = ImageSearch.httpGetString(
-        ImageSearch.buildDdgTokenUrl(query), 15, ImageSearch.DDG_HEADERS)
-    if not token_body then return nil, err end
-    local vqd = ImageSearch.extractVqd(token_body)
-    if not vqd then
-        -- No token means DuckDuckGo changed its page shape. Log it so a future
-        -- silent break of the no-key default is diagnosable from the log.
-        if logger then
-            logger.warn("[X-Ray] DuckDuckGo image search: could not read vqd token; site format may have changed")
-        end
-        return nil, "could not read DuckDuckGo token"
+-- Keyed providers, in the order they are tried. This table is the ONLY list of
+-- providers: xray_ui builds both its keys table and its settings submenu from
+-- it, so the two files cannot drift on order, names, or config fields.
+--   name         picker/source label used across the UI, and the field name
+--                in the keys table doSearch is given
+--   config_field key name in xray_config.lua / on the AI helper
+--   loc_key      .po key for the settings row title. The UI reads it as
+--                loc:t(p.loc_key); tools/sync_translations.py reads the key
+--                straight from this field, and takes its English text from
+--                the hardcoded fallbacks table in localization_xray.lua, so
+--                keep that table entry too.
+--   brand        English label fallback when the .po key is missing
+--   search       dispatches through ImageSearch at call time, so the test suite
+--                can replace an individual provider function
+--   slow         when set, the provider always gets TIMEOUT_FIRST, even as a
+--                fallback (Tavily runs a web search plus image extraction, so
+--                the shorter fallback budget reads a working key as a timeout)
+ImageSearch.PROVIDERS = {
+    {
+        name = "serpapi", brand = "SerpApi",
+        config_field = "serpapi_api_key", loc_key = "img_key_serpapi",
+        search = function(q, k, t) return ImageSearch.searchSerpApi(q, k, t) end,
+    },
+    {
+        name = "brave", brand = "Brave Search",
+        config_field = "brave_api_key", loc_key = "img_key_brave",
+        search = function(q, k, t) return ImageSearch.searchBrave(q, k, t) end,
+    },
+    {
+        name = "tavily", brand = "Tavily",
+        config_field = "tavily_api_key", loc_key = "img_key_tavily",
+        slow = true,
+        search = function(q, k, t) return ImageSearch.searchTavily(q, k, t) end,
+    },
+}
+
+-- Human-readable name for a source string, for the picker label and the
+-- fallback notice. Returns nil for an unknown source.
+function ImageSearch.brandFor(source)
+    for _, p in ipairs(ImageSearch.PROVIDERS) do
+        if p.name == source then return p.brand end
     end
-    local body, serr = ImageSearch.httpGetString(
-        ImageSearch.buildDdgSearchUrl(query, vqd), 20, ImageSearch.DDG_HEADERS)
-    if not body then return nil, serr end
-    return ImageSearch.parseDdg(body)
+    return nil
 end
 
--- Run the search. Tavily is the primary when a key is set; DuckDuckGo is the
--- no-key default and the fallback when Tavily fails or returns nothing.
--- Returns results, source, err.
-function ImageSearch.doSearch(query, tavily_key)
-    if type(tavily_key) == "string" and #tavily_key > 0 then
-        local results, err = ImageSearch.searchTavily(query, tavily_key)
-        if results and #results > 0 then return results, "tavily" end
-        -- Tavily errored or came back empty: fall back to DuckDuckGo.
-        local ddg, derr = ImageSearch.searchDdg(query)
-        if ddg then return ddg, "duckduckgo" end
-        return nil, "tavily", err or derr
+-- Setting value that means "no pick: use PROVIDERS order as it is".
+ImageSearch.AUTO_PROVIDER = "auto"
+
+-- True when `name` is the name of a provider in PROVIDERS.
+function ImageSearch.isProviderName(name)
+    if type(name) ~= "string" then return false end
+    for _, p in ipairs(ImageSearch.PROVIDERS) do
+        if p.name == name then return true end
+    end
+    return false
+end
+
+-- Providers in the order a search tries them. `preferred` is the user's pick
+-- from the settings: a provider name moves that provider to the front and
+-- leaves the rest in PROVIDERS order behind it. "auto", nil, or an unknown
+-- name (a provider removed in an update) leaves PROVIDERS order untouched, so
+-- a stale setting can never turn image search off.
+function ImageSearch.providerOrder(preferred)
+    local order = {}
+    if ImageSearch.isProviderName(preferred) then
+        for _, p in ipairs(ImageSearch.PROVIDERS) do
+            if p.name == preferred then order[1] = p end
+        end
+    end
+    for _, p in ipairs(ImageSearch.PROVIDERS) do
+        if p.name ~= preferred then order[#order + 1] = p end
+    end
+    return order
+end
+
+-- Name of the first provider in providerOrder(preferred) that has a key, or
+-- nil when none has one. The caller uses this to tell whether the search fell
+-- back. A nil or malformed `keys` reads as "no keys". A picked provider with
+-- no key is skipped the same as under "auto", so the next keyed one is
+-- returned; the settings card marks such a pick "(no key)".
+function ImageSearch.preferredProvider(keys, preferred)
+    if type(keys) ~= "table" then keys = {} end
+    for _, p in ipairs(ImageSearch.providerOrder(preferred)) do
+        local k = keys[p.name]
+        if type(k) == "string" and #k > 0 then return p.name end
+    end
+    return nil
+end
+
+-- Error returned when the user has configured no image-search key at all.
+-- The UI checks for this case up front, so it should be rare.
+ImageSearch.ERR_NO_KEY = "no image search key configured"
+
+-- Run the search. Try each keyed provider in providerOrder(preferred) and take
+-- the first one that returns at least one image. Every provider needs a key,
+-- so a setup with no keys cannot search at all.
+--
+-- Returns results, source, err. Two "nothing to show" cases are kept apart:
+--   * a provider ANSWERED with no image -> an empty list plus its name, no err,
+--     so the caller can show its own localized "no images found" text;
+--   * a provider FAILED -> nil plus the error, which the caller reports.
+function ImageSearch.doSearch(query, keys, preferred)
+    -- The keys table is { serpapi=, brave=, tavily= }; nil or malformed reads
+    -- as "no keys".
+    if type(keys) ~= "table" then keys = {} end
+
+    -- Keep the outcome of the FIRST provider that came up short. It names the
+    -- highest-priority provider the user actually configured, which is the
+    -- useful thing to report when every provider comes up empty.
+    local first_source, first_err, first_was_empty
+    -- Also keep the LAST failure seen. When the top provider answers empty and
+    -- a lower one then fails (bad key, quota exhausted), reporting only the
+    -- empty answer would hide the broken key behind "No images found."
+    local last_err, last_err_source
+    local tried = 0
+    for _, p in ipairs(ImageSearch.providerOrder(preferred)) do
+        local api_key = keys[p.name]
+        if type(api_key) == "string" and #api_key > 0 then
+            tried = tried + 1
+            -- Only the first provider gets the full timeout; later ones in the
+            -- chain get less, so a hung chain cannot run for minutes. A `slow`
+            -- provider is the exception -- see TIMEOUT_NEXT above.
+            local timeout = (tried == 1 or p.slow)
+                and ImageSearch.TIMEOUT_FIRST or ImageSearch.TIMEOUT_NEXT
+            local results, err = p.search(query, api_key, timeout)
+            if results and #results > 0 then return results, p.name end
+            if type(results) ~= "table" then
+                last_err = err or "provider returned no data"
+                last_err_source = p.name
+            end
+            if not first_source then
+                first_source = p.name
+                if type(results) == "table" then
+                    first_was_empty = true
+                else
+                    first_err = last_err
+                end
+            end
+        end
     end
 
-    local ddg, derr = ImageSearch.searchDdg(query)
-    if not ddg then return nil, "duckduckgo", derr end
-    return ddg, "duckduckgo"
+    if tried == 0 then return nil, nil, ImageSearch.ERR_NO_KEY end
+    if first_was_empty then
+        -- The top provider answered with no image, but a lower one FAILED.
+        -- Report the failure: a broken key must not read as "no images found".
+        if last_err then return nil, last_err_source, last_err end
+        return {}, first_source
+    end
+    return nil, first_source, first_err
 end
 
 -- Downscale a preview file in place to PREVIEW_MAX_EDGE (never upscale) and
@@ -584,12 +860,48 @@ function ImageSearch.shrinkPreviewFile(path)
     return false
 end
 
--- Search, then download each candidate thumbnail into tmp_dir so the picker can
--- render local files with no per-page network. Returns a list of
--- { local_thumb=<path|nil>, full=<url>, title=<str> }, source, err.
+-- Download one candidate thumbnail into tmp_dir. Returns the local path, or
+-- nil when there is no thumbnail URL, no tmp_dir, or the download failed.
+local function _fetchThumb(r, i, tmp_dir)
+    if not (tmp_dir and r and r.thumb) then return nil end
+    local ext = ImageSearch.extFromUrl(r.thumb)
+    local thumb_path = tmp_dir .. "/thumb_" .. i .. "." .. ext
+    if not ImageSearch.httpGetToFile(r.thumb, thumb_path, 15) then return nil end
+    -- When the provider has no separate thumbnail (thumb URL equals the full
+    -- URL, e.g. Tavily), the downloaded "thumbnail" is a full-size image.
+    -- Shrink it here in the subprocess so the picker does not decode a large
+    -- file on the UI thread each tap. SerpApi and Brave give a real thumbnail,
+    -- so they skip this decode entirely.
+    if r.thumb == r.full then
+        local shrunk = ImageSearch.shrinkPreviewFile(thumb_path)
+        if shrunk then thumb_path = shrunk end
+    end
+    return thumb_path
+end
+
+-- Download the thumbnails for results[first..last] into tmp_dir. Returns
+-- { [index] = <local path> } holding only the downloads that succeeded. It
+-- does not write into `results`: this runs in a subprocess, and the parent
+-- never sees a child's mutations, only what it returns.
 -- Designed to be the body of a Trapper:dismissableRunInSubprocess call.
-function ImageSearch.searchAndFetchThumbs(query, tavily_key, tmp_dir)
-    local results, source, err = ImageSearch.doSearch(query, tavily_key)
+function ImageSearch.fetchThumbPage(results, first, last, tmp_dir)
+    local paths = {}
+    for i = first, math.min(last, #results) do
+        local p = _fetchThumb(results[i], i, tmp_dir)
+        if p then paths[i] = p end
+    end
+    return paths
+end
+
+-- Search, then download the first page of candidate thumbnails into tmp_dir so
+-- the picker can render local files with no per-page network. `keys` is the
+-- keys table taken by doSearch. Returns a list of
+-- { local_thumb=<path|nil>, thumb=<url|nil>, full=<url> }, source, err.
+-- Entries past THUMB_PAGE keep their thumb URL for a later fetchThumbPage call.
+-- `preferred` is the provider pick from the settings; see providerOrder.
+-- Designed to be the body of a Trapper:dismissableRunInSubprocess call.
+function ImageSearch.searchAndFetchThumbs(query, keys, tmp_dir, preferred)
+    local results, source, err = ImageSearch.doSearch(query, keys, preferred)
     if not results then return nil, source, err end
 
     -- Prune leftovers from a previous search so old extensions do not pile up.
@@ -598,25 +910,10 @@ function ImageSearch.searchAndFetchThumbs(query, tavily_key, tmp_dir)
     local out = {}
     for i, r in ipairs(results) do
         if i > MAX_RESULTS then break end
-        local entry = { full = r.full, title = r.title or "" }
-        if tmp_dir and r.thumb then
-            local ext = ImageSearch.extFromUrl(r.thumb)
-            local thumb_path = tmp_dir .. "/thumb_" .. i .. "." .. ext
-            local ok = ImageSearch.httpGetToFile(r.thumb, thumb_path, 15)
-            if ok then
-                -- When the provider has no separate thumbnail (thumb URL equals
-                -- the full URL, e.g. Tavily), the downloaded "thumbnail" is a
-                -- full-size image. Shrink it here in the subprocess so the picker
-                -- does not decode a large file on the UI thread each tap.
-                if r.thumb == r.full then
-                    local shrunk = ImageSearch.shrinkPreviewFile(thumb_path)
-                    if shrunk then thumb_path = shrunk end
-                end
-                entry.local_thumb = thumb_path
-            end
-        end
-        out[#out + 1] = entry
+        out[i] = { full = r.full, thumb = r.thumb }
     end
+    local paths = ImageSearch.fetchThumbPage(out, 1, THUMB_PAGE, tmp_dir)
+    for i, p in pairs(paths) do out[i].local_thumb = p end
     return out, source
 end
 
@@ -706,6 +1003,11 @@ function ImageSearch.makeVariants(image_path, thumb_edge, cap_display)
 end
 
 ImageSearch.MAX_RESULTS = MAX_RESULTS
+ImageSearch.THUMB_PAGE = THUMB_PAGE
+ImageSearch.MAX_RESULTS_SERPAPI = MAX_RESULTS_SERPAPI
+ImageSearch.MAX_RESULTS_BRAVE = MAX_RESULTS_BRAVE
+ImageSearch.MAX_RESULTS_TAVILY = MAX_RESULTS_TAVILY
+ImageSearch.BRAVE_COUNT_HEADROOM = BRAVE_COUNT_HEADROOM
 ImageSearch.DISPLAY_MAX_EDGE = DISPLAY_MAX_EDGE
 ImageSearch.THUMB_MIN_EDGE = THUMB_MIN_EDGE
 ImageSearch.PREVIEW_MAX_EDGE = PREVIEW_MAX_EDGE

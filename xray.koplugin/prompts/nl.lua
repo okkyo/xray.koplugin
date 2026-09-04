@@ -41,7 +41,7 @@ Stap 1. Kijk UITSLUITEND naar het blok "CHAPTER SAMPLES". Identificeer de verhal
 Stap 2. SLUIT alle niet-verhalende inleidingen en nawoorden UIT (bijv. Omslag, Titelpagina, Auteursrecht, Inhoudsopgave, Opdracht, Dankwoord, Ook van).
 Stap 3. Maak voor elk verhalend hoofdstuk, beginnend bij het allereerste, PRECIES ÉÉN gebeurtenisobject aan in de `timeline`-array.
 Stap 4. Het veld `chapter` MOET exact overeenkomen met de hoofdstuktitel in het voorbeeld. (Koppel ze strikt in opeenvolgende volgorde).
-Stap 5. Samenvat dit specifieke hoofdstuk in het veld `event` {TIMELINE_DETAIL_GUIDANCE} (MAXIMAAL {MAX_TIMELINE_EVENT} tekens). Gropeer hoofdstukken NIET.
+Stap 5. Samenvat dat specifieke hoofdstuk in het veld `event`. {TIMELINE_DETAIL_GUIDANCE} Schrijf tussen {MIN_TIMELINE_EVENT} en {MAX_TIMELINE_EVENT} tekens. Schrijf GEEN kortere samenvatting tenzij het hoofdstuk bijna geen inhoud heeft. Gropeer hoofdstukken NIET.
 Stap 6. GEEN SPOILERS: Stop exact bij de %d%%-grens. Neem geen gebeurtenissen op na deze voortgang.
 
 ALGORITME VOOR PERSONAGES & HISTORISCHE FIGUREN:
@@ -231,6 +231,21 @@ Secundaire beschrijving: %s
 VEREIST JSON-FORMAAT:
 {
   "merged_description": "Gecombineerde en gepolijste beschrijving (Max {MAX_CHAR_DESC} tekens)"
+}]],
+
+    -- Book Type Detection
+    book_type_detect = [[Boektitel: %s
+Auteur: %s
+Serie: %s
+Bestandsbeschrijving/Onderwerp-metadata: %s
+
+TAAK: Classificeer dit boek in precies ÉÉN van deze boektypes op basis van de metadata en genresignalen:
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+Geef ALLEEN geldige JSON terug:
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
 }]],
 
     -- Multi-Book Series Context Prompts

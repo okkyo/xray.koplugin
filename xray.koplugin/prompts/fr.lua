@@ -41,7 +41,7 @@ Pour éviter de sauter des chapitres ou d'halluciner des événements, vous DEVE
 Étape 2. EXCLUEZ tous les éléments non narratifs (par exemple, couverture, page de titre, copyright, table des matières, dédicace, remerciements).
 Étape 3. Pour chaque chapitre narratif, en commençant par le tout premier, créez EXACTEMENT UN objet d'événement dans le tableau `timeline`.
 Étape 4. Le champ `chapter` DOIT correspondre exactement à l'en-tête du chapitre dans l'échantillon. (Mappez-les strictement dans l'ordre séquentiel).
-Étape 5. Résumez ce chapitre spécifique dans le champ `event` {TIMELINE_DETAIL_GUIDANCE} (MAX {MAX_TIMELINE_EVENT} caractères). Ne groupez PAS les chapitres.
+Étape 5. Résumez ce chapitre spécifique dans le champ `event`. {TIMELINE_DETAIL_GUIDANCE} Rédigez entre {MIN_TIMELINE_EVENT} et {MAX_TIMELINE_EVENT} caractères. Ne rédigez PAS de résumé plus court à moins que le chapitre n'ait presque aucun contenu. Ne groupez PAS les chapitres.
 Étape 6. PAS DE SPOILERS : Arrêtez-vous exactement à la marque de %d%%. N'incluez pas d'événements après cette progression.
 
 ALGORITHME POUR LES PERSONNAGES ET LES FIGURES HISTORIQUES :
@@ -219,6 +219,21 @@ If `is_valid` is false:
 {
   "is_valid": false,
   "error_message": "Explication courte expliquant pourquoi ce n'est ni un personnage ni un lieu."
+}]],
+
+    -- Book Type Detection
+    book_type_detect = [[Titre du livre : %s
+Auteur : %s
+Série : %s
+Description du fichier/Métadonnées du sujet : %s
+
+TÂCHE : Classer ce livre dans EXACTEMENT UN de ces types de livres en fonction de ses métadonnées et des signaux de genre :
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+Retournez UNIQUEMENT un JSON valide :
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
 }]],
 
     -- Multi-Book Series Context Prompts

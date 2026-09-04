@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Language-Team: Zh_cn\n"
+"Language-Team: 简体中文\n"
 "Language: zh_CN\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -197,7 +197,7 @@ msgstr "粘贴"
 msgid "cache_cleared"
 msgstr "缓存已清除！\n\n现在可以获取新数据：\n菜单 → X-Ray → 获取 AI 数据"
 
-# en-hash: 2e361c4db7a5480c21b02780ed4e9e0b
+# en-hash: 1edc355371d87a94d024eebfed9f8815
 msgid "cache_save_failed"
 msgstr "保存缓存失败"
 
@@ -248,10 +248,6 @@ msgstr "确定要清除所有已配置的 API 密钥和自定义接口吗？\n\n
 # en-hash: dd6eee404e54eafd92e56d09cb4848f3
 msgid "confirm_clear_single_key"
 msgstr "确定要清除 %s 的已配置 API 密钥吗？"
-
-# en-hash: 9cfefed8fb9497baa5cd519d7d2bb5d7
-msgid "current_language"
-msgstr "zh_CN"
 
 # en-hash: 97b9ad7336ac722cf16044cf603bfe10
 msgid "current_mode"
@@ -483,7 +479,7 @@ msgstr "获取成功"
 
 # en-hash: 572e520194e629b3b906bb5b3e5bce2d
 msgid "fetching_ai"
-msgstr "正在获取 X-Ray..."
+msgstr "正在从 %s 获取..."
 
 # en-hash: 2b05ded75b73f463504a742fe3492e55
 msgid "fetching_author"
@@ -533,13 +529,33 @@ msgstr "正在下载图片..."
 msgid "img_error"
 msgstr "搜索失败：%s"
 
+# en-hash: fe63191987f62b9e4806e376671ed335
+msgid "img_extract_failed"
+msgstr "无法提取图片文件。"
+
+# en-hash: a557254d6ea7fb31d1776d65e97f9a43
+msgid "img_key_brave"
+msgstr "Brave Search 密钥"
+
 # en-hash: 2bcf4d0012d8fec18f5b97a1f307c958
 msgid "img_key_saved"
 msgstr "已保存。"
 
+# en-hash: 6fa56c2b1cb703d54c4b8b0e4440cf16
+msgid "img_key_serpapi"
+msgstr "SerpApi 密钥"
+
 # en-hash: 6ad9a851e6b0ab3cb2f3b75e87cd234a
-msgid "img_key_title"
+msgid "img_key_tavily"
 msgstr "Tavily API 密钥"
+
+# en-hash: 6c625a44b20a366fb63ef60e096e759a
+msgid "img_loading_more"
+msgstr "正在加载更多图片..."
+
+# en-hash: fd2941cfb27f0d8ab5a606e86d757e8a
+msgid "img_minimized_hint"
+msgstr "已最小化“%s”。请重新打开“图像与地图”以继续。"
 
 # en-hash: d3da97e2d9aee5c8fbe03156ad051c99
 msgid "img_more"
@@ -549,6 +565,22 @@ msgstr "更多"
 msgid "img_next"
 msgstr "下一页"
 
+# en-hash: 30936c8b483b8b104a4ad7821ce2262b
+msgid "img_no_favorites"
+msgstr "暂无收藏。\n\n在任何图片上使用 ⋮ 菜单即可将其添加到收藏。"
+
+# en-hash: c3e4c8dd2122260b0c4e14d6509e62ca
+msgid "img_no_hidden"
+msgstr "没有隐藏的图片。\n\n在图库中的任何图片上使用 ⋮ 菜单即可隐藏装饰性插图或首字下沉。"
+
+# en-hash: 95407637295cd7c30378be19be6e36cb
+msgid "img_no_images"
+msgstr "未找到此标签/过滤器的图片。\n\n正在从书籍中提取或扫描图片..."
+
+# en-hash: a0c513c130fac7b4559f145cd9352091
+msgid "img_no_key"
+msgstr "请先在图像搜索设置中添加图像搜索密钥。"
+
 # en-hash: b79b9ffffededdcf093dc9f81e0a4412
 msgid "img_no_preview"
 msgstr "（无可用预览）"
@@ -556,6 +588,10 @@ msgstr "（无可用预览）"
 # en-hash: 5db1e02d891c15e428428c0e6e83c363
 msgid "img_no_results"
 msgstr "未找到图片。"
+
+# en-hash: 74ab2b6d760dc64ea26012a4fca84490
+msgid "img_no_series"
+msgstr "未保存系列参考资料。\n\n在任何地图上使用 ⋮ 菜单即可将其保存到系列参考资料中。"
 
 # en-hash: dd1f775e443ff3b9a89270713580a51b
 msgid "img_prev"
@@ -565,9 +601,33 @@ msgstr "上一页"
 msgid "img_processing"
 msgstr "正在处理图片..."
 
-# en-hash: 67a68190ce74fbbee740d8c7d03e360c
+# en-hash: a2c65774cce0bdcd3ad1e08086e2ea40
+msgid "img_provider_about"
+msgstr "[B]自动[/B]将按 SerpApi、Brave Search、Tavily 的顺序使用第一个拥有密钥的服务商。\n\n将首先尝试所选服务商。如果失败或未找到结果，将按相同顺序尝试其他服务商，并在通知中显示响应的服务商。\n\n没有密钥的服务商将被跳过。"
+
+# en-hash: ae0482189aa02d8b159c077edf8ca8c6
+msgid "img_provider_auto"
+msgstr "自动（按顺序第一个密钥）"
+
+# en-hash: 56039cb24bf2fecba0a4aa7947d0e720
+msgid "img_provider_desc"
+msgstr "选择执行图像搜索的服务商："
+
+# en-hash: 11943975b2ef7d14f6c41bfeafc3a795
+msgid "img_provider_fallback"
+msgstr "%s 不可用。正在显示 %s 的结果。"
+
+# en-hash: b82a86548d797c4682913295fc676ac9
 msgid "img_provider_hint"
-msgstr "默认：DuckDuckGo（无需密钥）。"
+msgstr "按顺序尝试。至少需要一个密钥。"
+
+# en-hash: edc912fec23be8b7c8b6d318899d8d0d
+msgid "img_provider_no_key"
+msgstr "%s（无密钥）"
+
+# en-hash: 01fd162e98f5553ab970a30e3a0efd2a
+msgid "img_provider_setting"
+msgstr "图像搜索服务商"
 
 # en-hash: fc35ec973f5b3a16f0d4b009834f39a6
 msgid "img_remove"
@@ -581,9 +641,17 @@ msgstr "确定要移除添加的图片吗？"
 msgid "img_removed"
 msgstr "图片已移除。"
 
+# en-hash: 2bea7b6d66811b50767c7b22f81fb2c2
+msgid "img_rename_title"
+msgstr "重命名图片标签"
+
 # en-hash: 6fe2ab43d39c389ef5f665a86121f95c
 msgid "img_result_count"
 msgstr "结果 %1$d / %2$d"
+
+# en-hash: 393c3f5ea8ad35c02691d507bdbb31b0
+msgid "img_reveal"
+msgstr "显示"
 
 # en-hash: c3612962736fa980b8a853fbc9fa981c
 msgid "img_saved"
@@ -605,13 +673,41 @@ msgstr "搜索图片"
 msgid "img_searching"
 msgstr "正在搜索图片..."
 
+# en-hash: e14cbcb87dce9e2354fdf7db62b93a9c
+msgid "img_show_first"
+msgstr "返回第一张图片"
+
+# en-hash: e0bcbbbd7e4041eb19382d32dd0c47a6
+msgid "img_show_more"
+msgstr "显示更多图片"
+
 # en-hash: 772eeb0a8a4e1193a21b9d2631e4a508
 msgid "img_source_suffix"
 msgstr "  (%s)"
 
-# en-hash: e3cea90d4e14007d88412e5a300c97ff
-msgid "img_tavily_fallback"
-msgstr "Tavily 不可用，正在显示 DuckDuckGo 搜索结果。"
+# en-hash: 646ef4f9024779f1a04ee945deffb8d5
+msgid "img_spoiler_confirm"
+msgstr "该图片位于第 %d 页（超出您当前的阅读进度）。是否显示图片？"
+
+# en-hash: d0f2e5376298c880665077b565ffd7dd
+msgid "img_spoiler_locked"
+msgstr "已锁定"
+
+# en-hash: b1c94ca2fbc3e78fc30069c8d0f01680
+msgid "img_tab_all"
+msgstr "全部"
+
+# en-hash: d78986947356ddd37b43d57df289dee9
+msgid "img_tab_favorites"
+msgstr "收藏"
+
+# en-hash: 9d948e617b083222afc868add2f50ec2
+msgid "img_tab_series"
+msgstr "系列"
+
+# en-hash: be53a0541a6d36f6ecb879fa2c584b08
+msgid "img_untitled"
+msgstr "图片"
 
 # en-hash: c54c117a6b6dfeed9d6276e093a6aa15
 msgid "img_use_this"
@@ -620,49 +716,6 @@ msgstr "使用此图片"
 # en-hash: c4f1dea83d1eb17400190339311b3482
 msgid "img_view"
 msgstr "查看图片"
-
-msgid "img_extract_failed"
-msgstr "无法提取图片文件。"
-
-msgid "img_minimized_hint"
-msgstr "最小化图片提示"
-
-msgid "img_no_favorites"
-msgstr "暂无收藏。\n\n在任何图片上使用 ⋮ 菜单即可将其添加到收藏。"
-
-msgid "img_no_hidden"
-msgstr "没有隐藏的图片。\n\n在图库中的任何图片上使用 ⋮ 菜单即可隐藏装饰性插图或首字下沉。"
-
-msgid "img_no_images"
-msgstr "未找到此标签/过滤器的图片。\n\n正在从书籍中提取或扫描图片..."
-
-msgid "img_no_series"
-msgstr "未保存系列参考资料。\n\n在任何地图上使用 ⋮ 菜单即可将其保存到系列参考资料中。"
-
-msgid "img_rename_title"
-msgstr "重命名图片标签"
-
-msgid "img_reveal"
-msgstr "显示"
-
-msgid "img_spoiler_confirm"
-msgstr "该图片位于第 %d 页（超出您当前的阅读进度）。是否显示图片？"
-
-msgid "img_spoiler_locked"
-msgstr "已锁定"
-
-msgid "img_tab_all"
-msgstr "全部"
-
-msgid "img_tab_favorites"
-msgstr "收藏"
-
-msgid "img_tab_series"
-msgstr "系列"
-
-msgid "img_untitled"
-msgstr "图片"
-
 
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
@@ -956,9 +1009,9 @@ msgstr "历史人物"
 msgid "menu_image_search"
 msgstr "图片搜索"
 
+# en-hash: 073096c9e6fbe0599a7c64e0e7a665cb
 msgid "menu_images"
 msgstr "图片与地图"
-
 
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
@@ -1224,10 +1277,6 @@ msgstr "没有找到与“%s”完全匹配的项。请点击相关条目或获�
 msgid "paste_clipboard_confirm"
 msgstr "是否将剪贴板中的 API 密钥用于 %s？"
 
-# en-hash: 607481fc96e754b33650eb171aac9447
-msgid "path"
-msgstr "plugins/xray.koplugin"
-
 # en-hash: 046763a0d64321194477604b7751c8e4
 msgid "pending_duplicates_prompt"
 msgstr "AI 发现了上次获取的 %d 个潜在重复项。现在查看吗？"
@@ -1236,6 +1285,7 @@ msgstr "AI 发现了上次获取的 %d 个潜在重复项。现在查看吗？"
 msgid "plugin_description"
 msgstr "使用 AI 驱动的书籍分析提升您的阅读体验，就像 Kindle X-Ray 一样！"
 
+# en-hash: 14230d11143a03f4330c6433d5032a9d
 msgid "prev"
 msgstr "上一页"
 
@@ -1379,7 +1429,7 @@ msgstr "剧透偏好"
 msgid "stop"
 msgstr "Stop"
 
-# en-hash: d725036d492c380f06f4eb32f5704bc9
+# en-hash: d7c6deb856024d209d52d833b9f4c95d
 msgid "term_not_found"
 msgstr "未找到匹配“%s”的术语"
 
@@ -1707,13 +1757,9 @@ msgstr "X-Ray 已是最新版本 (%s)。"
 msgid "updater_whats_new"
 msgstr "更新内容："
 
-# en-hash: 362b2e695aa7299e20bb0d9ce320f58d
+# en-hash: 46667b51ced49ca8828f897cf83e89b8
 msgid "updating_ai"
 msgstr "正在更新 X-Ray 数据..."
-
-# en-hash: 0d1b08c34858921bc7c662b228acb7ba
-msgid "val"
-msgstr "???"
 
 # en-hash: 1739e3ae6d734407aef8af879665b8ee
 msgid "validate_keys_title"

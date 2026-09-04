@@ -41,7 +41,7 @@ Krok 1. Spójrz WYŁĄCZNIE na blok "CHAPTER SAMPLES". Zidentyfikuj rozdziały n
 Krok 2. WYKLUCZ wszystkie nienarracyjne elementy początkowe i końcowe (np. okładkę, stronę tytułową, prawa autorskie, spis treści, dedykację, podziękowania, inne dzieła autora).
 Krok 3. Dla każdego rozdziału narracyjnego, zaczynając od samego pierwszego, utwórz DOKŁADNIE JEDEN obiekt zdarzenia w tablicy `timeline`.
 Krok 4. Pole `chapter` MUSI dokładnie odpowiadać nagłówkowi rozdziału w próbce. (Przyporządkuj je ściśle w kolejności sekwencyjnej).
-Krok 5. Podsumuj ten konkretny rozdział w polu `event` {TIMELINE_DETAIL_GUIDANCE} (MAKSYMALNIE {MAX_TIMELINE_EVENT} znaków). NIE grupuj rozdziałów.
+Krok 5. Podsumuj ten konkretny rozdział w polu `event`. {TIMELINE_DETAIL_GUIDANCE} Napisz od {MIN_TIMELINE_EVENT} do {MAX_TIMELINE_EVENT} znaków. NIE pisz krótszego podsumowania, chyba że rozdział nie ma prawie żadnej treści. NIE grupuj rozdziałów.
 Krok 6. BEZ SPOILERÓW: Zatrzymaj się dokładnie na punkcie %d%%. Nie uwzględniaj wydarzeń wykraczających poza ten postęp.
 
 ALGORYTM DLA POSTACI I POSTACI HISTORYCZNYCH:
@@ -231,6 +231,21 @@ Opis pomocniczy: %s
 WYMAGANY FORMAT JSON:
 {
   "merged_description": "Połączony i dopracowany opis (Maksymalnie {MAX_CHAR_DESC} znaków)"
+}]],
+
+    -- Book Type Detection
+    book_type_detect = [[Tytuł książki: %s
+Autor: %s
+Seria: %s
+Opis pliku / Metadane tematyczne: %s
+
+ZADANIE: Sklasyfikuj tę książkę do dokładnie JEDNEGO z poniższych typów książek na podstawie jej metadanych i sygnałów gatunkowych:
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+Zwróć TYLKO poprawny format JSON:
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
 }]],
 
     -- Multi-Book Series Context Prompts

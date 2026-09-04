@@ -17,6 +17,7 @@ if sys.version_info >= (3, 7):
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from env_loader import load_env_file
+from lang_names import language_name
 
 # Read GEMINI_API_KEY (and anything else) from a .env file at the repo root.
 load_env_file()
@@ -39,6 +40,162 @@ ALLOWLIST = {
 def get_md5(text):
     return hashlib.md5(text.encode('utf-8')).hexdigest()
 
+# --- Escaping ---------------------------------------------------------------
+# Values are held DECODED in memory (real newlines, bare double quotes) and are
+# encoded only when written to a .po file. parse_po used to hand back the raw,
+# still-encoded text while save_po encoded it again, so every sync added one
+# more backslash in front of each embedded quote. Keep these two functions
+# exact inverses of each other.
+#
+# The alphabet matches the reader in xray.koplugin/localization_xray.lua:
+# backslash, double quote, newline, tab.
+_PO_DECODE = {'\\': '\\', '"': '"', 'n': '\n', 't': '\t'}
+
+def po_unescape(text):
+    """Decode a .po (or Lua) string body. Single pass, so `\\n` decodes to a
+    backslash followed by the letter n, not to a newline."""
+    if not text:
+        return text
+    return re.sub(r'\\(.)', lambda m: _PO_DECODE.get(m.group(1), m.group(0)), text)
+
+def po_escape(text):
+    """Encode a value for a .po string body. Backslash first, or the escapes
+    added after it would be escaped a second time."""
+    if not text:
+        return text
+    return (text.replace('\\', '\\\\')
+                .replace('"', '\\"')
+                .replace('\n', '\\n')
+                .replace('\t', '\\t'))
+
+# Format specifiers a translation must keep: %s, %d, and the positional %1$s.
+_PLACEHOLDER_RE = re.compile(r'%(?:(\d+)\$)?([a-zA-Z])')
+
+def _placeholders(text):
+    """Multiset of conversion types a string consumes, e.g. ('d', 's').
+
+    The position prefix is dropped on purpose. A translation is free to rewrite
+    `Book %d of %s` as `%2$s no %1$d` when the target language needs the other
+    word order -- Localization:t supports that, and it is correct localization,
+    not drift. What must match is which argument types get consumed.
+    """
+    # `%%` is a literal percent sign, so `%%s` must not count as a `%s`.
+    text = (text or '').replace('%%', '')
+    return tuple(sorted(m.group(2) for m in _PLACEHOLDER_RE.finditer(text)))
+
+def en_hash(text):
+    """Hash the ENCODED form, so the stored en-hash values stay comparable with
+    the ones written before decoding was introduced."""
+    return get_md5(po_escape(text))
+
+# A loc:t call, with its optional `or "fallback"` default.
+#
+# Three traps here:
+#  - The fallback body must be matched escape-aware. A non-greedy `(.*?)` stops
+#    at the first \" and stores a value ending in a stray backslash.
+#  - The argument tail must not cross a line. With re.DOTALL a `.*?` there runs
+#    past the end of the call and pairs the key with some later call's fallback.
+#  - The `or` group must stay OPTIONAL, or a key with no fallback drags the
+#    match forward to the next one that has one.
+#  - The call may be wrapped in grouping parentheses, as in
+#    `(p and p.loc:t("k")) or "fallback"`, so extra `)` before the `or` are
+#    allowed -- but only when each one closes a grouping paren on the same
+#    line. In `foo(loc:t("k")) or "x"` the `)` closes a CALL, and "x" is the
+#    fallback for foo(), not for the key. A `(` preceded by an identifier,
+#    `)`, `]` or a string is a call; anything else groups. Every inline
+#    fallback for a key must agree across files: files are walked in sorted
+#    order and the last one wins.
+_STR_BODY = r'(?:\\.|[^%s\\\n])*'
+LOC_KEY_RE = re.compile(r'loc:t\(\s*["\']([^"\']*)["\']')
+FALLBACK_TAIL_RE = re.compile(
+    r'\s*or\s*(?:"(' + (_STR_BODY % '"') + r')"'
+    r"|'(" + (_STR_BODY % "'") + r")')"
+)
+# A provider table field, `loc_key = "img_key_x"`. The UI reads these as
+# loc:t(p.loc_key), which the call scanner cannot see; without this the sync
+# drops the key from every .po file and the settings row shows the raw key.
+LOC_FIELD_RE = re.compile(r'\bloc_key\s*=\s*["\']([^"\']+)["\']')
+
+
+def _walk_parens(text, start, stop=None):
+    """Walk `text` from `start` (to `stop`, or the end of the line), skipping
+    string bodies and tracking parens. Return (close_idx, unmatched_opens):
+    close_idx is the index of the first `)` with no matching `(` inside the
+    walk (None when the walk ends first); unmatched_opens lists the indices of
+    `(` still open at that point."""
+    opens = []
+    quote = None
+    i = start
+    n = len(text) if stop is None else stop
+    while i < n:
+        c = text[i]
+        if quote:
+            if c == '\\':
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c in '"\'':
+            quote = c
+        elif c == '\n':
+            break
+        elif c == '(':
+            opens.append(i)
+        elif c == ')':
+            if not opens:
+                return i, opens
+            opens.pop()
+        i += 1
+    return None, opens
+
+
+def _is_grouping_paren(text, open_idx):
+    j = open_idx - 1
+    while j >= 0 and text[j] in ' \t':
+        j -= 1
+    return j < 0 or not (text[j].isalnum() or text[j] in '_)]"\'')
+
+
+def iter_loc_calls(content):
+    """Yield (key, fallback-or-None) for every loc:t("key") call."""
+    for m in LOC_KEY_RE.finditer(content):
+        key = m.group(1)
+        # From just after the key, the first unmatched `)` closes loc:t(.
+        end, _ = _walk_parens(content, m.end())
+        if end is None:
+            yield key, None
+            continue
+        i = end + 1
+        extra = 0
+        while i < len(content) and content[i] == ')':
+            extra += 1
+            i += 1
+        if extra:
+            # Each extra `)` must close a grouping paren opened earlier on
+            # this line. If it closes a call, the fallback belongs to that
+            # call, not to the key.
+            line_start = content.rfind('\n', 0, m.start()) + 1
+            _, unmatched = _walk_parens(content, line_start, m.start())
+            if extra > len(unmatched) or not all(
+                    _is_grouping_paren(content, o) for o in unmatched[-extra:]):
+                yield key, None
+                continue
+        t = FALLBACK_TAIL_RE.match(content, i)
+        if not t:
+            yield key, None
+            continue
+        yield key, (t.group(1) if t.group(1) is not None else t.group(2))
+
+# One `key = "value"` line inside the hardcoded fallback table.
+FALLBACK_ENTRY_RE = re.compile(r'(\w+)\s*=\s*"(' + (_STR_BODY % '"') + r')"')
+
+# An escape cannot span two lines, so decode only after every continuation
+# line has been concatenated.
+def _decode_entry(entry):
+    entry['msgid'] = po_unescape(entry['msgid'])
+    entry['msgstr'] = po_unescape(entry['msgstr'])
+    return entry
+
 def parse_po(file_path):
     entries = []
     current_entry = {'msgid': '', 'msgstr': '', 'comments': [], 'en_hash': None}
@@ -49,7 +206,7 @@ def parse_po(file_path):
             line = line.strip()
             if not line:
                 if current_entry['msgid'] or current_entry['msgstr']:
-                    entries.append(current_entry)
+                    entries.append(_decode_entry(current_entry))
                     current_entry = {'msgid': '', 'msgstr': '', 'comments': [], 'en_hash': None}
                 current_field = None
                 continue
@@ -77,10 +234,11 @@ def parse_po(file_path):
                     elif current_field == 'msgstr':
                         current_entry['msgstr'] += m.group(1)
         if current_entry['msgid'] or current_entry['msgstr']:
-            entries.append(current_entry)
+            entries.append(_decode_entry(current_entry))
     return entries
 
-def save_po(file_path, lang_name, lang_code, keys, translations, fallback_map, en_final):
+def save_po(file_path, lang_name, lang_code, keys, translations, fallback_map, en_final,
+            stored_hashes=None, updated_keys=None):
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(f'msgid ""\nmsgstr ""\n"Language-Team: {lang_name}\\n"\n"Language: {lang_code}\\n"\n"Content-Type: text/plain; charset=UTF-8\\n"\n"Content-Transfer-Encoding: 8bit\\n"\n\n')
         for key in sorted(keys):
@@ -89,14 +247,28 @@ def save_po(file_path, lang_name, lang_code, keys, translations, fallback_map, e
                 val = translations.get(key) or fallback_map.get(key) or key
             else:
                 val = translations.get(key, "")
-            escaped_val = val.replace('\n', '\\n').replace('"', '\\"')
-            
-            # For non-English languages, write the hash of the English value we translated from
+            escaped_val = po_escape(val)
+
+            # For non-English languages, write the hash of the English value
+            # this translation was actually made from.
+            #
+            # Do NOT stamp the current English hash on a translation that was
+            # not updated this run. Skip mode used to do that, which told the
+            # next run the stale translation was fresh -- real drift then went
+            # unreported for good. Keep the stored hash instead, so the key
+            # stays stale until somebody translates it. A key that had no
+            # stored hash gets none: stamping the current one would make the
+            # same false claim of freshness.
             if lang_code != 'en':
                 en_val = en_final.get(key, "")
                 if en_val:
-                    f.write(f'# en-hash: {get_md5(en_val)}\n')
-            f.write(f'msgid "{key}"\nmsgstr "{escaped_val}"\n\n')
+                    if updated_keys is not None and key not in updated_keys:
+                        keep = (stored_hashes or {}).get(key)
+                    else:
+                        keep = en_hash(en_val)
+                    if keep:
+                        f.write(f'# en-hash: {keep}\n')
+            f.write(f'msgid "{po_escape(key)}"\nmsgstr "{escaped_val}"\n\n')
 
 def get_gemini_key():
     return os.environ.get("GEMINI_API_KEY")
@@ -230,7 +402,8 @@ Target languages and strings to translate:
             
     return all_results
 
-def manual_translate_languages(all_untranslated, lang_names, all_existing_tr):
+def manual_translate_languages(all_untranslated, lang_names, all_existing_tr,
+                               updated=None):
     """
     Prompts the user interactively in the terminal to translate keys.
     """
@@ -279,6 +452,8 @@ def manual_translate_languages(all_untranslated, lang_names, all_existing_tr):
                 
             if val:
                 existing_tr[key] = val
+                if updated is not None:
+                    updated.setdefault(lang_code, set()).add(key)
                 print(f"      Saved: {val}")
             else:
                 print("      Skipped.")
@@ -295,19 +470,63 @@ def sync():
     print("--- Starting Translation Sync ---")
     
     # 1. Scan Source for Used Keys
-    used_keys = {} # key -> default_string
+    #
+    # Two places hold an English default: the inline `or "..."` on a loc:t call,
+    # and the hardcoded fallbacks table in localization_xray.lua. They disagree
+    # for 30 keys, and this used to read them in os.walk order, so which one
+    # reached en.po was arbitrary -- that is how `fetching_ai` ended up with a
+    # different placeholder set than every translation of it.
+    #
+    # Precedence is now fixed: the inline default wins, because that is the copy
+    # that gets maintained (it carries the [B]markup[/B] and the current wording).
+    # The table only fills in keys that have no inline default. Walk in sorted
+    # order too, so two runs cannot disagree.
+    inline_defaults = {}   # key -> English from an `or "..."` on the call
+    table_defaults = {}    # key -> English from the hardcoded fallbacks table
+    keys_seen = set()
     for root, _, files in os.walk(SOURCE_DIR):
-        for file in files:
+        for file in sorted(files):
             if file.endswith('.lua'):
                 with open(os.path.join(root, file), 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read()
-                    matches = re.finditer(r'loc:t\([\"\']([^\"\']*)[\"\'](?:,\s*.*?)?\)(?:\s*or\s*([\"\'])(.*?)\2)?', content, re.DOTALL)
-                    for m in matches:
-                        used_keys[m.group(1)] = m.group(3) or used_keys.get(m.group(1), "")
+                    for m in LOC_FIELD_RE.finditer(content):
+                        keys_seen.add(m.group(1))
+                    for key, fb in iter_loc_calls(content):
+                        keys_seen.add(key)
+                        if fb:
+                            fb = po_unescape(fb)
+                            prev = inline_defaults.get(key)
+                            if prev is not None and prev != fb:
+                                # Two call sites disagree. The later file in
+                                # sorted order wins; say so, or the choice is
+                                # silent and looks arbitrary from en.po.
+                                print(f"  ! {key}: inline defaults differ, {file} wins")
+                                print(f"      using   {fb!r}")
+                                print(f"      ignored {prev!r}")
+                            inline_defaults[key] = fb
                     if 'localization_xray.lua' in file:
-                        fb_matches = re.finditer(r'(\w+)\s*=\s*\"(.*?)\"', content)
-                        for m in fb_matches:
-                            used_keys[m.group(1)] = m.group(2)
+                        # Read the hardcoded fallback table only. Scanning the
+                        # whole file matched every `name = "value"` assignment
+                        # in it and invented keys out of module fields and
+                        # locals (`path`, `current_language`, `val`).
+                        blk = re.search(r'local fallbacks = \{(.*?)\n\s*\}', content, re.DOTALL)
+                        if blk:
+                            for m in re.finditer(FALLBACK_ENTRY_RE, blk.group(1)):
+                                table_defaults[m.group(1)] = po_unescape(m.group(2))
+                                keys_seen.add(m.group(1))
+
+    used_keys = {} # key -> default_string
+    for key in keys_seen:
+        used_keys[key] = inline_defaults.get(key) or table_defaults.get(key) or ""
+
+    # A default that takes an argument must keep its placeholder, or the
+    # argument is dropped and every translation of the key drifts against it.
+    for key, val in sorted(used_keys.items()):
+        other = table_defaults.get(key) if inline_defaults.get(key) else inline_defaults.get(key)
+        if other and _placeholders(val) != _placeholders(other):
+            print(f"  ! {key}: the two English defaults disagree on placeholders")
+            print(f"      using   {val!r}")
+            print(f"      ignored {other!r}")
 
     print(f"Found {len(used_keys)} keys in source code.")
 
@@ -326,6 +545,7 @@ def sync():
 
     # 3. Read and Prepare other languages
     lang_files = [f for f in os.listdir(LANGUAGES_DIR) if f.endswith('.po') and not f.startswith(MASTER_LANG)]
+    lang_files_codes = [f.split('.')[0] for f in lang_files]
     
     lang_names = {}
     all_existing_tr = {}
@@ -337,14 +557,18 @@ def sync():
         path = os.path.join(LANGUAGES_DIR, file)
         entries = parse_po(path)
         
-        # Extract Language Name from header
-        lang_name = lang_code.capitalize()
+        # Language name, from xray_ui.lua. The header is only a fallback for a
+        # language that is not registered there yet: the tools write that header
+        # themselves, so a bad value in it survives every later sync. That is
+        # how every file came to say "Language-Team: Ar".
+        header_name = None
         for e in entries:
             if e['msgid'] == '':
-                m = re.search(r'Language-Team: (.*?)\\n', e['msgstr'])
-                if m: lang_name = m.group(1)
-        
-        lang_names[lang_code] = lang_name
+                m = re.search(r'Language-Team: (.*?)\n', e['msgstr'])
+                if m and m.group(1) != lang_code.capitalize():
+                    header_name = m.group(1)
+
+        lang_names[lang_code] = language_name(lang_code, header_name)
         
         existing_tr = {e['msgid']: e['msgstr'] for e in entries if e['msgid'] and e['msgstr']}
         existing_hashes = {e['msgid']: e['en_hash'] for e in entries if e['msgid']}
@@ -359,13 +583,20 @@ def sync():
                 current_val = existing_tr.get(key, "")
                 en_val = en_final.get(key, "")
                 stored_hash = existing_hashes.get(key)
-                current_hash = get_md5(en_val) if en_val else None
+                current_hash = en_hash(en_val) if en_val else None
                 
                 is_missing = (current_val == "")
                 is_fallback = (current_val == key and key not in ALLOWLIST)
                 is_stale = (stored_hash and current_hash and stored_hash != current_hash)
-                
-                if is_missing or is_fallback or is_stale:
+                # A translation that lost or gained a format specifier is wrong
+                # whatever its hash says: at best the argument is dropped, and
+                # tools/translate_all.py --audit reports it as drift. Catch it
+                # here so one run of this tool actually fixes it.
+                is_placeholder_drift = (
+                    current_val != ""
+                    and _placeholders(current_val) != _placeholders(en_val))
+
+                if is_missing or is_fallback or is_stale or is_placeholder_drift:
                     untranslated[key] = en_val
                     
         if untranslated:
@@ -748,12 +979,17 @@ def sync():
                 "web_setup_title": "通过手机 / 电脑连接"
         }
 }
+    # Keys whose translation this run actually replaced. Only these may have
+    # their en-hash refreshed; see save_po.
+    updated = {code: set() for code in lang_files_codes}
+
     for lang_code, keys in list(all_untranslated.items()):
         if lang_code in local_translations:
             for k in list(keys.keys()):
                 if k in local_translations[lang_code]:
                     val = local_translations[lang_code][k]
                     all_existing_tr[lang_code][k] = val
+                    updated.setdefault(lang_code, set()).add(k)
                     del keys[k]
             if not keys:
                 del all_untranslated[lang_code]
@@ -808,9 +1044,11 @@ def sync():
                 if lang_code in all_existing_tr:
                     for k, v in tr_map.items():
                         all_existing_tr[lang_code][k] = v
+                        updated.setdefault(lang_code, set()).add(k)
                         
         elif mode == "manual":
-            manual_translate_languages(all_untranslated, lang_names, all_existing_tr)
+            manual_translate_languages(all_untranslated, lang_names, all_existing_tr,
+                                       updated)
             
         elif mode == "skip":
             print("\nSkipping translations. Saving updated keys with fallbacks.")
@@ -824,7 +1062,9 @@ def sync():
         lang_name = lang_names[lang_code]
         existing_tr = all_existing_tr[lang_code]
         
-        save_po(path, lang_name, lang_code, en_final.keys(), existing_tr, en_final, en_final)
+        save_po(path, lang_name, lang_code, en_final.keys(), existing_tr, en_final, en_final,
+                stored_hashes=all_existing_hashes.get(lang_code, {}),
+                updated_keys=updated.get(lang_code, set()))
         
         missing_count = len([k for k in en_final if k not in existing_tr or existing_tr[k] == ""])
         print(f"Updated {file} ({missing_count} keys need translation)")

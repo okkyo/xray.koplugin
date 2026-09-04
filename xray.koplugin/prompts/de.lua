@@ -41,7 +41,7 @@ Schritt 1. Schauen Sie NUR in den Block "CHAPTER SAMPLES". Identifizieren Sie di
 Schritt 2. SCHLIESSEN Sie alle nicht-erzählenden Vorspann- und Nachspann-Elemente AUS (z. B. Cover, Titelseite, Copyright, Inhaltsverzeichnis, Widmung, Danksagung, Auch von).
 Schritt 3. Erstellen Sie für jedes erzählende Kapitel, beginnend mit dem allerersten, GENAU EIN Ereignisobjekt im Array `timeline`.
 Schritt 4. Das Feld `chapter` MUSS exakt mit der Kapitelüberschrift in der Stichprobe übereinstimmen. (Ordnen Sie diese strikt in sequentieller Reihenfolge zu).
-Schritt 5. Fassen Sie dieses spezifische Kapitel im Feld `event` zusammen {TIMELINE_DETAIL_GUIDANCE} (MAX. {MAX_TIMELINE_EVENT} Zeichen). Gruppieren Sie KEINE Kapitel.
+Schritt 5. Fassen Sie dieses spezifische Kapitel im Feld `event` zusammen. {TIMELINE_DETAIL_GUIDANCE} Schreiben Sie zwischen {MIN_TIMELINE_EVENT} und {MAX_TIMELINE_EVENT} Zeichen. Schreiben Sie KEINE kürzere Zusammenfassung, es sei denn, das Kapitel hat fast keinen Inhalt. Gruppieren Sie KEINE Kapitel.
 Schritt 6. KEINE SPOILER: Hören Sie genau bei der %d%%-Marke auf. Beziehen Sie keine Ereignisse nach diesem Fortschritt ein.
 
 ALGORITHMUS FÜR CHARAKTERE & HISTORISCHE PERSONEN:
@@ -219,6 +219,21 @@ If `is_valid` is false:
 {
   "is_valid": false,
   "error_message": "Kurze Erklärung, warum dies kein Charakter oder Ort ist."
+}]],
+
+    -- Book Type Detection
+    book_type_detect = [[Buchtitel: %s
+Autor: %s
+Serie: %s
+Dateibeschreibung/Betreff-Metadaten: %s
+
+AUFGABE: Klassifiziere dieses Buch basierend auf seinen Metadaten und Genresignalen in genau EINEN dieser Buchtypen:
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+Gib NUR gültiges JSON zurück:
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
 }]],
 
     -- Multi-Book Series Context Prompts

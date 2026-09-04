@@ -15,6 +15,12 @@ if sys.version_info >= (3, 7):
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from env_loader import load_env_file
+from lang_names import language_name
+# One PO reader/writer for both tools. This file used to keep its own copies:
+# its parse_po returned still-encoded text and its save_po encoded it again,
+# so every --translate run doubled the backslashes sync_translations.py had
+# just cleaned, and dropped every `# en-hash:` line with them.
+from sync_translations import parse_po, po_escape, en_hash
 
 # Read GEMINI_API_KEY (and anything else) from a .env file at the repo root.
 load_env_file()
@@ -70,51 +76,31 @@ def call_gemini(prompt):
             print(f"API Error calling Gemini: {e}")
             sys.exit(1)
 
-# PO File Parser & Generator
-def parse_po(file_path):
-    entries = []
-    current_entry = {'msgid': '', 'msgstr': '', 'comments': []}
-    current_field = None
-    if not os.path.exists(file_path): return []
-    with open(file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                if current_entry['msgid'] or current_entry['msgstr']:
-                    entries.append(current_entry)
-                    current_entry = {'msgid': '', 'msgstr': '', 'comments': []}
-                current_field = None
-                continue
-            if line.startswith('#'):
-                current_entry['comments'].append(line)
-            elif line.startswith('msgid '):
-                m = re.match(r'^msgid "(.*)"$', line)
-                if m: current_entry['msgid'] = m.group(1)
-                current_field = 'msgid'
-            elif line.startswith('msgstr '):
-                m = re.match(r'^msgstr "(.*)"$', line)
-                if m: current_entry['msgstr'] = m.group(1)
-                current_field = 'msgstr'
-            elif line.startswith('"'):
-                m = re.match(r'^"(.*)"$', line)
-                if m:
-                    if current_field == 'msgid':
-                        current_entry['msgid'] += m.group(1)
-                    elif current_field == 'msgstr':
-                        current_entry['msgstr'] += m.group(1)
-        if current_entry['msgid'] or current_entry['msgstr']:
-            entries.append(current_entry)
-    return entries
+# PO File Generator (the parser is shared with sync_translations.py)
+def save_po(file_path, lang_name, lang_code, keys, translations, en_values=None,
+            stored_hashes=None, updated_keys=None):
+    """Write a .po file. Values arrive DECODED (real newlines, bare quotes)
+    and are encoded once here.
 
-def save_po(file_path, lang_name, lang_code, keys, translations):
+    The `# en-hash:` line records which English text a translation was made
+    from. A key translated this run gets the current hash. Any other key keeps
+    the hash it had; a key that had none gets none, so sync_translations.py
+    still treats it as unverified instead of reading it as fresh."""
+    en_values = en_values or {}
+    stored_hashes = stored_hashes or {}
+    updated_keys = set() if updated_keys is None else updated_keys
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(f'msgid ""\nmsgstr ""\n"Language-Team: {lang_name}\\n"\n"Language: {lang_code}\\n"\n"Content-Type: text/plain; charset=UTF-8\\n"\n"Content-Transfer-Encoding: 8bit\\n"\n\n')
         for key in sorted(keys):
             if not key: continue
             val = translations.get(key, "")
-            # Ensure escaped newlines
-            escaped_val = val.replace('\n', '\\n').replace('"', '\\"')
-            f.write(f'msgid "{key}"\nmsgstr "{escaped_val}"\n\n')
+            en_val = en_values.get(key, "")
+            if en_val:
+                if key in updated_keys:
+                    f.write(f'# en-hash: {en_hash(en_val)}\n')
+                elif stored_hashes.get(key):
+                    f.write(f'# en-hash: {stored_hashes[key]}\n')
+            f.write(f'msgid "{po_escape(key)}"\nmsgstr "{po_escape(val)}"\n\n')
 
 # Lua Prompts Parser & Generator
 def parse_lua_prompts(file_path):
@@ -309,6 +295,8 @@ def translate_language(lang_code, lang_name):
     
     en_po_dict = {e['msgid']: e['msgstr'] for e in en_po if e['msgid']}
     target_po_dict = {e['msgid']: e['msgstr'] for e in target_po if e['msgid']}
+    target_hashes = {e['msgid']: e['en_hash'] for e in target_po if e['msgid']}
+    updated_keys = set()
     
     # 1. Translate PO Keys
     missing_po = {}
@@ -340,13 +328,16 @@ Strings to translate:
             translated_batch = call_gemini(prompt)
             for k, v in translated_batch.items():
                 target_po_dict[k] = v
+                updated_keys.add(k)
             # Save incrementally to prevent losing progress on rate limits
             target_po_dict['language_name'] = lang_name
-            save_po(target_po_path, lang_name, lang_code, en_po_dict.keys(), target_po_dict)
+            save_po(target_po_path, lang_name, lang_code, en_po_dict.keys(), target_po_dict,
+                    en_po_dict, target_hashes, updated_keys)
             print(f"Saved batch progress to {target_po_path}")
                 
         target_po_dict['language_name'] = lang_name
-        save_po(target_po_path, lang_name, lang_code, en_po_dict.keys(), target_po_dict)
+        save_po(target_po_path, lang_name, lang_code, en_po_dict.keys(), target_po_dict,
+                en_po_dict, target_hashes, updated_keys)
         print(f"Saved translated UI strings to {target_po_path}")
     else:
         print("All UI strings already translated.")
@@ -409,13 +400,18 @@ def get_supported_languages():
         if file.endswith('.po') and file != 'en.po':
             lang_code = file.split('.')[0]
             path = os.path.join(LANGUAGES_DIR, file)
-            lang_name = lang_code.capitalize()
+            # Language name, from xray_ui.lua. The header is only a fallback
+            # for a language that is not registered there yet: this tool writes
+            # that header itself, so a bad value in it survives every later
+            # run. Must stay in step with tools/sync_translations.py.
+            header_name = None
             entries = parse_po(path)
             for e in entries:
                 if e['msgid'] == '':
-                    m = re.search(r'Language-Team: (.*?)\\n', e['msgstr'])
-                    if m: lang_name = m.group(1)
-            languages[lang_code] = lang_name
+                    m = re.search(r'Language-Team: (.*?)\n', e['msgstr'])
+                    if m and m.group(1) != lang_code.capitalize():
+                        header_name = m.group(1)
+            languages[lang_code] = language_name(lang_code, header_name)
     return languages
 
 if __name__ == '__main__':

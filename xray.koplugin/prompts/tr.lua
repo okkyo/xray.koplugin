@@ -40,7 +40,7 @@ Adım 1. SADECE "CHAPTER SAMPLES" bloğuna bak. Anlatı bölümlerini belirle.
 Adım 2. Anlatı olmayan tüm ön madde ve arka maddeleri HARİÇ TUT (örn., Kapak, Başlık Sayfası, Telif Hakkı, İçindekiler, İthaf, Teşekkür, Ayrıca Yazan).
 Adım 3. Her anlatı bölümü için, en ilk bölümden başlayarak, `timeline` dizisinde TAM OLARAK BİR olay objesi oluştur.
 Adım 4. `chapter` alanı, örnekteki bölüm başlığıyla tam olarak eşleşmelidir. (Bunları kesinlikle sıralı düzende eşle).
-Adım 5. Bu özel bölümü `event` alanında özetle {TIMELINE_DETAIL_GUIDANCE} (MAKS {MAX_TIMELINE_EVENT} karakter). Bölümleri GRUPLANDIRMA.
+Adım 5. Bu özel bölümü `event` alanında özetle. {TIMELINE_DETAIL_GUIDANCE} {MIN_TIMELINE_EVENT} ile {MAX_TIMELINE_EVENT} karakter arasında yaz. Bölüm neredeyse hiç içeriğe sahip olmadığı sürece daha kısa bir özet yazma. Bölümleri GRUPLANDIRMA.
 Adım 6. SPOILER YOK: Tam olarak %%%d noktasında dur. Bu ilerlemeden sonraki olayları dahil etme.
 
 KARAKTERLER VE TARİHİ KİŞİLER İÇİN ALGORİTMA:
@@ -264,6 +264,21 @@ Birincil Açıklama: %s
 GEREKLİ JSON BİÇİMİ:
 {
   "merged_description": "Birleştirilmiş ve cilalanmış açıklama (En fazla {MAX_CHAR_DESC} karakter)"
+}]],
+
+    -- Book Type Detection
+    book_type_detect = [[Kitap Başlığı: %s
+Yazar: %s
+Seri: %s
+Dosya Açıklaması/Konu Metaverisi: %s
+
+GÖREV: Bu kitabı metaverilerine ve tür sinyallerine dayanarak tam olarak BU kitap türlerinden BİRİNE sınıflandırın:
+prose_fiction, prose_nonfiction, manga, graphic_novel, children, poetry, cookbook, textbook, travel, unknown
+
+YALNIZCA geçerli JSON döndürün:
+{
+  "book_type_label": "prose_fiction",
+  "confidence": "high"
 }]],
 
 -- Multi-Book Series Context Prompts

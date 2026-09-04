@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Language-Team: Tr\n"
+"Language-Team: Türkçe\n"
 "Language: tr\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -197,7 +197,7 @@ msgstr "Yapıştır"
 msgid "cache_cleared"
 msgstr "Önbellek temizlendi!\n\nŞimdi yeni verileri çekebilirsiniz:\nMenü → X-Ray → AI Verilerini Çek"
 
-# en-hash: 2e361c4db7a5480c21b02780ed4e9e0b
+# en-hash: 1edc355371d87a94d024eebfed9f8815
 msgid "cache_save_failed"
 msgstr "Önbelleğe kaydetme başarısız"
 
@@ -248,10 +248,6 @@ msgstr "Yapılandırılmış tüm API anahtarlarını ve özel uç noktaları te
 # en-hash: dd6eee404e54eafd92e56d09cb4848f3
 msgid "confirm_clear_single_key"
 msgstr "%s için yapılandırılmış API anahtarı temizlensin mi?"
-
-# en-hash: 9cfefed8fb9497baa5cd519d7d2bb5d7
-msgid "current_language"
-msgstr "tr"
 
 # en-hash: 97b9ad7336ac722cf16044cf603bfe10
 msgid "current_mode"
@@ -483,7 +479,7 @@ msgstr "Veri çekme başarılı"
 
 # en-hash: 572e520194e629b3b906bb5b3e5bce2d
 msgid "fetching_ai"
-msgstr "X-Ray getiriliyor..."
+msgstr "%s konumundan alınıyor..."
 
 # en-hash: 2b05ded75b73f463504a742fe3492e55
 msgid "fetching_author"
@@ -533,13 +529,33 @@ msgstr "Resim indiriliyor..."
 msgid "img_error"
 msgstr "Arama başarısız: %s"
 
+# en-hash: fe63191987f62b9e4806e376671ed335
+msgid "img_extract_failed"
+msgstr "Görsel dosyası ayıklanamadı."
+
+# en-hash: a557254d6ea7fb31d1776d65e97f9a43
+msgid "img_key_brave"
+msgstr "Brave Search Anahtarı"
+
 # en-hash: 2bcf4d0012d8fec18f5b97a1f307c958
 msgid "img_key_saved"
 msgstr "Kaydedildi."
 
+# en-hash: 6fa56c2b1cb703d54c4b8b0e4440cf16
+msgid "img_key_serpapi"
+msgstr "SerpApi Anahtarı"
+
 # en-hash: 6ad9a851e6b0ab3cb2f3b75e87cd234a
-msgid "img_key_title"
+msgid "img_key_tavily"
 msgstr "Tavily API Anahtarı"
+
+# en-hash: 6c625a44b20a366fb63ef60e096e759a
+msgid "img_loading_more"
+msgstr "Daha fazla görsel yükleniyor..."
+
+# en-hash: fd2941cfb27f0d8ab5a606e86d757e8a
+msgid "img_minimized_hint"
+msgstr "'%s' simge durumuna küçültüldü. Devam etmek için 'Görseller ve Haritalar'ı yeniden açın."
 
 # en-hash: d3da97e2d9aee5c8fbe03156ad051c99
 msgid "img_more"
@@ -549,6 +565,22 @@ msgstr "Daha Fazla"
 msgid "img_next"
 msgstr "Sonraki"
 
+# en-hash: 30936c8b483b8b104a4ad7821ce2262b
+msgid "img_no_favorites"
+msgstr "Henüz favori yok.\n\nFavorilerinize eklemek için herhangi bir görselde ⋮ menüsünü kullanın."
+
+# en-hash: c3e4c8dd2122260b0c4e14d6509e62ca
+msgid "img_no_hidden"
+msgstr "Gizlenmiş görsel yok.\n\nDekoratif illüstrasyonları veya süslü başharfleri gizlemek için galerideki herhangi bir görselde ⋮ menüsünü kullanın."
+
+# en-hash: 95407637295cd7c30378be19be6e36cb
+msgid "img_no_images"
+msgstr "Bu sekme/filtre için resim bulunamadı.\n\nKitaptan resimler çıkarılıyor veya taranıyor..."
+
+# en-hash: a0c513c130fac7b4559f145cd9352091
+msgid "img_no_key"
+msgstr "Önce Resim Arama ayarlarından bir resim arama anahtarı ekleyin."
+
 # en-hash: b79b9ffffededdcf093dc9f81e0a4412
 msgid "img_no_preview"
 msgstr "(Önizleme yok)"
@@ -556,6 +588,10 @@ msgstr "(Önizleme yok)"
 # en-hash: 5db1e02d891c15e428428c0e6e83c363
 msgid "img_no_results"
 msgstr "Resim bulunamadı."
+
+# en-hash: 74ab2b6d760dc64ea26012a4fca84490
+msgid "img_no_series"
+msgstr "Kaydedilmiş seri referansı yok.\n\nSeri referanslarınıza kaydetmek için herhangi bir haritada ⋮ menüsünü kullanın."
 
 # en-hash: dd1f775e443ff3b9a89270713580a51b
 msgid "img_prev"
@@ -565,9 +601,33 @@ msgstr "Önceki"
 msgid "img_processing"
 msgstr "Resim işleniyor..."
 
-# en-hash: 67a68190ce74fbbee740d8c7d03e360c
+# en-hash: a2c65774cce0bdcd3ad1e08086e2ea40
+msgid "img_provider_about"
+msgstr "[B]Otomatik[/B], SerpApi, Brave Search, Tavily sırasıyla bir anahtarı olan ilk sağlayıcıyı kullanır.\n\nÖncelikle seçilen sağlayıcı denenir. Başarısız olursa veya hiçbir şey bulamazsa, diğerleri aynı sırayla denenir ve yanıt veren sağlayıcı bir bildirimle belirtilir.\n\nAnahtarı olmayan bir sağlayıcı atlanır."
+
+# en-hash: ae0482189aa02d8b159c077edf8ca8c6
+msgid "img_provider_auto"
+msgstr "Otomatik (sıradaki ilk anahtar)"
+
+# en-hash: 56039cb24bf2fecba0a4aa7947d0e720
+msgid "img_provider_desc"
+msgstr "Görsel aramasını hangi sağlayıcının çalıştıracağını seçin:"
+
+# en-hash: 11943975b2ef7d14f6c41bfeafc3a795
+msgid "img_provider_fallback"
+msgstr "%s kullanılamıyor. %s sonuçları gösteriliyor."
+
+# en-hash: b82a86548d797c4682913295fc676ac9
 msgid "img_provider_hint"
-msgstr "Varsayılan: DuckDuckGo (anahtar gerekmez)."
+msgstr "Sırasıyla denenir. En az bir anahtar gereklidir."
+
+# en-hash: edc912fec23be8b7c8b6d318899d8d0d
+msgid "img_provider_no_key"
+msgstr "%s (anahtar yok)"
+
+# en-hash: 01fd162e98f5553ab970a30e3a0efd2a
+msgid "img_provider_setting"
+msgstr "Görsel Arama Sağlayıcısı"
 
 # en-hash: fc35ec973f5b3a16f0d4b009834f39a6
 msgid "img_remove"
@@ -581,9 +641,17 @@ msgstr "Eklenen görsel kaldırılsın mı?"
 msgid "img_removed"
 msgstr "Resim kaldırıldı."
 
+# en-hash: 2bea7b6d66811b50767c7b22f81fb2c2
+msgid "img_rename_title"
+msgstr "Görsel Etiketini Yeniden Adlandır"
+
 # en-hash: 6fe2ab43d39c389ef5f665a86121f95c
 msgid "img_result_count"
 msgstr "Sonuç %1$d / %2$d"
+
+# en-hash: 393c3f5ea8ad35c02691d507bdbb31b0
+msgid "img_reveal"
+msgstr "Göster"
 
 # en-hash: c3612962736fa980b8a853fbc9fa981c
 msgid "img_saved"
@@ -605,13 +673,41 @@ msgstr "Resim Ara"
 msgid "img_searching"
 msgstr "Resimler aranıyor..."
 
+# en-hash: e14cbcb87dce9e2354fdf7db62b93a9c
+msgid "img_show_first"
+msgstr "İlk görsele dön"
+
+# en-hash: e0bcbbbd7e4041eb19382d32dd0c47a6
+msgid "img_show_more"
+msgstr "Daha fazla görsel göster"
+
 # en-hash: 772eeb0a8a4e1193a21b9d2631e4a508
 msgid "img_source_suffix"
 msgstr "  (%s)"
 
-# en-hash: e3cea90d4e14007d88412e5a300c97ff
-msgid "img_tavily_fallback"
-msgstr "Tavily kullanılamıyor. DuckDuckGo sonuçları gösteriliyor."
+# en-hash: 646ef4f9024779f1a04ee945deffb8d5
+msgid "img_spoiler_confirm"
+msgstr "Bu görsel %d. sayfada yer alıyor (mevcut okuma ilerlemenizin ötesinde). Görsel gösterilsin mi?"
+
+# en-hash: d0f2e5376298c880665077b565ffd7dd
+msgid "img_spoiler_locked"
+msgstr "Kilitli"
+
+# en-hash: b1c94ca2fbc3e78fc30069c8d0f01680
+msgid "img_tab_all"
+msgstr "Tümü"
+
+# en-hash: d78986947356ddd37b43d57df289dee9
+msgid "img_tab_favorites"
+msgstr "Favoriler"
+
+# en-hash: 9d948e617b083222afc868add2f50ec2
+msgid "img_tab_series"
+msgstr "Seriler"
+
+# en-hash: be53a0541a6d36f6ecb879fa2c584b08
+msgid "img_untitled"
+msgstr "Görsel"
 
 # en-hash: c54c117a6b6dfeed9d6276e093a6aa15
 msgid "img_use_this"
@@ -620,49 +716,6 @@ msgstr "Bu Resmi Kullan"
 # en-hash: c4f1dea83d1eb17400190339311b3482
 msgid "img_view"
 msgstr "Resmi Görüntüle"
-
-msgid "img_extract_failed"
-msgstr "Görsel dosyası ayıklanamadı."
-
-msgid "img_minimized_hint"
-msgstr "Küçültülmüş görsel ipucu"
-
-msgid "img_no_favorites"
-msgstr "Henüz favori yok.\n\nFavorilerinize eklemek için herhangi bir görselde ⋮ menüsünü kullanın."
-
-msgid "img_no_hidden"
-msgstr "Gizlenmiş görsel yok.\n\nDekoratif illüstrasyonları veya süslü başharfleri gizlemek için galerideki herhangi bir görselde ⋮ menüsünü kullanın."
-
-msgid "img_no_images"
-msgstr "Bu sekme/filtre için resim bulunamadı.\n\nKitaptan resimler çıkarılıyor veya taranıyor..."
-
-msgid "img_no_series"
-msgstr "Kaydedilmiş seri referansı yok.\n\nSeri referanslarınıza kaydetmek için herhangi bir haritada ⋮ menüsünü kullanın."
-
-msgid "img_rename_title"
-msgstr "Görsel Etiketini Yeniden Adlandır"
-
-msgid "img_reveal"
-msgstr "Göster"
-
-msgid "img_spoiler_confirm"
-msgstr "Bu görsel %d. sayfada yer alıyor (mevcut okuma ilerlemenizin ötesinde). Görsel gösterilsin mi?"
-
-msgid "img_spoiler_locked"
-msgstr "Kilitli"
-
-msgid "img_tab_all"
-msgstr "Tümü"
-
-msgid "img_tab_favorites"
-msgstr "Favoriler"
-
-msgid "img_tab_series"
-msgstr "Seriler"
-
-msgid "img_untitled"
-msgstr "Görsel"
-
 
 # en-hash: 57519cae872270f11151178ce007fd53
 msgid "import_file_not_found"
@@ -956,9 +1009,9 @@ msgstr "Tarihi Kişiler"
 msgid "menu_image_search"
 msgstr "Görsel Arama"
 
+# en-hash: 073096c9e6fbe0599a7c64e0e7a665cb
 msgid "menu_images"
 msgstr "Görseller ve Haritalar"
-
 
 # en-hash: 31a20a82ddb0aada27aab20c1352115f
 msgid "menu_import_file"
@@ -1224,10 +1277,6 @@ msgstr "'%s' için tam eşleşme bulunamadı. İlgili bir girdiye dokunun veya b
 msgid "paste_clipboard_confirm"
 msgstr "Panodaki API anahtarı %s için kullanılsın mı?"
 
-# en-hash: 607481fc96e754b33650eb171aac9447
-msgid "path"
-msgstr "plugins/xray.koplugin"
-
 # en-hash: 046763a0d64321194477604b7751c8e4
 msgid "pending_duplicates_prompt"
 msgstr "Yapay zeka, son getirmeden %d olası kopya buldu. Şimdi incelemek ister misiniz?"
@@ -1236,6 +1285,7 @@ msgstr "Yapay zeka, son getirmeden %d olası kopya buldu. Şimdi incelemek ister
 msgid "plugin_description"
 msgstr "Amazon Kindle X-Ray gibi, YZ destekli kitap analizi ile okuma deneyiminizi dönüştürün!"
 
+# en-hash: 14230d11143a03f4330c6433d5032a9d
 msgid "prev"
 msgstr "Önceki"
 
@@ -1379,7 +1429,7 @@ msgstr "Spoiler Tercihi"
 msgid "stop"
 msgstr "Stop"
 
-# en-hash: d725036d492c380f06f4eb32f5704bc9
+# en-hash: d7c6deb856024d209d52d833b9f4c95d
 msgid "term_not_found"
 msgstr "'%s' ile eşleşen terim bulunamadı"
 
@@ -1707,13 +1757,9 @@ msgstr "X-Ray güncel (%s)."
 msgid "updater_whats_new"
 msgstr "Yenilikler:"
 
-# en-hash: 362b2e695aa7299e20bb0d9ce320f58d
+# en-hash: 46667b51ced49ca8828f897cf83e89b8
 msgid "updating_ai"
 msgstr "X-Ray verileri güncelleniyor..."
-
-# en-hash: 0d1b08c34858921bc7c662b228acb7ba
-msgid "val"
-msgstr "???"
 
 # en-hash: 1739e3ae6d734407aef8af879665b8ee
 msgid "validate_keys_title"

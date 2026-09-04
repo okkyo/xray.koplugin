@@ -150,7 +150,7 @@ msgid "cache_cleared"
 msgstr "Cache cleared!\n\nYou can now fetch new data:\nMenu → X-Ray → Fetch AI Data"
 
 msgid "cache_save_failed"
-msgstr "[Save failed]"
+msgstr "✗ Cache failed."
 
 msgid "cache_save_success"
 msgstr "✓ Cache updated."
@@ -187,9 +187,6 @@ msgstr "Are you sure you want to clear all configured API keys and custom endpoi
 
 msgid "confirm_clear_single_key"
 msgstr "Clear the configured API key for %s?"
-
-msgid "current_language"
-msgstr "en"
 
 msgid "current_mode"
 msgstr "Current: "
@@ -401,11 +398,26 @@ msgstr "Downloading image..."
 msgid "img_error"
 msgstr "Search failed: %s"
 
+msgid "img_extract_failed"
+msgstr "Could not extract image file."
+
+msgid "img_key_brave"
+msgstr "Brave Search Key"
+
 msgid "img_key_saved"
 msgstr "Saved."
 
-msgid "img_key_title"
+msgid "img_key_serpapi"
+msgstr "SerpApi Key"
+
+msgid "img_key_tavily"
 msgstr "Tavily API Key"
+
+msgid "img_loading_more"
+msgstr "Loading more images..."
+
+msgid "img_minimized_hint"
+msgstr "Minimized '%s'. Reopen 'Images & Maps' to resume."
 
 msgid "img_more"
 msgstr "More"
@@ -413,11 +425,26 @@ msgstr "More"
 msgid "img_next"
 msgstr "Next"
 
+msgid "img_no_favorites"
+msgstr "No favorites yet.\n\nUse the ⋮ menu on any image to add it to your favorites."
+
+msgid "img_no_hidden"
+msgstr "No hidden images.\n\nUse the ⋮ menu on any image in the gallery to hide decorative illustrations or drop caps."
+
+msgid "img_no_images"
+msgstr "No images found for this tab/filter.\n\nExtracting or scanning images from book..."
+
+msgid "img_no_key"
+msgstr "Add an image search key in the Image Search settings first."
+
 msgid "img_no_preview"
 msgstr "(No preview available)"
 
 msgid "img_no_results"
 msgstr "No images found."
+
+msgid "img_no_series"
+msgstr "No series references saved.\n\nUse the ⋮ menu on any map to save it to your series references."
 
 msgid "img_prev"
 msgstr "Previous"
@@ -425,8 +452,26 @@ msgstr "Previous"
 msgid "img_processing"
 msgstr "Processing image..."
 
+msgid "img_provider_about"
+msgstr "[B]Auto[/B] uses the first provider that has a key, in the order SerpApi, Brave Search, Tavily.\n\nA chosen provider is tried first. When it fails or finds nothing, the others are tried in that same order, and a notice names the provider that answered.\n\nA provider with no key is skipped."
+
+msgid "img_provider_auto"
+msgstr "Auto (first key in order)"
+
+msgid "img_provider_desc"
+msgstr "Select which provider runs an image search:"
+
+msgid "img_provider_fallback"
+msgstr "%s unavailable. Showing %s results."
+
 msgid "img_provider_hint"
-msgstr "Default: DuckDuckGo (no key needed)."
+msgstr "Tried in order. At least one key is required."
+
+msgid "img_provider_no_key"
+msgstr "%s (no key)"
+
+msgid "img_provider_setting"
+msgstr "Image Search Provider"
 
 msgid "img_remove"
 msgstr "Remove Image"
@@ -437,8 +482,14 @@ msgstr "Remove the attached image?"
 msgid "img_removed"
 msgstr "Image removed."
 
+msgid "img_rename_title"
+msgstr "Rename Image Label"
+
 msgid "img_result_count"
 msgstr "Result %1$d of %2$d"
+
+msgid "img_reveal"
+msgstr "Reveal"
 
 msgid "img_saved"
 msgstr "Image attached."
@@ -455,41 +506,14 @@ msgstr "Search Image"
 msgid "img_searching"
 msgstr "Searching for images..."
 
+msgid "img_show_first"
+msgstr "Back to first image"
+
+msgid "img_show_more"
+msgstr "Show more images"
+
 msgid "img_source_suffix"
 msgstr "  (%s)"
-
-msgid "img_tavily_fallback"
-msgstr "Tavily unavailable. Showing DuckDuckGo results."
-
-msgid "img_use_this"
-msgstr "Use This Image"
-
-msgid "img_view"
-msgstr "View Image"
-
-msgid "img_extract_failed"
-msgstr "Could not extract image file."
-
-msgid "img_minimized_hint"
-msgstr "img_minimized_hint"
-
-msgid "img_no_favorites"
-msgstr "No favorites yet.\n\nUse the ⋮ menu on any image to add it to your favorites."
-
-msgid "img_no_hidden"
-msgstr "No hidden images.\n\nUse the ⋮ menu on any image in the gallery to hide decorative illustrations or drop caps."
-
-msgid "img_no_images"
-msgstr "No images found for this tab/filter.\n\nExtracting or scanning images from book..."
-
-msgid "img_no_series"
-msgstr "No series references saved.\n\nUse the ⋮ menu on any map to save it to your series references."
-
-msgid "img_rename_title"
-msgstr "Rename Image Label"
-
-msgid "img_reveal"
-msgstr "Reveal"
 
 msgid "img_spoiler_confirm"
 msgstr "This image appears on page %d (past your current reading progress). Reveal image?"
@@ -509,6 +533,11 @@ msgstr "Series"
 msgid "img_untitled"
 msgstr "Image"
 
+msgid "img_use_this"
+msgstr "Use This Image"
+
+msgid "img_view"
+msgstr "View Image"
 
 msgid "import_file_not_found"
 msgstr "No xray_key.txt file found in storage root or settings directory."
@@ -732,7 +761,6 @@ msgstr "Image Search"
 msgid "menu_images"
 msgstr "Images & Maps"
 
-
 msgid "menu_import_file"
 msgstr "Import Keys from xray_key.txt"
 
@@ -931,9 +959,6 @@ msgstr "No exact match for '%s'. Tap a related entry, or fetch it:"
 msgid "paste_clipboard_confirm"
 msgstr "Use the API key found in clipboard for %s?"
 
-msgid "path"
-msgstr "plugins/xray.koplugin"
-
 msgid "pending_duplicates_prompt"
 msgstr "AI found %d possible duplicate location(s) from the last fetch. Review now?"
 
@@ -1049,7 +1074,7 @@ msgid "stop"
 msgstr "Stop"
 
 msgid "term_not_found"
-msgstr "Term not found."
+msgstr "No term found matching '%s'"
 
 msgid "testing_api_keys"
 msgstr "Testing API key connections..."
@@ -1295,10 +1320,7 @@ msgid "updater_whats_new"
 msgstr "What's new:"
 
 msgid "updating_ai"
-msgstr "Updating X-Ray Data..."
-
-msgid "val"
-msgstr "???"
+msgstr "Updating X-Ray..."
 
 msgid "validate_keys_title"
 msgstr "API Key Status & Validation"
