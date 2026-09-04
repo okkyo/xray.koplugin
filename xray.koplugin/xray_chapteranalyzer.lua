@@ -964,19 +964,25 @@ local function extractSentenceSnippet(text, match_pos, max_len)
     max_len = max_len or 300
     if not text or not match_pos then return "" end
 
-    -- Use pattern matching to find boundaries, which is much faster than byte loops in Lua
-    local before = text:sub(1, match_pos - 1)
-    local sent_start = 1
-    -- Find the last sentence-ending character before the match
-    local b_start, b_end = before:find("[.!?\n][^.!?\n]*$")
+    -- Scan only a bounded window around the match instead of copying the whole
+    -- prefix and suffix. The snippet is capped at max_len, so a sentence boundary
+    -- farther than that is trimmed away regardless. Copying text:sub(1, match_pos)
+    -- for every match made a heavily-mentioned entity O(chapter_chars * mentions),
+    -- which froze the scan on long books and slow e-ink devices.
+    local before_start = math.max(1, match_pos - max_len)
+    local before = text:sub(before_start, match_pos - 1)
+    local sent_start = before_start
+    -- Find the last sentence-ending character before the match (within the window)
+    local b_start = before:find("[.!?\n][^.!?\n]*$")
     if b_start then
-        sent_start = b_start + 1
+        sent_start = before_start + b_start
     end
 
-    local after = text:sub(match_pos)
-    local sent_end = #text
-    -- Find the first sentence-ending character after the match
-    local a_start, a_end = after:find("[.!?\n]")
+    local after_end = math.min(#text, match_pos + max_len)
+    local after = text:sub(match_pos, after_end)
+    local sent_end = after_end
+    -- Find the first sentence-ending character after the match (within the window)
+    local a_start = after:find("[.!?\n]")
     if a_start then
         sent_end = match_pos + a_start - 1
     end
@@ -986,6 +992,19 @@ local function extractSentenceSnippet(text, match_pos, max_len)
         local half = math.floor(max_len / 2)
         sent_start = math.max(sent_start, match_pos - half)
         sent_end = math.min(sent_end, match_pos + half)
+    end
+
+    -- The window/trim fallbacks pick a byte offset, which can land in the middle
+    -- of a multibyte UTF-8 character. Advance past any continuation byte
+    -- (0x80-0xBF) so the snippet starts on a character boundary and does not
+    -- render a broken leading glyph.
+    while sent_start < match_pos do
+        local b = text:byte(sent_start)
+        if b and b >= 0x80 and b < 0xC0 then
+            sent_start = sent_start + 1
+        else
+            break
+        end
     end
 
     return text:sub(sent_start, sent_end):gsub("^%s+", ""):gsub("%s+$", "")
