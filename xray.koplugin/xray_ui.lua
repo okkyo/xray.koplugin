@@ -390,6 +390,33 @@ function XRayBottomPopup:_rebuild()
         })
     end
 
+    -- D. Image button. The compact in-text popup has no thumbnail, so give it a
+    -- button that opens the full detail card (the same window as X-Ray >
+    -- Characters), where the image thumbnail and Search Images button live. The
+    -- button always opens the full card, so keep one consistent label. Only for
+    -- the four entity types that support images, never for conversions or timeline
+    -- events. Act on the ORIGINAL list entity so the card and any image change land
+    -- on the real object. It joins raw_button_defs so d-pad (non-touch) focus and
+    -- select reach it like the other buttons.
+    local IMG_TYPES = {
+        character = "showCharacterDetails",
+        location = "showLocationDetails",
+        term = "showTermDetails",
+        historical_figure = "showHistoricalFigureDetails",
+    }
+    local detail_method = self.entity_type and IMG_TYPES[self.entity_type]
+    if plugin and detail_method and plugin[detail_method]
+        and not e.is_conversion and not e.is_timeline then
+        local img_entity = self.source_entity or e
+        table.insert(raw_button_defs, {
+            label = get_loc_t("img_more", "More"),
+            cb = function()
+                UIManager:close(self)
+                plugin[detail_method](plugin, img_entity, { force_full_card = true })
+            end,
+        })
+    end
+
     if #raw_button_defs > 0 then
         if self.focused_btn_index > #raw_button_defs then self.focused_btn_index = #raw_button_defs end
         if self.focused_btn_index < 1 then self.focused_btn_index = 1 end
@@ -403,32 +430,6 @@ function XRayBottomPopup:_rebuild()
         local is_focused = (idx == self.focused_btn_index)
         local btn = make_btn(bdef.label, bdef.cb, is_focused)
         table.insert(active_btns, btn)
-    end
-
-    -- D. Image button. The compact in-text popup has no thumbnail, so give it a
-    -- button that opens the full detail card (the same window as X-Ray >
-    -- Characters), where the image thumbnail and Search Images button live. The
-    -- label reflects the image state so the reader knows what the card offers.
-    -- Only for the four entity types that support images, never for conversions
-    -- or timeline events. Act on the ORIGINAL list entity so the card and any
-    -- image change land on the real object.
-    local IMG_TYPES = {
-        character = "showCharacterDetails",
-        location = "showLocationDetails",
-        term = "showTermDetails",
-        historical_figure = "showHistoricalFigureDetails",
-    }
-    local detail_method = self.entity_type and IMG_TYPES[self.entity_type]
-    if plugin and detail_method and plugin[detail_method]
-        and not e.is_conversion and not e.is_timeline then
-        local img_entity = self.source_entity or e
-        -- The button always opens the full card (which itself shows the image or a
-        -- Search Images button), so keep one consistent label regardless of state.
-        local img_btn = make_btn(get_loc_t("img_more", "More"), function()
-            UIManager:close(self)
-            plugin[detail_method](plugin, img_entity, { force_full_card = true })
-        end)
-        table.insert(active_btns, img_btn)
     end
 
     -- The Fetch More button was removed: opening a card now auto-enriches a
